@@ -26,6 +26,8 @@ class Nexus(object):
         self.tweak = Tweak(file)
 
     def createNexus(self):
+        self._startStore(100000) #TODO
+    
         self.limbo = store.Limbo()
         self.loadTweak()
     
@@ -39,7 +41,30 @@ class Nexus(object):
         self.Acquirer = Acquirer(self.acqName)
 
     def destroyNexus(self):
-        self.limbo.closeStore()
+        self._closeStore()
+
+    def _closeStore(self):
+        try:
+            self.p.kill()
+            logger.info('Store closed successfully')
+        except Exception as e:
+            logger.exception('Cannot close store {0}'.format(e))
+
+    def _startStore(self, size):
+        '''
+        '''
+        
+        if size is None:
+            raise RuntimeEror('Server size needs to be specified')
+        try:
+            self.p = subprocess.Popen(['plasma_store',
+                              '-s', '/tmp/store',
+                              '-m', str(size)],
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL)
+            logger.info('Store started successfully')
+        except Exception as e:
+            logger.exception('Store cannot be started: {0}'.format(e))
 
 
 if __name__ == '__main__':
