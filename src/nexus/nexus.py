@@ -19,11 +19,14 @@ class Nexus(object):
     def __init__(self, name):
         self.name = name
 
+
     def __str__(self):
         return self.name
+    
 
     def loadTweak(self, file=None):
         self.tweak = Tweak(file)
+
 
     def createNexus(self):
         self._startStore(100000) #TODO
@@ -40,8 +43,10 @@ class Nexus(object):
         self.acqName = Tweak.acqName
         self.Acquirer = Acquirer(self.acqName)
 
+
     def destroyNexus(self):
         self._closeStore()
+    
 
     def _closeStore(self):
         try:
@@ -50,8 +55,11 @@ class Nexus(object):
         except Exception as e:
             logger.exception('Cannot close store {0}'.format(e))
 
+
     def _startStore(self, size):
-        '''
+        ''' Start a subprocess that runs the plasma store
+            Raises a RuntimeError exception size is undefined
+            Raises an Exception if the plasma store doesn't start
         '''
         
         if size is None:
@@ -70,6 +78,7 @@ class Nexus(object):
 if __name__ == '__main__':
     testNexus = Nexus('test')
     testNexus.createNexus()
+    
     testNexus.destroyNexus()
     
     

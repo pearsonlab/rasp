@@ -43,7 +43,7 @@ class Limbo(StoreInterface):
             logger.info('Successfully connected to store')
         except Exception as e:
             #client = None
-            logger.exception('Cannot connect to store {0}'.format(e))
+            logger.exception('Cannot connect to store: {0}'.format(e))
             raise Exception
         return client
 
@@ -79,6 +79,13 @@ class Limbo(StoreInterface):
             return self._get(object_name)
 
 
+    def get_all(self):
+        ''' Get a listing of all objects in the store
+        '''
+        print(self.client.list())
+        return self.client.list()
+
+
     def _get(self, object_name):
         ''' Get an object from the store using its name
             Assumes we know the id for the object_name
@@ -90,6 +97,26 @@ class Limbo(StoreInterface):
             raise ObjectNotFoundError
         else:
             return res
+
+
+class HardDisk(StoreInterface):
+    ''' Implementation of the data store on disk
+        instead of in memory. Uses h5 format primarily
+    '''
+
+    def __init__(self, folder_loc):
+        ''' Construct the hard disk data store
+            folder_loc is the location to store data
+        '''
+        # will likely need multiple formats supported
+        pass
+
+    def get(self):
+        pass
+
+    def put(self):
+        pass
+
 
 
 class ObjectNotFoundError(Exception):

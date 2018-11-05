@@ -21,3 +21,9 @@ class Tweak(object):
     def addVisual(self, newVisual):
          # newVisual is a visual object, has a name
          self.visName.update({newVisual.name: newVisual})
+
+
+    def addParams(self, type, param)
+        ''' Function to add paramter param of type type
+        '''
+

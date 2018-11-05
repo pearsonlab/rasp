@@ -1,5 +1,5 @@
 import time
-from nexus.store import Limbo
+from src.nexus.store import Limbo
 from caiman.online_cnmf import OnACID
 from caiman.params import CNMFParams
 import caiman as cm
@@ -70,7 +70,7 @@ class CaimanProcessor(Processor):
             # still more to process
             init_batch = [self.params.init_batch]+[0]*(len(self.frames)-1)
             frame_number = 1
-            for file_count, ffll in enumerate(self.frames)
+            for file_count, ffll in enumerate(self.frames):
                 Y = cm.load(ffll, subindices=slice(init_batch, None, None))
                 # TODO replace load
                 for frame_count, frame in enumerate(Y):
@@ -116,7 +116,7 @@ class CaimanProcessor(Processor):
             except Exception as e:
                 logger.error('Unknown exception {0}'.format(e))
             
-            if self.onAc.params.get('motion', 'pw_rigid')
+            if self.onAc.params.get('motion', 'pw_rigid'):
                 frame_cor1, shift = motion_correct_iteration_fast(
                             frame, templ, max_shifts_online, max_shifts_online)
                 frame_cor, shift = tile_and_correct(frame, templ, onAc.params.motion['strides'], onAc.params.motion['overlaps'], onAc.params.motion['max_shifts'], newoverlaps=None, newstrides=None, upsample_factor_grid=4, upsample_factor_fft=10, show_movie=False, max_deviation_rigid=onAc.params.motion['max_deviation_rigid'],add_to_movie=0, shifts_opencv=True, gSig_filt=None, use_cuda=False, border_nan='copy')[:2]
