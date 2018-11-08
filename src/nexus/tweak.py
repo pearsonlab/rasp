@@ -2,7 +2,7 @@ import time
 
 import logging; logger = logging.getLogger(__name__)
 
-class Tweak(object):
+class Tweak():
 ''' Handles configuration and logging of configs for
     the entire server/processing pipeline.
 '''

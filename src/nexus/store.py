@@ -9,7 +9,7 @@ from multiprocessing import Pool
 import logging; logger=logging.getLogger(__name__)
 
 
-class StoreInterface(object):
+class StoreInterface():
     '''General interface for a store
     '''
     def get(self):
@@ -49,14 +49,45 @@ class Limbo(StoreInterface):
 
 
     def put(self, object, object_name):
-        ''' Put object referenced by its string name into the store
+        ''' Put a single object referenced by its string name 
+            into the store
             Unknown errors 
         '''
         
         id = self.client.put(object)
         self.stored.update({object_name:id})
         logger.info('object ', object_name, 'successfully stored')
-        return id
+        return id  #needed?
+    
+    
+#    def putArray(self, data, size=1000):
+#        ''' General put for numpy array objects into the store
+#            TODO: use pandas
+#            Unknown errors
+#        '''
+#    
+#        arr = arrow.array(data)
+#        id = plasma.ObjectID(np.random.bytes(20))
+#        buf = memoryview(self.client.create(id, size))
+
+    
+    
+    def putBuffer(self, data, data_name):
+        ''' Try to serialize the data to store as buffer
+            TODO: convert unknown data types to dicts for serializing
+                using SerializationContext
+            TODO: consider to_components for large np arrays
+            Unknown errors
+            
+            doc: arrow.apache.org/docs/python/ipc.html Arbitrary Object Serialization
+        '''
+    
+        try:
+            buf = arrow.serialize(data).to_buffer()
+        except Exception as e:
+            raise Exception
+
+        return self.put(buf, data_name)
 
 
     def updateStored(self, object_name, object_id):
@@ -67,9 +98,10 @@ class Limbo(StoreInterface):
     
     
     def get(self, object_name):
-        ''' Get an object from the store
+        ''' Get a single object from the store
             Checks to see if it knows the object first
             Otherwise throw CannotGetObject to request dict update
+            TODO: update for lists of objects
         '''
         
         if self.stored.get(object_name) is None:

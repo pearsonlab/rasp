@@ -11,7 +11,7 @@ from ..acquire import Acquirer
 
 import logging; logger = logging.getLogger(__name__)
 
-class Nexus(object):
+class Nexus():
 ''' Main server class for handling objects in RASP
 
 '''

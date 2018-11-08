@@ -1,12 +1,13 @@
 import time
 from src.nexus.store import Limbo
-from caiman.online_cnmf import OnACID
-from caiman.params import CNMFParams
+from caiman.source_extraction import cnmf
+from caiman.source_extraction.cnmf.online_cnmf import OnACID
+from caiman.source_extraction.cnmf.params import CNMFParams
 import caiman as cm
 import logging; logger = logging.getLogger(__name__)
 
 
-class Processor(object):
+class Processor():
     '''Abstract class for the processor component
        Needs to take an image from data store (DS)
        Needs to output spikes estimates over time
@@ -32,27 +33,67 @@ class CaimanProcessor(Processor):
        interface with our pipeline.
     '''
 
-    def __init__(self, name):
+    def __init__(self, name, client):
         self.name = name
+        self.client = client
 
     def __str__(self):
         return self.name
+    
+    def loadParams(self, param_file=None):
+        ''' Load parameters from file or 'defaults' into store
+            TODO: accept user input from GUI
+            This also effectively registers specific params
+            that CaimanProcessor needs with Nexus
+        '''
+        if param_file is not None:
+            try:
+                params_dict = _load_params_from_file(param_file)
+            except Exception as e:
+                logger.exception('File cannot be loaded. {0}'.format(e))
+        else:
+            # defaults from demo scripts; CNMFParams does not set
+            # each parameter needed by default (TODO change that?)
+            params_dict = {'fnames': '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5',
+                   'fr': 15,
+                   'decay_time': 0.5,
+                   'gSig': (3,3),
+                   'p': 1,
+                   'min_SNR': 1,
+                   'rval_thr': 0.9,
+                   'ds_factor': 1,
+                   'nb': 2,
+                   'motion_correct': True,
+                   'init_batch': 200,
+                   'init_method': 'bare',
+                   'normalize': True,
+                   'sniper_mode': True,
+                   'K': 2,
+                   'epochs': 1,
+                   'max_shifts_online': np.ceil(10).astype('int'),
+                   'pw_rigid': False,
+                   'dist_shape_update': True,
+                   'min_num_trial': 10,
+                   'show_movie': False}
+        self.client.put(params_dict, 'params_dict')
+    
 
-    def setupProcess(self, limboClient, params):
+    def setupProcess(self, params):
         ''' Create OnACID object and initialize it
             limboClient is a client to the data store server
             params is an object_name to return a dict
             Future option: put configParams in store and load here
         '''
 
-        self.client = limboClient
+        # TODO self.loadParams(param_file)
         self.params = self.client.get(params)
+        
         # MUST include inital set of frames
         # Institute check here as requirement to Nexus
         
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)
-        self.onAC.initialize_online()
+        self.onAc.initialize_online()
 
 
     def runProcess(self, frames, output):
@@ -65,6 +106,7 @@ class CaimanProcessor(Processor):
             place the Estimates results, with ref number that
             corresponds to the frame number
         '''
+        
         self.frames = self.checkFrames(frames)
         if self.frames is not None:
             # still more to process
