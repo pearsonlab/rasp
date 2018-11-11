@@ -1,8 +1,11 @@
 import time
-from src.nexus.store import Limbo
+import numpy as np
+import scipy.sparse
+from nexus.store import Limbo
 from caiman.source_extraction import cnmf
 from caiman.source_extraction.cnmf.online_cnmf import OnACID
 from caiman.source_extraction.cnmf.params import CNMFParams
+from caiman.motion_correction import motion_correct_iteration_fast
 import caiman as cm
 import logging; logger = logging.getLogger(__name__)
 
@@ -54,7 +57,7 @@ class CaimanProcessor(Processor):
         else:
             # defaults from demo scripts; CNMFParams does not set
             # each parameter needed by default (TODO change that?)
-            params_dict = {'fnames': '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5',
+            params_dict = {'fnames': ['/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5', '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -76,6 +79,7 @@ class CaimanProcessor(Processor):
                    'min_num_trial': 10,
                    'show_movie': False}
         self.client.put(params_dict, 'params_dict')
+        print('put dict into limbo')
     
 
     def setupProcess(self, params):
@@ -86,7 +90,9 @@ class CaimanProcessor(Processor):
         '''
 
         # TODO self.loadParams(param_file)
+        self.loadParams()
         self.params = self.client.get(params)
+        print('Using parameters:', self.params)
         
         # MUST include inital set of frames
         # Institute check here as requirement to Nexus
@@ -94,9 +100,10 @@ class CaimanProcessor(Processor):
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)
         self.onAc.initialize_online()
+        self.max_shifts_online = self.onAc.params.get('online', 'max_shifts_online')
 
 
-    def runProcess(self, frames, output):
+    def runProcess(self, fnames, output):
         ''' Run process. Persists running while it has data
             NOT IMPLEMENTED. Runs once atm. Add new function
             to run continually.
@@ -107,23 +114,27 @@ class CaimanProcessor(Processor):
             corresponds to the frame number
         '''
         
-        self.frames = self.checkFrames(frames)
-        if self.frames is not None:
+        self.fnames = self._checkFrames(fnames)
+        print('fnames is ', self.fnames)
+        if self.fnames is not None:
             # still more to process
-            init_batch = [self.params.init_batch]+[0]*(len(self.frames)-1)
-            frame_number = 1
-            for file_count, ffll in enumerate(self.frames):
-                Y = cm.load(ffll, subindices=slice(init_batch, None, None))
+            init_batch = [self.params['init_batch']]+[0]*(len(self.fnames)-1)
+            print('init batch is ', init_batch)
+            frame_number = init_batch[0]
+            for file_count, ffll in enumerate(self.fnames):
+                print('Loading file:', ffll, ' init batch ', init_batch[file_count])
+                Y = cm.load(ffll, subindices=slice(init_batch[file_count], None, None))
                 # TODO replace load
                 for frame_count, frame in enumerate(Y):
-                    frame = self._processFrame(frame)
+                    frame = self._processFrame(frame, frame_number)
                     self._fitFrame(frame_number, frame.reshape(-1, order='F'))
-                    self.putAnalysis(ouput) # currently every frame. User-specified?
+                    self.putAnalysis(output) # currently every frame. User-specified?
+                    frame_number += 1
                 if self.onAc.params.get('online', 'normalize'):
                     # normalize final estimates for this file. Useful?
                     self._normAnalysis()
                     self.putAnalysis(output)
-                frame_number += 1
+            self._finalAnalysis() #and put somewhere
 
 
     def putAnalysis(self, output):
@@ -137,7 +148,29 @@ class CaimanProcessor(Processor):
         self.client.put(output, currEstimates)
 
 
-    def _processFrame(self, frame):
+    def _finalAnalysis(self):
+        ''' Some kind of final steps for estimates
+            TODO: get params from elsewhere in case changed?!
+        '''
+        self.onAc.estimates.A, self.onAc.estimates.b = self.onAc.estimates.Ab[
+            :, self.onAc.params.get('init', 'nb'):], self.onAc.estimates.Ab[:, :self.onAc.params.get('init', 'nb')].toarray()
+        self.onAc.estimates.C, self.onAc.estimates.f = self.onAc.estimates.C_on[
+            self.onAc.params.get('init', 'nb'):self.onAc.M, len(Y) - len(Y) //
+                         epochs:len(Y)], self.onAc.estimates.C_on[:onAc.params.get('init', 'nb'), len(Y) - len(Y) // epochs:len(Y)]
+        noisyC = onAc.estimates.noisyC[onAc.params.get('init', 'nb'):onAc.M, len(Y) - len(Y) // epochs:len(Y)]
+        onAc.estimates.YrA = noisyC - onAc.estimates.C
+        onAc.estimates.bl = [osi.b for osi in onAc.estimates.OASISinstances] if hasattr(onAc, 'OASISinstances') else [0] * onAc.estimates.C.shape[0]
+
+
+
+
+    def _checkFrames(self, fnames):
+        ''' Check to see if we have frames for processing
+        '''
+        return fnames
+
+
+    def _processFrame(self, frame, frame_number):
         ''' Do some basic processing on a single frame
             Raises NaNFrameException if a frame contains NaN
             Returns the normalized/etc modified frame
@@ -153,18 +186,19 @@ class CaimanProcessor(Processor):
         if self.onAc.params.get('online', 'motion_correct'):
             try:
                 templ = self.onAc.estimates.Ab.dot(
-                self.onAc.estimates.C_on[:self.onAc.M, ind-1]).reshape(
+                self.onAc.estimates.C_on[:self.onAc.M, frame_number-1]).reshape(
                 self.onAc.params.get('data', 'dims'), order='F')*self.onAc.img_norm
             except Exception as e:
                 logger.error('Unknown exception {0}'.format(e))
+                raise Exception
             
             if self.onAc.params.get('motion', 'pw_rigid'):
                 frame_cor1, shift = motion_correct_iteration_fast(
-                            frame, templ, max_shifts_online, max_shifts_online)
+                            frame, templ, self.max_shifts_online, self.max_shifts_online)
                 frame_cor, shift = tile_and_correct(frame, templ, onAc.params.motion['strides'], onAc.params.motion['overlaps'], onAc.params.motion['max_shifts'], newoverlaps=None, newstrides=None, upsample_factor_grid=4, upsample_factor_fft=10, show_movie=False, max_deviation_rigid=onAc.params.motion['max_deviation_rigid'],add_to_movie=0, shifts_opencv=True, gSig_filt=None, use_cuda=False, border_nan='copy')[:2]
             else:
-                frame_cor, shift = motion_correct_iteration_fast(frame, templ, max_shifts_online, max_shifts_online)
-            onAc.estimates.shifts.append(shift)
+                frame_cor, shift = motion_correct_iteration_fast(frame, templ, self.max_shifts_online, self.max_shifts_online)
+            self.onAc.estimates.shifts.append(shift)
         else:
             #templ = None
             frame_cor = frame
@@ -179,7 +213,16 @@ class CaimanProcessor(Processor):
         ''' Do the heavy lifting here. CNMF, etc
             Updates self.onAc.estimates
         '''
-        self.onAc.fit_next(frame_number, frame)
+        try:
+            self.onAc.fit_next(frame_number, frame)
+        except Exception as e:
+            print('error likely due to frame number ', frame_number)
+            raise Exception
+
+
+    def _normAnalysis(self):
+        self.onAc.estimates.Ab /= 1./self.onAc.img_norm.reshape(-1, order='F')[:,np.newaxis]
+        self.onAc.estimates.Ab = scipy.sparse.csc_matrix(self.onAc.estimates.Ab)
 
 
 class NaNFrameException(Exception):

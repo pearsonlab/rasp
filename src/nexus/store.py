@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import pickle
 import pyarrow as arrow
 import pyarrow.plasma as plasma
 from pyarrow.plasma import ObjectNotAvailable
@@ -27,7 +28,8 @@ class Limbo(StoreInterface):
           shortname, value is object_id
     '''
 
-    def __init__(self, store_loc='/tmp/store'):
+    def __init__(self, name='default', store_loc='/tmp/store'):
+        self.name = name
         self.client = self.connectStore(store_loc)
         self.stored = {}
     
@@ -106,6 +108,7 @@ class Limbo(StoreInterface):
         
         if self.stored.get(object_name) is None:
             logger.error('Never recorded storing this object: ', object_name)
+            # Don't know anything about this object, treat as problematic
             raise CannotGetObjectError
         else:
             return self._get(object_name)
@@ -123,12 +126,62 @@ class Limbo(StoreInterface):
             Assumes we know the id for the object_name
             Raises ObjectNotFound if object_id returns no object from the store
         '''
-        res = self.client.get(self.stored.get(object_name))
+        res = self.client.get(self.stored.get(object_name), 0)
+        # Can also use contains() to check
         if isinstance(res, ObjectNotAvailable):
             logger.warn('Object ',object_name,' cannot be found.')
             raise ObjectNotFoundError
         else:
             return res
+
+
+    def delete(self, object_name):
+        ''' Deletes an object from the store based on name
+            assumes we have id from name
+            This prevents us from deleting other portions of 
+            the store that we don't have access to
+        '''
+
+        if self.stored.get(object_name) is None:
+            logger.error('Never recorded storing this object: ', object_name)
+            # Don't know anything about this object, treat as problematic
+            raise CannotGetObjectError
+        else:
+            self._delete(object_name)
+            
+    
+    def _delete(self, object_name):
+        ''' Deletes object from store
+        '''
+        self.client.delete([self.stored.get(object_name)])
+        #redo with object_id as argument
+
+
+    def saveStore(self, fileName='/home/store_dump'):
+        ''' Save the entire store to disk
+            Uses pickle, should extend to mmap, hd5f, ...
+        '''
+
+
+    def saveTweak(self, tweak_ids, fileName='/home/tweak_dump'):
+        ''' Save current Tweak object containing parameters
+            to run the experiment.
+            Tweak is pickleable
+            TODO: move this to Nexus' domain?
+        '''
+        #tweakids list of Tweak items stored. Tweak is list of results
+        tweak = self.client.get(tweak_ids)
+        #for object ID in list of items in tweak, get from store
+        #and put into dict (?)
+        with open(fileName, 'wb') as output:
+            pickle.dump(tweak, output, -1)
+
+
+    def saveSubstore(self, keys, fileName='/home/substore_dump'):
+        ''' Save portion of store based on keys
+            to disk
+        '''
+
 
 
 class HardDisk(StoreInterface):
@@ -156,14 +209,5 @@ class ObjectNotFoundError(Exception):
 
 class CannotGetObjectError(Exception):
     pass
-
-
-if __name__ == '__main__':
-# assumes store server is started
-    limbo = Limbo('/tmp/store')
-    limbo.put('hi', 'hi_name')
-    print(limbo.get('hi_name'))
-    #limbo.closeStore()
-
 
 

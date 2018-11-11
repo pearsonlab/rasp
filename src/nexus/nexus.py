@@ -1,20 +1,23 @@
+import sys
+sys.path.append('../')
 import time
 import subprocess
 from multiprocessing import Pool
 import numpy as np
 import pyarrow as arrow
 import pyarrow.plasma as plasma
-import .store
-from ..visual import Visual
-from ..process import Processor
-from ..acquire import Acquirer
+from nexus import store
+from nexus.tweak import Tweak
+from visual import Visual
+from process.process import Processor
+from acquire.acquire import Acquirer
 
 import logging; logger = logging.getLogger(__name__)
 
 class Nexus():
-''' Main server class for handling objects in RASP
-
-'''
+    ''' Main server class for handling objects in RASP
+    
+    '''
 
     def __init__(self, name):
         self.name = name
@@ -25,23 +28,31 @@ class Nexus():
     
 
     def loadTweak(self, file=None):
-        self.tweak = Tweak(file)
+        #TODO load from file or user input?
+        return Tweak(file)
 
 
     def createNexus(self):
         self._startStore(100000) #TODO
     
         self.limbo = store.Limbo()
-        self.loadTweak()
+        
+        # Create connections to the store based on module name
+        # Instatiate modules and give them Limbo client connections
+        self.tweakLimbo = store.Limbo('tweak')
+        self.tweak = self.loadTweak(self.tweakLimbo)
     
-        self.visName = Tweak.visName
-        self.Visual = Visual(self.visName)
+        self.visName = seal.tweak.visName
+        self.visLimbo = store.Limbo(self.visName)
+        self.Visual = Visual(self.visName, self.visLimbo)
 
-        self.procName = Tweak.procName
-        self.Processor = Processor(self.procName)
+        self.procName = self.tweak.procName
+        self.procLimbo = store.Limbo(self.procName)
+        self.Processor = Processor(self.procName, self.procLimbo)
 
-        self.acqName = Tweak.acqName
-        self.Acquirer = Acquirer(self.acqName)
+        self.acqName = self.tweak.acqName
+        self.acqLimbo = store.Limbo(self.acqName)
+        self.Acquirer = Acquirer(self.acqName, self.acqLimbo)
 
 
     def destroyNexus(self):
