@@ -1,3 +1,6 @@
 [submodule "CaImAn"]
 	path = CaImAn
 	url = https://github.com/flatironinstitute/CaImAn
+[submodule "arrow"]
+	path = arrow
+	url = https://github.com/apache/arrow

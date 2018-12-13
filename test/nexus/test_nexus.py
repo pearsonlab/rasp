@@ -26,8 +26,8 @@ class Nexus_Setup(TestCase):
 
     def test_consecProc(self):
         self.nexus.setupProcessor()
-        self.nexus.runProcessor()
-        self.nexus.runProcessor()
+        for _ in range(6):
+            self.nexus.runProcessor()
         self.assertTrue(1)
 
     def tearDown(self):
