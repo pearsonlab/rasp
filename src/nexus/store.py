@@ -35,10 +35,15 @@ class Limbo(StoreInterface):
 
     def __init__(self, name='default', store_loc='/tmp/store'):
         self.name = name
+        self.store_loc = store_loc
         self.client = self.connectStore(store_loc)
         self.stored = {}
     
-    
+    def reset(self):
+        ''' Reset client connection
+        '''
+        self.client = self.connectStore(self.store_loc)
+
     def connectStore(self, store_loc):
         ''' Connect to the store at store_loc
             Raises exception if can't connect

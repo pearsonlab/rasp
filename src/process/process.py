@@ -44,6 +44,9 @@ class CaimanProcessor(Processor):
 
     def __str__(self):
         return self.name
+
+    def setStore(self, client):
+        self.client = client
     
     def loadParams(self, param_file=None):
         ''' Load parameters from file or 'defaults' into store
@@ -60,7 +63,9 @@ class CaimanProcessor(Processor):
             # defaults from demo scripts; CNMFParams does not set
             # each parameter needed by default (TODO change that?)
             # TODO add parameter validation inside Tweak perhaps
-            params_dict = {'fnames': ['/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5', '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': ['/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5', 
+                                '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_2.hdf5',
+                                '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_3.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -176,7 +181,7 @@ class CaimanProcessor(Processor):
         dF = estimates.detrend_df_f(frames_window=100).F_dff
         #currEstimates = pickle.dumps(self.onAc.estimates.__dict__)
             # TODO replace above with translator to panda DF?
-        print('replacing analysis, frame is ', self.frame_number)
+        #print('replacing analysis, frame is ', self.frame_number)
         self.client.replace(dF, output)
 
 

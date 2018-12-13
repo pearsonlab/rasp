@@ -62,6 +62,7 @@ class Nexus():
 
     def runProcessor(self):
         #proc_params = self.limbo.get('params_from_Processor')
+        self.Processor.client.reset()
         self.Processor.runProcess()
         logger.error('Done running process')
         #self.subproc = Process(target=self.Processor.runProcess)
