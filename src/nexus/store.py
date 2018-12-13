@@ -1,7 +1,9 @@
 import time
+import sys
 import numpy as np
 import pickle
 import pyarrow as arrow
+from pyarrow import PlasmaObjectExists
 import pyarrow.plasma as plasma
 from pyarrow.plasma import ObjectNotAvailable
 import subprocess
@@ -17,6 +19,9 @@ class StoreInterface():
         raise NotImplementedError
 
     def put(self):
+        raise NotImplementedError
+
+    def subscribe(self):
         raise NotImplementedError
 
 
@@ -38,30 +43,86 @@ class Limbo(StoreInterface):
         ''' Connect to the store at store_loc
             Raises exception if can't connect
             Returns the plamaclient if successful
+            Updates the client internal
         '''
         
         try:
-            client = plasma.connect(store_loc, '', 0)
+            self.client = plasma.connect(store_loc, '', 0)
             logger.info('Successfully connected to store')
         except Exception as e:
             #client = None
             logger.exception('Cannot connect to store: {0}'.format(e))
             raise Exception
-        return client
+        return self.client
+
+
+    def subscribe(self):
+        ''' Subscribe to a section? of the ds for singals
+            Throws unknown errors
+        '''
+
+        try: 
+            self.client.subscribe()
+        except Exception as e:
+            logger.error('Unknown error: {}'.format(e))
+            raise Exception
 
 
     def put(self, object, object_name):
         ''' Put a single object referenced by its string name 
             into the store
-            Unknown errors 
+            Raises PlasmaObjectExists if we are overwriting
+            Unknown error
         '''
+        object_id = None
+        try:
+            object_id = self.client.put(object)
+            #print('we did a plasma put in put ', object_id)
+                #self.stored.update({object_name:object_id})
+            self.updateStored(object_name, object_id)
+            logger.error('object successfully stored: '+object_name)
+            #print(object_id)
+        except PlasmaObjectExists:
+            logger.error('Object already exists. Meant to call replace?')
+            print(self.client.list())
+            print(self.stored.keys())
+            raise PlasmaObjectExists
+        except Exception as e:
+            logger.error('could not store object: {0}'.format(e))
+            print('size ', sys.getsizeof(object))
+        return object_id
+    
+    
+    def replace(self, object, object_name):
+        ''' Explicitly replace an object with new data
+            TODO: Combine with put. Default behavior:
+                Accept overwrite, but dump old data to disk and log.
+            Throws AssertionError if replace fails
+        '''
+
+        # Check/confirm we need to replace
+        if object_name in self.stored:
+            logger.info('replacing '+object_name)
+            self.saveSubstore(object_name)
+            old_id = self.stored[object_name]
+            self.delete(object_name)
+            #print('before newconn')
+          #  newconn = plasma.connect('/tmp/store', '', 0)
+            #print('got newconn ', newconn)
+           # object_id = newconn.put(object, old_id)
+            #print('put using newconn; end of replacing')
+           # newconn.disconnect()
+            object_id = self.client.put(object, old_id) #plasma put
+            self.updateStored(object_name, object_id)
+            assert object_id == old_id
+
+        else:
+            logger.error('Not replacing '+object_name)
+            object_id = self.client.put(object) #internal put fcn
+            self.updateStored(object_name, object_id)
         
-        id = self.client.put(object)
-        self.stored.update({object_name:id})
-        logger.info('object ', object_name, 'successfully stored')
-        return id  #needed?
-    
-    
+        return object_id
+
 #    def putArray(self, data, size=1000):
 #        ''' General put for numpy array objects into the store
 #            TODO: use pandas
@@ -72,7 +133,6 @@ class Limbo(StoreInterface):
 #        id = plasma.ObjectID(np.random.bytes(20))
 #        buf = memoryview(self.client.create(id, size))
 
-    
     
     def putBuffer(self, data, data_name):
         ''' Try to serialize the data to store as buffer
@@ -87,16 +147,25 @@ class Limbo(StoreInterface):
         try:
             buf = arrow.serialize(data).to_buffer()
         except Exception as e:
+            logger.error('Error: {}'.format(e))
             raise Exception
 
         return self.put(buf, data_name)
 
 
     def updateStored(self, object_name, object_id):
-        '''Update local dict with info we need locally
+        ''' Update local dict with info we need locally
+            Report to Nexus that we updated the store
+                (did a put or delete/replace)
         '''
     
-        self.stored.update({object_name:id})
+        self.stored.update({object_name:object_id})
+
+
+    def getStored(self):
+        ''' returns its info about what it has stored
+        '''
+        return self.stored
     
     
     def get(self, object_name):
@@ -105,9 +174,11 @@ class Limbo(StoreInterface):
             Otherwise throw CannotGetObject to request dict update
             TODO: update for lists of objects
         '''
-        
+        #print('trying to get ', object_name)
+        #print('stored? ', self.stored.get(object_name))
         if self.stored.get(object_name) is None:
-            logger.error('Never recorded storing this object: ', object_name)
+            logger.error('stored contains: '+self.stored.items())
+            logger.error('Never recorded storing this object: '+object_name)
             # Don't know anything about this object, treat as problematic
             raise CannotGetObjectError
         else:
@@ -126,10 +197,11 @@ class Limbo(StoreInterface):
             Assumes we know the id for the object_name
             Raises ObjectNotFound if object_id returns no object from the store
         '''
+        #print('trying to get object, ', object_name)
         res = self.client.get(self.stored.get(object_name), 0)
         # Can also use contains() to check
         if isinstance(res, ObjectNotAvailable):
-            logger.warn('Object ',object_name,' cannot be found.')
+            logger.warn('Object {} cannot be found.'.format(object_name))
             raise ObjectNotFoundError
         else:
             return res
@@ -143,18 +215,39 @@ class Limbo(StoreInterface):
         '''
 
         if self.stored.get(object_name) is None:
-            logger.error('Never recorded storing this object: ', object_name)
+            logger.error('Never recorded storing this object: '+object_name)
             # Don't know anything about this object, treat as problematic
             raise CannotGetObjectError
         else:
-            self._delete(object_name)
+            #print('trying to delete ', object_name, ' ID ', self.stored.get(object_name))
+            #print(self.client.list())
+            retcode = self._delete(object_name)
+            #print('supposedly deleted. Retcode: ', retcode)
+            #print(self.client.list())
+            self.stored.pop(object_name)
+            #print('stored has ', self.stored.items())
+            #print('DS has ', self.client.list())
             
     
     def _delete(self, object_name):
         ''' Deletes object from store
         '''
-        self.client.delete([self.stored.get(object_name)])
-        #redo with object_id as argument
+        #print('length ', len(self.client.list()))
+        #print('list ', self.client.list())
+        #print('id to delete is : ', self.stored.get(object_name))
+        tmp_id = self.stored.get(object_name)
+        #print('tmp id  is ', tmp_id)
+        #print(self.client.list())
+        #print('before connect to delete')
+        new_client = plasma.connect('/tmp/store', '', 0)
+        new_client.delete([tmp_id])
+        #new_client.disconnect()
+        #print('before check store')
+        #print('store still there? ', plasma.connect('/tmp/store', '', 0))
+        #print('after delete and disconnect')
+        #print(self.client.list())
+        #print('check temp too: ', new_client.list())
+        #redo with object_id as argument?
 
 
     def saveStore(self, fileName='/home/store_dump'):
@@ -181,6 +274,7 @@ class Limbo(StoreInterface):
         ''' Save portion of store based on keys
             to disk
         '''
+        pass
 
 
 

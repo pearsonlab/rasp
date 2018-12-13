@@ -1,11 +1,12 @@
 import time
+from nexus.store import Limbo
 
 import logging; logger = logging.getLogger(__name__)
 
-class Visual(object):
+class Visual():
+    '''Class for displaying data
+    '''
 
-    def __init__(self, type):
-        self.type = type
-
-    def createVisual(self, type):
-        raise NotImplementedError
+    def __init__(self, name, client):
+        self.name = name
+        self.client = client

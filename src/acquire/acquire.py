@@ -2,11 +2,12 @@ import time
 
 import logging; logger = logging.getLogger(__name__)
 
-class Acquirer(object):
+class Acquirer():
     '''Class for acquiring images
     '''
 
-    def __init__(self):
-        pass
+    def __init__(self, name, client):
+        self.name = name
+        self.client = client
 
 

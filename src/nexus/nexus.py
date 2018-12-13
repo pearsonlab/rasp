@@ -1,16 +1,15 @@
 import sys
-sys.path.append('../')
 import time
 import subprocess
-from multiprocessing import Pool
+from multiprocessing import Process
 import numpy as np
 import pyarrow as arrow
 import pyarrow.plasma as plasma
 from nexus import store
 from nexus.tweak import Tweak
-from visual import Visual
-from process.process import Processor
+from process.process import CaimanProcessor
 from acquire.acquire import Acquirer
+from visual.visual import Visual
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -35,31 +34,53 @@ class Nexus():
     def createNexus(self):
         self._startStore(100000) #TODO
     
+        #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
+        self.limbo.subscribe()
         
         # Create connections to the store based on module name
         # Instatiate modules and give them Limbo client connections
         self.tweakLimbo = store.Limbo('tweak')
         self.tweak = self.loadTweak(self.tweakLimbo)
     
-        self.visName = seal.tweak.visName
+        self.visName = self.tweak.visName
         self.visLimbo = store.Limbo(self.visName)
         self.Visual = Visual(self.visName, self.visLimbo)
 
         self.procName = self.tweak.procName
         self.procLimbo = store.Limbo(self.procName)
-        self.Processor = Processor(self.procName, self.procLimbo)
+        self.Processor = CaimanProcessor(self.procName, self.procLimbo)
 
         self.acqName = self.tweak.acqName
         self.acqLimbo = store.Limbo(self.acqName)
         self.Acquirer = Acquirer(self.acqName, self.acqLimbo)
 
 
+    def setupProcessor(self):
+        self.Processor = self.Processor.setupProcess()
+
+
+    def runProcessor(self):
+        #proc_params = self.limbo.get('params_from_Processor')
+        self.Processor.runProcess()
+        logger.error('Done running process')
+        #self.subproc = Process(target=self.Processor.runProcess)
+        #self.subproc.start()
+        #self.subproc.join()
+
+
     def destroyNexus(self):
+        ''' Method that calls the internal method
+            to kill the process running the store (plasma server)
+        '''
         self._closeStore()
     
 
     def _closeStore(self):
+        ''' Internal method to kill the subprocess
+            running the store (plasma sever)
+        '''
+
         try:
             self.p.kill()
             logger.info('Store closed successfully')
@@ -74,7 +95,7 @@ class Nexus():
         '''
         
         if size is None:
-            raise RuntimeEror('Server size needs to be specified')
+            raise RuntimeError('Server size needs to be specified')
         try:
             self.p = subprocess.Popen(['plasma_store',
                               '-s', '/tmp/store',
@@ -84,6 +105,7 @@ class Nexus():
             logger.info('Store started successfully')
         except Exception as e:
             logger.exception('Store cannot be started: {0}'.format(e))
+
 
 
 if __name__ == '__main__':

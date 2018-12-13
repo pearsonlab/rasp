@@ -13,18 +13,16 @@ class Caiman_Setup(StoreDependentTestCase):
         self.proc = cp('caiman', self.limbo)
 
     def test_StartProc(self):
-        #params = self.limbo.put({'fnames': '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5'}, 'params')
-        #cp.setupProcess(self.proc, 'params')
-        cp.setupProcess(self.proc, 'params_dict')
+        #cp.setupProcess(self.proc, 'params_dict')
         self.assertTrue(1)
     
     def test_runProc(self):
-        #params = self.limbo.put({'fnames': '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5'}, 'params')
-        cp.setupProcess(self.proc, 'params_dict')
-        fnames = self.limbo.get('params_dict')['fnames']
-        print('Processing files: ',fnames)
-        output = ''
-        cp.runProcess(self.proc, fnames, output)
+        #cp.setupProcess(self.proc, 'params_dict')
+        #fnames = self.limbo.get('params_dict')['fnames']
+        #print('Test runProc: processing files: ',fnames)
+        #output = 'outputEstimates'
+        #cp.runProcess(self.proc, fnames, output)
+        #self.limbo.get(output)
         self.assertTrue(1)
 
 
