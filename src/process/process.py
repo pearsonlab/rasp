@@ -145,7 +145,7 @@ class CaimanProcessor(Processor):
                 for frame_count, frame in enumerate(Y):
                     frame = self._processFrame(frame, self.frame_number)
                     self._fitFrame(self.frame_number, frame.reshape(-1, order='F'))
-                    if frame_count % 10 == 0: self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
+                    if frame_count % 5 == 0: self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
                     self.frame_number += 1
             if self.onAc.params.get('online', 'normalize'):
                 # normalize final estimates for this set of files. Useful?
