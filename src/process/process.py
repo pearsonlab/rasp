@@ -41,6 +41,7 @@ class CaimanProcessor(Processor):
     def __init__(self, name, client):
         self.name = name
         self.client = client
+        self.ests = None
 
     def __str__(self):
         return self.name
@@ -63,7 +64,7 @@ class CaimanProcessor(Processor):
             # defaults from demo scripts; CNMFParams does not set
             # each parameter needed by default (TODO change that?)
             # TODO add parameter validation inside Tweak perhaps
-            params_dict = {'fnames': ['/home/hawkwings/RASP/rasp/data/Tolias_mesoscope_1.hdf5', '/home/hawkwings/RASP/rasp/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': ['/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5', '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -145,7 +146,7 @@ class CaimanProcessor(Processor):
                 for frame_count, frame in enumerate(Y):
                     frame = self._processFrame(frame, self.frame_number)
                     self._fitFrame(self.frame_number, frame.reshape(-1, order='F'))
-                    if frame_count % 5 == 0: self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
+                    if frame_count % 10 == 0: self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
                     self.frame_number += 1
             if self.onAc.params.get('online', 'normalize'):
                 # normalize final estimates for this set of files. Useful?
@@ -174,11 +175,17 @@ class CaimanProcessor(Processor):
         # Just store dF/F traces for now
         # can also use utils function directly vs
         # calling from Estimates class
-        dF = estimates.detrend_df_f(frames_window=100).F_dff
+        #   dF = estimates.detrend_df_f(frames_window=100).F_dff
         #currEstimates = pickle.dumps(self.onAc.estimates.__dict__)
             # TODO replace above with translator to panda DF?
-        self.client.replace(dF, output)
+        #   self.client.replace(dF, output)
+        self.ests = estimates.C_on
 
+    def getEstimates(self):
+        return self.ests
+    
+    def getTime(self):
+        return self.frame_number
 
     def _finalAnalysis(self, t):
         ''' Some kind of final steps for estimates

@@ -17,12 +17,12 @@ class Caiman_Setup(StoreDependentTestCase):
         self.assertTrue(1)
     
     def test_runProc(self):
-        #cp.setupProcess(self.proc, 'params_dict')
-        #fnames = self.limbo.get('params_dict')['fnames']
-        #print('Test runProc: processing files: ',fnames)
-        #output = 'outputEstimates'
-        #cp.runProcess(self.proc, fnames, output)
-        #self.limbo.get(output)
+        self.proc.setupProcess()
+        fnames = self.limbo.get('params_dict')['fnames']
+        print('Test runProc: processing files: ',fnames)
+        output = 'outputEstimates'
+        self.proc.runProcess()
+        self.limbo.get(output)
         self.assertTrue(1)
 
 

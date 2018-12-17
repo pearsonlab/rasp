@@ -71,9 +71,6 @@ class Store_DeleteThread(StoreDependentTestCase):
     def test_deleteOne(self):
         id = self.limbo.put(1, 'one')
         id2 = self.limbo.put(2, 'two')
-        #self.mp = Process(target=self.limbo.delete, args=('one',))
-        #self.mp.start()
-        #self.mp.join()
         self.limbo.delete('one')
         self.assertEqual(1, len(self.limbo.client.list()))
     

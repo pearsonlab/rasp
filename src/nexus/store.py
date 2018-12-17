@@ -91,7 +91,7 @@ class Limbo(StoreInterface):
             logger.error('Object already exists. Meant to call replace?')
             print(self.client.list())
             print(self.stored.keys())
-            raise PlasmaObjectExists
+            #raise PlasmaObjectExists
         except Exception as e:
             logger.error('could not store object: {0}'.format(e))
             print('size ', sys.getsizeof(object))
@@ -244,10 +244,10 @@ class Limbo(StoreInterface):
         #print('tmp id  is ', tmp_id)
         #print(self.client.list())
         #print('before connect to delete')
-    #    new_client = plasma.connect('/tmp/store', '', 0)
-    #    new_client.delete([tmp_id])
-        self.client.delete([tmp_id])
-        #new_client.disconnect()
+        new_client = plasma.connect('/tmp/store', '', 0)
+        new_client.delete([tmp_id])
+        #self.client.delete([tmp_id])
+        new_client.disconnect()
         #print('before check store')
         #print('store still there? ', plasma.connect('/tmp/store', '', 0))
         #print('after delete and disconnect')

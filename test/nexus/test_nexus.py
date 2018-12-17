@@ -26,7 +26,7 @@ class Nexus_Setup(TestCase):
 
     def test_consecProc(self):
         self.nexus.setupProcessor()
-        for _ in range(6):
+        for _ in range(1):
             self.nexus.runProcessor()
         self.assertTrue(1)
 

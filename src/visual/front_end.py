@@ -70,25 +70,22 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def update(self):
 
-        num = 0
+        Y = None
+
         try:
-            whereEst = self.nexus.Processor.getStored()['params_dict']['ouput']
-            self.ests = self.nexus.limbo.get(whereEst)
-            #print('got it', self.ests)
-            a, b = self.ests.shape
-            num+=1
-            print(num)
+            self.ests = self.nexus.getEstimates()
+            t = self.nexus.getTime()
+            data = self.ests[0][1:t]
+            X=np.arange(t-1)
+            Y=data 
+
         except Exception as e:
             logger.info('output does not yet exist. error: {}'.format(e))
 
-        t1=time.clock()
-        points=100 #number of data points
-        X=np.arange(points)
-        Y=np.sin(np.arange(points)/points*3*np.pi+time.time())
-        C=pyqtgraph.hsvColor(time.time()/5%1,alpha=.5)
-        pen=pyqtgraph.mkPen(color=C,width=10)
-        self.grplot.plot(X,Y,pen=pen,clear=True)
-        
+        if(Y is not None):
+            pen=pyqtgraph.mkPen(width=1)
+            self.grplot.plot(X,Y,pen=pen,clear=True)
+
         if self.checkBox.isChecked():
             QtCore.QTimer.singleShot(1, self.update)
 

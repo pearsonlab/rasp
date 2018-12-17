@@ -50,6 +50,7 @@ class Nexus():
         self.procName = self.tweak.procName
         self.procLimbo = store.Limbo(self.procName)
         self.Processor = CaimanProcessor(self.procName, self.procLimbo)
+        self.ests = None
 
         self.acqName = self.tweak.acqName
         self.acqLimbo = store.Limbo(self.acqName)
@@ -69,6 +70,13 @@ class Nexus():
         #self.subproc.start()
         #self.subproc.join()
 
+    def getEstimates(self):
+        return self.Processor.getEstimates()
+
+    def getTime(self):
+        '''TODO: grabe from input source, not processor
+        '''
+        return self.Processor.getTime()
 
     def destroyNexus(self):
         ''' Method that calls the internal method
