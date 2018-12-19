@@ -24,6 +24,10 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         super(FrontEnd, self).__init__(parent)
         
         self.setupUi(self)
+        self.rawplot.ui.histogram.hide()
+        self.rawplot.ui.roiBtn.hide()
+        self.rawplot.ui.menuBtn.hide()
+        self.checkBox.setChecked(True)
         
         self.nexus = Nexus('NeuralNexus')
         self.nexus.createNexus()
@@ -36,6 +40,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.pushButton_3.clicked.connect(_call(self._runProcess))
         self.pushButton_3.clicked.connect(_call(self.update))
         self.pushButton.clicked.connect(_call(self._loadParams))
+        self.checkBox.stateChanged.connect(self.update)
     
     
     def _loadParams(self):
@@ -70,24 +75,31 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def update(self):
 
+        #plot traces
         Y = None
-
         try:
             self.ests = self.nexus.getEstimates()
-            t = self.nexus.getTime()
-            data = self.ests[0][1:t]
-            X=np.arange(t-1)
-            Y=data 
-
+            (X, Y) = self.nexus.getPlotEst()
         except Exception as e:
             logger.info('output does not yet exist. error: {}'.format(e))
 
         if(Y is not None):
-            pen=pyqtgraph.mkPen(width=1)
-            self.grplot.plot(X,Y,pen=pen,clear=True)
+            pen=pyqtgraph.mkPen(width=2)
+            self.grplot.plot(X, Y,pen=pen,clear=True)
 
+        #plot video
+        image = None
+        try:
+            image = self.nexus.getPlotRaw()
+        except Exception as e:
+            logger.error('Oh no {0}'.format(e))
+
+        if image is not None:
+            self.rawplot.setImage(image)
+
+        #re-update
         if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(1, self.update)
+            QtCore.QTimer.singleShot(5, self.update)
 
 
     def closeEvent(self, event):

@@ -78,6 +78,18 @@ class Nexus():
         '''
         return self.Processor.getTime()
 
+    def getPlotEst(self):
+        '''Get X,Y to plot estimates from visual
+        '''
+        return self.Visual.plotEstimates(self.getEstimates(), self.getTime())
+
+    def getPlotRaw(self):
+        '''Send img to visual to plot
+        '''
+        data = self.Processor.makeImage() #just get denoised frame for now
+        #TODO: get some raw data from Acquirer and some contours from Processor
+        return data
+
     def destroyNexus(self):
         ''' Method that calls the internal method
             to kill the process running the store (plasma server)

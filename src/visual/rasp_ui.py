@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'rasp_ui.ui'
+# Form implementation generated from reading ui file 'src/visual/rasp_ui.ui'
 #
 # Created by: PyQt5 UI code generator 5.6
 #
@@ -15,7 +15,7 @@ class Ui_MainWindow(object):
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalWidget = QtWidgets.QWidget(self.centralwidget)
-        self.horizontalWidget.setGeometry(QtCore.QRect(90, 20, 601, 261))
+        self.horizontalWidget.setGeometry(QtCore.QRect(10, 10, 301, 261))
         self.horizontalWidget.setObjectName("horizontalWidget")
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.horizontalWidget)
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
@@ -25,23 +25,23 @@ class Ui_MainWindow(object):
         self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame.setObjectName("frame")
         self.pushButton = QtWidgets.QPushButton(self.frame)
-        self.pushButton.setGeometry(QtCore.QRect(180, 100, 115, 81))
+        self.pushButton.setGeometry(QtCore.QRect(140, 40, 115, 81))
         self.pushButton.setObjectName("pushButton")
         self.pushButton_2 = QtWidgets.QPushButton(self.frame)
-        self.pushButton_2.setGeometry(QtCore.QRect(40, 100, 115, 81))
+        self.pushButton_2.setGeometry(QtCore.QRect(20, 40, 115, 81))
         self.pushButton_2.setObjectName("pushButton_2")
         self.pushButton_3 = QtWidgets.QPushButton(self.frame)
-        self.pushButton_3.setGeometry(QtCore.QRect(320, 100, 115, 81))
+        self.pushButton_3.setGeometry(QtCore.QRect(20, 130, 115, 81))
         self.pushButton_3.setObjectName("pushButton_3")
         self.label = QtWidgets.QLabel(self.frame)
-        self.label.setGeometry(QtCore.QRect(180, 40, 131, 20))
+        self.label.setGeometry(QtCore.QRect(40, 10, 131, 20))
         self.label.setObjectName("label")
         self.checkBox = QtWidgets.QCheckBox(self.frame)
-        self.checkBox.setGeometry(QtCore.QRect(460, 120, 101, 41))
+        self.checkBox.setGeometry(QtCore.QRect(150, 150, 101, 41))
         self.checkBox.setObjectName("checkBox")
         self.horizontalLayout.addWidget(self.frame)
         self.verticalWidget = QtWidgets.QWidget(self.centralwidget)
-        self.verticalWidget.setGeometry(QtCore.QRect(89, 319, 601, 201))
+        self.verticalWidget.setGeometry(QtCore.QRect(9, 319, 771, 211))
         self.verticalWidget.setObjectName("verticalWidget")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.verticalWidget)
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
@@ -49,6 +49,15 @@ class Ui_MainWindow(object):
         self.grplot = PlotWidget(self.verticalWidget)
         self.grplot.setObjectName("grplot")
         self.verticalLayout.addWidget(self.grplot)
+        self.horizontalWidget1 = QtWidgets.QWidget(self.centralwidget)
+        self.horizontalWidget1.setGeometry(QtCore.QRect(340, 10, 431, 301))
+        self.horizontalWidget1.setObjectName("horizontalWidget1")
+        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.horizontalWidget1)
+        self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.rawplot = ImageView(self.horizontalWidget1)
+        self.rawplot.setObjectName("rawplot")
+        self.horizontalLayout_2.addWidget(self.rawplot)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 22))
@@ -78,7 +87,7 @@ class Ui_MainWindow(object):
 "Update"))
         self.menuRASP_Display.setTitle(_translate("MainWindow", "RASP Display"))
 
-from pyqtgraph import PlotWidget
+from pyqtgraph import ImageView, PlotWidget
 
 if __name__ == "__main__":
     import sys

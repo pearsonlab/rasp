@@ -5,6 +5,7 @@ import numpy as np
 import scipy.sparse
 from nexus.store import Limbo
 from caiman.source_extraction import cnmf
+from caiman.source_extraction.cnmf.utilities import detrend_df_f
 from caiman.source_extraction.cnmf.online_cnmf import OnACID
 from caiman.source_extraction.cnmf.params import CNMFParams
 from caiman.motion_correction import motion_correct_iteration_fast, tile_and_correct
@@ -93,6 +94,8 @@ class CaimanProcessor(Processor):
     def _load_params_from_file(self, param_file):
         return {}
 
+    def getImageData(self):
+        return self.onAc.estimates
 
     def setupProcess(self):
         ''' Create OnACID object and initialize it
@@ -146,7 +149,8 @@ class CaimanProcessor(Processor):
                 for frame_count, frame in enumerate(Y):
                     frame = self._processFrame(frame, self.frame_number)
                     self._fitFrame(self.frame_number, frame.reshape(-1, order='F'))
-                    if frame_count % 10 == 0: self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
+                    #if frame_count % 5 == 0: 
+                    self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
                     self.frame_number += 1
             if self.onAc.params.get('online', 'normalize'):
                 # normalize final estimates for this set of files. Useful?
@@ -173,19 +177,43 @@ class CaimanProcessor(Processor):
             TODO rewrite output input
         '''
         # Just store dF/F traces for now
-        # can also use utils function directly vs
-        # calling from Estimates class
-        #   dF = estimates.detrend_df_f(frames_window=100).F_dff
+        nb = self.onAc.params.get('init', 'nb')
+        A = self.onAc.estimates.Ab[:, nb:]
+        b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
+        C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
+        f = self.onAc.estimates.C_on[:nb, :self.frame_number]
+        self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
+
         #currEstimates = pickle.dumps(self.onAc.estimates.__dict__)
             # TODO replace above with translator to panda DF?
+        
         #   self.client.replace(dF, output)
-        self.ests = estimates.C_on
 
     def getEstimates(self):
+        ''' ests contains C or dF_f; just neural data
+        '''
         return self.ests
     
     def getTime(self):
+        ''' returns what frame we have/are processing
+        '''
         return self.frame_number
+
+    def makeImage(self):
+        '''Create image data for visualiation
+            Using caiman code here
+        '''
+        mn = self.onAc.M - self.onAc.N
+        image = None
+        try:
+            components = self.onAc.estimates.Ab[:,mn:].dot(self.onAc.estimates.C_on[mn:self.onAc.M,self.frame_number-1]).reshape(self.onAc.dims, order='F')
+            background = self.onAc.estimates.Ab[:,:mn].dot(self.onAc.estimates.C_on[:mn,self.frame_number-1]).reshape(self.onAc.dims, order='F')
+            image = ((components + background) - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
+            image = np.minimum((image*255.),255).astype('u1')
+        except ValueError as ve:
+            logger.info('ValueError: {0}'.format(ve))
+        return image
+
 
     def _finalAnalysis(self, t):
         ''' Some kind of final steps for estimates

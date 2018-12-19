@@ -17,9 +17,9 @@
    <widget class="QWidget" name="horizontalWidget" native="true">
     <property name="geometry">
      <rect>
-      <x>90</x>
-      <y>20</y>
-      <width>601</width>
+      <x>10</x>
+      <y>10</y>
+      <width>301</width>
       <height>261</height>
      </rect>
     </property>
@@ -35,8 +35,8 @@
        <widget class="QPushButton" name="pushButton">
         <property name="geometry">
          <rect>
-          <x>180</x>
-          <y>100</y>
+          <x>140</x>
+          <y>40</y>
           <width>115</width>
           <height>81</height>
          </rect>
@@ -49,8 +49,8 @@ Parameters</string>
        <widget class="QPushButton" name="pushButton_2">
         <property name="geometry">
          <rect>
-          <x>40</x>
-          <y>100</y>
+          <x>20</x>
+          <y>40</y>
           <width>115</width>
           <height>81</height>
          </rect>
@@ -63,8 +63,8 @@ Processor</string>
        <widget class="QPushButton" name="pushButton_3">
         <property name="geometry">
          <rect>
-          <x>320</x>
-          <y>100</y>
+          <x>20</x>
+          <y>130</y>
           <width>115</width>
           <height>81</height>
          </rect>
@@ -77,8 +77,8 @@ Process</string>
        <widget class="QLabel" name="label">
         <property name="geometry">
          <rect>
-          <x>180</x>
-          <y>40</y>
+          <x>40</x>
+          <y>10</y>
           <width>131</width>
           <height>20</height>
          </rect>
@@ -90,8 +90,8 @@ Process</string>
        <widget class="QCheckBox" name="checkBox">
         <property name="geometry">
          <rect>
-          <x>460</x>
-          <y>120</y>
+          <x>150</x>
+          <y>150</y>
           <width>101</width>
           <height>41</height>
          </rect>
@@ -108,15 +108,30 @@ Update</string>
    <widget class="QWidget" name="verticalWidget" native="true">
     <property name="geometry">
      <rect>
-      <x>89</x>
+      <x>9</x>
       <y>319</y>
-      <width>601</width>
-      <height>201</height>
+      <width>771</width>
+      <height>211</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
      <item>
       <widget class="PlotWidget" name="grplot"/>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QWidget" name="horizontalWidget" native="true">
+    <property name="geometry">
+     <rect>
+      <x>340</x>
+      <y>10</y>
+      <width>431</width>
+      <height>301</height>
+     </rect>
+    </property>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="ImageView" name="rawplot"/>
      </item>
     </layout>
    </widget>
@@ -142,6 +157,11 @@ Update</string>
  <customwidgets>
   <customwidget>
    <class>PlotWidget</class>
+   <extends>QGraphicsView</extends>
+   <header>pyqtgraph.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ImageView</class>
    <extends>QGraphicsView</extends>
    <header>pyqtgraph.h</header>
   </customwidget>
