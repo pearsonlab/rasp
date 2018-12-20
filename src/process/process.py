@@ -19,7 +19,6 @@ class Processor():
        Needs to output spikes estimates over time
        Will likely change specifications in the future
     '''
-    
     def setupProcess(self):
         # Essenitally the registration process
         raise NotImplementedError
@@ -37,17 +36,19 @@ class Processor():
 class CaimanProcessor(Processor):
     '''Wraps CaImAn/OnACID functionality to
        interface with our pipeline.
+       Uses code from caiman/source_extraction/cnmf/online_cnmf.py
     '''
-
     def __init__(self, name, client):
         self.name = name
         self.client = client
-        self.ests = None
+        self.ests = None #neural activity
 
     def __str__(self):
         return self.name
 
     def setStore(self, client):
+        '''Set client interface to the store
+        '''
         self.client = client
     
     def loadParams(self, param_file=None):
@@ -56,6 +57,7 @@ class CaimanProcessor(Processor):
             This also effectively registers specific params
             that CaimanProcessor needs with Nexus
         '''
+        #TODO: Convert this to Tweak and load from there
         if param_file is not None:
             try:
                 params_dict = self._load_params_from_file(param_file)
@@ -64,7 +66,7 @@ class CaimanProcessor(Processor):
         else:
             # defaults from demo scripts; CNMFParams does not set
             # each parameter needed by default (TODO change that?)
-            # TODO add parameter validation inside Tweak perhaps
+            # TODO add parameter validation inside Tweak
             params_dict = {'fnames': ['/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5', '/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
@@ -88,28 +90,30 @@ class CaimanProcessor(Processor):
                    'show_movie': False,
                    'output': 'outputEstimates'}
         self.client.put(params_dict, 'params_dict')
-        print('put dict into limbo')
-    
+        #TODO: return code    
 
     def _load_params_from_file(self, param_file):
+        '''Filehandler for loading caiman parameters
+            TODO
+        '''
         return {}
 
     def getImageData(self):
+        ''' Return OnACID estimates for visualization
+        '''
         return self.onAc.estimates
 
     def setupProcess(self):
         ''' Create OnACID object and initialize it
+                (runs initialize online)
             limboClient is a client to the data store server
-            Future option: put configParams in store and load here
+            TODO: put configParams in store and load here
         '''
-
-        # TODO self.loadParams(param_file)
         self.loadParams()
         self.params = self.client.get('params_dict')
-        print('Using parameters:', self.params)
         
         # MUST include inital set of frames
-        # Institute check here as requirement to Nexus
+        # TODO: Institute check here as requirement to Nexus
         
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)
@@ -121,31 +125,27 @@ class CaimanProcessor(Processor):
 
     def runProcess(self):
         ''' Run process. Persists running while it has data
-            NOT IMPLEMENTED. Runs once atm. Add new function
+            (TODO). Runs once per set of files. Add new function
             to run continually.
             Frames is a location in the DS that this process
-            needs to check for more data
+            needs to check for more data (TODO)
             Output is a location in the DS to continually
             place the Estimates results, with ref number that
-            corresponds to the frame number
+            corresponds to the frame number (DONE)
         '''
-        print('Running process beginning with ', self.frame_number)
+        #TODO: Error handling for if these parameters don't work
+            #should implement in Tweak (?) or getting too complicated for users.
         proc_params = self.client.get('params_dict')
-        print('got parameter dict: ', proc_params)
         fnames = proc_params['fnames']
         output = proc_params['output']
         self.fnames = self._checkFrames(fnames)
-        print('fnames is ', self.fnames)
         if self.fnames is not None:
             # still more to process
             init_batch = [self.params['init_batch']]+[0]*(len(self.fnames)-1)
-            #print('init batch is ', init_batch)
-            #init_batch = [0]*len(self.fnames)
-            #frame_number = init_batch[0]
             for file_count, ffll in enumerate(self.fnames):
                 print('Loading file:', ffll, ' current frame ', self.frame_number)
                 Y = cm.load(ffll, subindices=slice(init_batch[file_count], None, None))
-                # TODO replace load
+                # TODO replace load with image grab from store
                 for frame_count, frame in enumerate(Y):
                     frame = self._processFrame(frame, self.frame_number)
                     self._fitFrame(self.frame_number, frame.reshape(-1, order='F'))
@@ -154,7 +154,7 @@ class CaimanProcessor(Processor):
                     self.frame_number += 1
             if self.onAc.params.get('online', 'normalize'):
                 # normalize final estimates for this set of files. Useful?
-                #self._normAnalysis()  #WARNING CANT LOOP
+                #self._normAnalysis()
                 self.putAnalysis(self.onAc.estimates, output)
             #self._finalAnalysis(frame_number)
             #self.putAnalysis(self.finalEstimates, output)
@@ -164,7 +164,7 @@ class CaimanProcessor(Processor):
         self.onAc.params.set('online', {'init_batch': 0})
         self.params['init_batch'] = 0
         # also need to extend dimensions of timesteps...TODO: better method init?
-
+            #currently changed T1 inside online_cnmf....
 
         #TODO: determine a SINGLE location for params. Internal vs logged?
         #self.client.replace(self.params, 'params_dict')
@@ -183,11 +183,8 @@ class CaimanProcessor(Processor):
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
         f = self.onAc.estimates.C_on[:nb, :self.frame_number]
         self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
-
-        #currEstimates = pickle.dumps(self.onAc.estimates.__dict__)
-            # TODO replace above with translator to panda DF?
-        
         #   self.client.replace(dF, output)
+        #TODO: instead of get from Nexus, put into store
 
     def getEstimates(self):
         ''' ests contains C or dF_f; just neural data
@@ -237,7 +234,6 @@ class CaimanProcessor(Processor):
         self.finalEstimates.noisyC = self.onAc.estimates.noisyC[:self.onAc.M]
 
 
-
     def _checkFrames(self, fnames):
         ''' Check to see if we have frames for processing
         '''
@@ -249,7 +245,6 @@ class CaimanProcessor(Processor):
             Raises NaNFrameException if a frame contains NaN
             Returns the normalized/etc modified frame
         '''
-
         if np.isnan(np.sum(frame)):
             raise NaNFrameException
         frame = frame.astype(np.float32) #or require float32 from image acquistion
@@ -275,7 +270,6 @@ class CaimanProcessor(Processor):
                 frame_cor, shift = motion_correct_iteration_fast(frame, templ, self.max_shifts_online, self.max_shifts_online)
             self.onAc.estimates.shifts.append(shift)
         else:
-            #templ = None
             frame_cor = frame
         if self.onAc.params.get('online', 'normalize'):
             frame_cor = frame_cor/self.onAc.img_norm
@@ -291,12 +285,16 @@ class CaimanProcessor(Processor):
         try:
             self.onAc.fit_next(frame_number, frame)
         except Exception as e:
-            #print('error likely due to frame number ', frame_number)
             print('Message: {0}'.format(e))
             raise Exception
 
 
     def _normAnalysis(self):
+        ''' Modifies in place Ab!
+        Do not use until the end, or
+        TODO: just return nicely normalized Ab. Possibly combine with other
+            visualization/estimation output
+        '''
         self.onAc.estimates.Ab /= 1./self.onAc.img_norm.reshape(-1, order='F')[:,np.newaxis]
         self.onAc.estimates.Ab = scipy.sparse.csc_matrix(self.onAc.estimates.Ab)
 

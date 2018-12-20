@@ -1,6 +1,4 @@
 import sys
-#sys.path.append('src')
-#print(sys.path)
 from PyQt5 import QtGui,QtCore
 from visual import rasp_ui
 from nexus.nexus import Nexus
@@ -19,7 +17,9 @@ import logging; logger = logging.getLogger(__name__)
 class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def __init__(self, parent=None):
-    
+        ''' Setup GUI
+            Setup and start Nexus
+        '''
         pyqtgraph.setConfigOption('background', 'w') #before loading widget
         super(FrontEnd, self).__init__(parent)
         
@@ -32,15 +32,13 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.nexus = Nexus('NeuralNexus')
         self.nexus.createNexus()
 
-        #temp
-        #self.proc = cp.setupProcess(self.nexus.Processor, 'params_dict')
-        
+        #Currently running initialize here        
         self.nexus.setupProcessor()
 
         self.pushButton_3.clicked.connect(_call(self._runProcess))
         self.pushButton_3.clicked.connect(_call(self.update))
         self.pushButton.clicked.connect(_call(self._loadParams))
-        self.checkBox.stateChanged.connect(self.update)
+        self.checkBox.stateChanged.connect(self.update) #TODO: call outside process or restric to checkbox update
     
     
     def _loadParams(self):
@@ -54,26 +52,22 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.nexus.loadTweak(fname[0])
         except FileNotFoundError as e:
             logger.error('File not found {}'.format(e))
-            raise FileNotFoundError
+            #raise FileNotFoundError
     
     
     def _runProcess(self):
-        #fnames = self.proc.client.get('params_dict')['fnames'] #CHANGEME
-        #output = 'outputEstimates'
+        '''Run ImageProcessor in separate thread
+        '''
         self.t = Thread(target=self.nexus.runProcessor)
         self.t.daemon = True
         self.t.start()
 
         #TODO: grey out button until self.t is done, but allow other buttons to be active
 
-        #self.p = Process(target=self.nexus.runProcessor)
-        #self.p.start()
-        #self.p.join()
-
-        #cp.runProcess(self.proc, fnames, output) #TODO: need flag for multiple updates...
-
 
     def update(self):
+        ''' Update visualization while running
+        '''
 
         #plot traces
         Y = None
@@ -103,7 +97,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
 
     def closeEvent(self, event):
-
+        '''Clicked x/close on window
+            Add confirmation for closing without saving
+        '''
         confirm = QMessageBox.question(self, 'Message', 'Quit without saving?',
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if confirm == QMessageBox.Yes:
@@ -115,7 +111,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 def _call(fnc, *args, **kwargs):
     ''' Call handler for (external) events
     '''
-    
     def _callback():
         return fnc(*args, **kwargs)
     return _callback
@@ -125,5 +120,4 @@ if __name__=="__main__":
     app = QtGui.QApplication(sys.argv)
     rasp = FrontEnd()
     rasp.show()
-    #rasp.update() #start with something in plot
     app.exec_()
