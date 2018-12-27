@@ -21,6 +21,12 @@ class StoreInterface():
     def put(self):
         raise NotImplementedError
 
+    def delete(self):
+        raise NotImplementedError
+    
+    def replace(self):
+        raise NotImplementedError
+
     def subscribe(self):
         raise NotImplementedError
 
@@ -55,7 +61,6 @@ class Limbo(StoreInterface):
             self.client = plasma.connect(store_loc, '', 0)
             logger.info('Successfully connected to store')
         except Exception as e:
-            #client = None
             logger.exception('Cannot connect to store: {0}'.format(e))
             raise Exception
         return self.client
@@ -83,7 +88,6 @@ class Limbo(StoreInterface):
         try:
             object_id = self.client.put(object)
             #print('we did a plasma put in put ', object_id)
-                #self.stored.update({object_name:object_id})
             self.updateStored(object_name, object_id)
             logger.error('object successfully stored: '+object_name)
             #print(object_id)
@@ -111,11 +115,8 @@ class Limbo(StoreInterface):
             self.saveSubstore(object_name)
             old_id = self.stored[object_name]
             self.delete(object_name)
-            #print('before newconn')
           #  newconn = plasma.connect('/tmp/store', '', 0)
-            #print('got newconn ', newconn)
            # object_id = newconn.put(object, old_id)
-            #print('put using newconn; end of replacing')
            # newconn.disconnect()
             object_id = self.client.put(object, old_id) #plasma put
             self.updateStored(object_name, object_id)
@@ -179,10 +180,8 @@ class Limbo(StoreInterface):
             Otherwise throw CannotGetObject to request dict update
             TODO: update for lists of objects
         '''
-        #print('trying to get ', object_name)
-        #print('stored? ', self.stored.get(object_name))
+        print('trying to get ', object_name)
         if self.stored.get(object_name) is None:
-            logger.error('stored contains: '+self.stored.items())
             logger.error('Never recorded storing this object: '+object_name)
             # Don't know anything about this object, treat as problematic
             raise CannotGetObjectError
@@ -193,7 +192,7 @@ class Limbo(StoreInterface):
     def get_all(self):
         ''' Get a listing of all objects in the store
         '''
-        print(self.client.list())
+        #print(self.client.list())
         return self.client.list()
 
 
@@ -225,34 +224,22 @@ class Limbo(StoreInterface):
             raise CannotGetObjectError
         else:
             #print('trying to delete ', object_name, ' ID ', self.stored.get(object_name))
-            #print(self.client.list())
             retcode = self._delete(object_name)
-            #print('supposedly deleted. Retcode: ', retcode)
             #print(self.client.list())
             self.stored.pop(object_name)
-            #print('stored has ', self.stored.items())
-            #print('DS has ', self.client.list())
             
     
     def _delete(self, object_name):
         ''' Deletes object from store
         '''
-        #print('length ', len(self.client.list()))
-        #print('list ', self.client.list())
         #print('id to delete is : ', self.stored.get(object_name))
         tmp_id = self.stored.get(object_name)
-        #print('tmp id  is ', tmp_id)
-        #print(self.client.list())
-        #print('before connect to delete')
+
         new_client = plasma.connect('/tmp/store', '', 0)
         new_client.delete([tmp_id])
         #self.client.delete([tmp_id])
         new_client.disconnect()
-        #print('before check store')
-        #print('store still there? ', plasma.connect('/tmp/store', '', 0))
-        #print('after delete and disconnect')
-        #print(self.client.list())
-        #print('check temp too: ', new_client.list())
+        
         #redo with object_id as argument?
 
 
@@ -284,16 +271,14 @@ class Limbo(StoreInterface):
 
 
 
-class HardDisk(StoreInterface):
-    ''' Implementation of the data store on disk
-        instead of in memory. Uses h5 format primarily
+class HStore(StoreInterface):
+    ''' Implementation of the data store on disk.
+        Using dict-like structure, employs h5py via hickle
     '''
 
-    def __init__(self, folder_loc):
-        ''' Construct the hard disk data store
-            folder_loc is the location to store data
+    def __init__(self):
+        ''' Construct the initial store.
         '''
-        # will likely need multiple formats supported
         pass
 
     def get(self):
@@ -302,7 +287,18 @@ class HardDisk(StoreInterface):
     def put(self):
         pass
 
+    def delete(self):
+        pass
 
+    def replace(self):
+        pass
+
+    def subscribe(self):
+        pass
+
+#class LStore(StoreInterface):
+#   ''' Implement data store using LMDB in python. TODO?
+#   '''
 
 class ObjectNotFoundError(Exception):
     pass

@@ -12,7 +12,7 @@ class Tweak():
             # Going with default config
             self.configFile = '/home' #TODO CHANGEME
         else:
-            # Reading config from json file
+            # Reading config from hd5 file
             self.configFile = configFile
 
         

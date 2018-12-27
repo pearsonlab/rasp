@@ -14,15 +14,15 @@ class Nexus_Setup(TestCase):
         self.nexus.createNexus()
         self.limbo = Limbo()
 
-    def test_setupProc(self):
+    #def test_setupProc(self):
         #self.nexus.setupProcessor()
         #cp.setupProcess(self.proc, 'params_dict')
-        self.assertTrue(1)
+    #    self.assertTrue(1)
     
-    def test_runProc(self):
+    #def test_runProc(self):
         #self.nexus.setupProcessor()
         #self.nexus.runProcessor()
-        self.assertTrue(1)
+    #    self.assertTrue(1)
 
     def test_consecProc(self):
         self.nexus.setupProcessor()
