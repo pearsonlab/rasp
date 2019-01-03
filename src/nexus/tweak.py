@@ -20,6 +20,7 @@ class Tweak():
         self.procName = {}
         self.acqName = {}
 
+
     def addVisual(self, newVisual):
          # newVisual is a visual object, has a name
          self.visName.update({newVisual.name: newVisual})

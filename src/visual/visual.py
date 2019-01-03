@@ -25,9 +25,10 @@ class Visual():
         else:
             window = frame_number
 
-        Y = ests[0][frame_number-window:frame_number]
-        X = np.arange(0,Y.size)+(frame_number-window)
-        return X,Y
+        Y0 = ests[0][frame_number-window:frame_number]
+        Y1 = ests[1][frame_number-window:frame_number]
+        X = np.arange(0,Y0.size)+(frame_number-window)
+        return X,[Y0,Y1]
 
     def plotRaw(self, img):
         ''' Take img and draw it

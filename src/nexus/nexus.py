@@ -8,7 +8,7 @@ import pyarrow.plasma as plasma
 from nexus import store
 from nexus.tweak import Tweak
 from process.process import CaimanProcessor
-from acquire.acquire import Acquirer
+from acquire.acquire import FileAcquirer
 from visual.visual import Visual
 
 import logging; logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class Nexus():
 
         self.acqName = self.tweak.acqName
         self.acqLimbo = store.Limbo(self.acqName)
-        self.Acquirer = Acquirer(self.acqName, self.acqLimbo)
+        self.Acquirer = FileAcquirer(self.acqName, self.acqLimbo)
 
 
     def setupProcessor(self):

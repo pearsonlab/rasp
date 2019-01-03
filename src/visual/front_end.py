@@ -28,6 +28,15 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.rawplot.ui.roiBtn.hide()
         self.rawplot.ui.menuBtn.hide()
         self.checkBox.setChecked(True)
+
+        #init line plot
+        self.c1 = self.grplot.plot()
+        self.c2 = self.grplot.plot()
+        self.axis = self.grplot.getAxis('bottom')
+        self.axis.setTickSpacing(major=50, minor=50)
+        self.grplot.setLabel('bottom', "Frames")
+        self.grplot.setLabel('left', "Temporal traces")
+        self.updateLines()
         
         self.nexus = Nexus('NeuralNexus')
         self.nexus.createNexus()
@@ -69,17 +78,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         ''' Update visualization while running
         '''
 
-        #plot traces
-        Y = None
-        try:
-            self.ests = self.nexus.getEstimates()
-            (X, Y) = self.nexus.getPlotEst()
-        except Exception as e:
-            logger.info('output does not yet exist. error: {}'.format(e))
-
-        if(Y is not None):
-            pen=pyqtgraph.mkPen(width=2)
-            self.grplot.plot(X, Y,pen=pen,clear=True)
+        self.updateLines()
 
         #plot video
         image = None
@@ -93,8 +92,25 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #re-update
         if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(5, self.update)
+            QtCore.QTimer.singleShot(10, self.update)
 
+    def updateLines(self):
+        ''' Helper function to plot the line traces
+            of the activity of the selected neurons.
+        '''
+        #plot traces
+        pen=pyqtgraph.mkPen(width=2, color='r')
+        pen2=pyqtgraph.mkPen(width=2, color='b')
+        Y = None
+        try:
+            #self.ests = self.nexus.getEstimates()
+            (X, Y) = self.nexus.getPlotEst()
+        except Exception as e:
+            logger.error('output does not yet exist. error: {}'.format(e))
+
+        if(Y is not None):
+            self.c1.setData(X, Y[0], pen=pen)
+            self.c2.setData(X, Y[1], pen=pen2)
 
     def closeEvent(self, event):
         '''Clicked x/close on window

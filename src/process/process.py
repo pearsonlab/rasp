@@ -10,6 +10,8 @@ from caiman.source_extraction.cnmf.online_cnmf import OnACID
 from caiman.source_extraction.cnmf.params import CNMFParams
 from caiman.motion_correction import motion_correct_iteration_fast, tile_and_correct
 import caiman as cm
+from os.path import expanduser
+import os
 import logging; logger = logging.getLogger(__name__)
 
 
@@ -67,7 +69,10 @@ class CaimanProcessor(Processor):
             # defaults from demo scripts; CNMFParams does not set
             # each parameter needed by default (TODO change that?)
             # TODO add parameter validation inside Tweak
-            params_dict = {'fnames': ['/home/hawkwings/RASP/rasp/data/Tolias_mesoscope_1.hdf5', '/home/hawkwings/RASP/rasp/data/Tolias_mesoscope_2.hdf5'],
+
+            home = expanduser("~")
+            cwd = os.getcwd()
+            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
