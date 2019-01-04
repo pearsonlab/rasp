@@ -1,5 +1,6 @@
 import sys
 from PyQt5 import QtGui,QtCore
+from PyQt5.QtGui import QColor
 from visual import rasp_ui
 from nexus.nexus import Nexus
 import numpy as np
@@ -20,7 +21,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         ''' Setup GUI
             Setup and start Nexus
         '''
-        pyqtgraph.setConfigOption('background', 'w') #before loading widget
+        pyqtgraph.setConfigOption('background', QColor(229, 229, 229)) #before loading widget
         super(FrontEnd, self).__init__(parent)
         
         self.setupUi(self)
@@ -88,7 +89,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             logger.error('Oh no {0}'.format(e))
 
         if image is not None:
-            self.rawplot.setImage(image)
+            self.rawplot.setImage(image.T)
 
         #re-update
         if self.checkBox.isChecked():
