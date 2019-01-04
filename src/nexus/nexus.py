@@ -61,7 +61,10 @@ class Nexus():
         '''Run the processor continually on input frames
         '''
         self.Processor.client.reset() #Reset client to limbo...FIXME
+        t = time.time()
         self.Processor.runProcess()
+        frames = self.Processor.getTime()
+        print('time for ', frames, ' frames is ', time.time()-t, ' s')
         logger.warning('Done running process')
 
     def getEstimates(self):

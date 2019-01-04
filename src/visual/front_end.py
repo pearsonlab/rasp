@@ -25,10 +25,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         super(FrontEnd, self).__init__(parent)
         
         self.setupUi(self)
+        self.setStyleSheet("QMainWindow {background: 'white';}")
+                
         self.rawplot.ui.histogram.hide()
         self.rawplot.ui.roiBtn.hide()
         self.rawplot.ui.menuBtn.hide()
         self.checkBox.setChecked(True)
+
+
 
         #init line plot
         self.c1 = self.grplot.plot()
