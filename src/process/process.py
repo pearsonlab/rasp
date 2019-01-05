@@ -72,7 +72,7 @@ class CaimanProcessor(Processor):
 
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/zf1.h5'], #Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': [cwd+'/data/zf1.h5'], #/Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -140,6 +140,7 @@ class CaimanProcessor(Processor):
         '''
         #TODO: Error handling for if these parameters don't work
             #should implement in Tweak (?) or getting too complicated for users.
+        self.process_time = []
         proc_params = self.client.get('params_dict')
         fnames = proc_params['fnames']
         output = proc_params['output']
@@ -152,8 +153,10 @@ class CaimanProcessor(Processor):
                 Y = cm.load(ffll, subindices=slice(init_batch[file_count], None, None))
                 # TODO replace load with image grab from store
                 for frame_count, frame in enumerate(Y):
+                    t = time.time()
                     frame = self._processFrame(frame, self.frame_number)
                     self._fitFrame(self.frame_number, frame.reshape(-1, order='F'))
+                    self.process_time.append(time.time()-t)
                     #if frame_count % 5 == 0: 
                     self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
                     self.frame_number += 1
@@ -174,6 +177,8 @@ class CaimanProcessor(Processor):
         #TODO: determine a SINGLE location for params. Internal vs logged?
         #self.client.replace(self.params, 'params_dict')
         logger.info('Updated init batch after first run')
+        #print('times ', self.process_time)
+        print('mean time per frame ', np.mean(self.process_time))
 
 
     def putAnalysis(self, estimates, output):
