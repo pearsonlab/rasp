@@ -32,15 +32,18 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.rawplot.ui.menuBtn.hide()
         self.checkBox.setChecked(True)
 
-
-
         #init line plot
         self.c1 = self.grplot.plot()
-        self.c2 = self.grplot.plot()
-        self.axis = self.grplot.getAxis('bottom')
-        self.axis.setTickSpacing(major=50, minor=50)
-        self.grplot.setLabel('bottom', "Frames")
-        self.grplot.setLabel('left', "Temporal traces")
+        self.c2 = self.grplot_2.plot()
+        self.c3 = self.grplot_3.plot()
+        grplot = [self.grplot, self.grplot_2, self.grplot_3]
+        for plt in grplot:
+            plt.getAxis('bottom').setTickSpacing(major=50, minor=50)
+            plt.setLabel('bottom', "Frames")
+            plt.setLabel('left', "Temporal traces")
+        # self.grplot_3.getAxis('bottom').setTickSpacing(major=50, minor=50)
+        # self.grplot_3.setLabel('bottom', "Frames")
+        # self.grplot_3.setLabel('left', "Temporal traces")
         self.updateLines()
         
         self.nexus = Nexus('NeuralNexus')
@@ -97,7 +100,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #re-update
         if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(10, self.update)
+            QtCore.QTimer.singleShot(100, self.update)
 
     def updateLines(self):
         ''' Helper function to plot the line traces
@@ -106,6 +109,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         #plot traces
         pen=pyqtgraph.mkPen(width=2, color='r')
         pen2=pyqtgraph.mkPen(width=2, color='b')
+        pen3=pyqtgraph.mkPen(width=2, color='g')
         Y = None
         try:
             #self.ests = self.nexus.getEstimates()
@@ -116,6 +120,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         if(Y is not None):
             self.c1.setData(X, Y[0], pen=pen)
             self.c2.setData(X, Y[1], pen=pen2)
+            self.c3.setData(X, Y[2], pen=pen3)
 
     def closeEvent(self, event):
         '''Clicked x/close on window
