@@ -87,7 +87,22 @@ class Nexus():
         '''
         data = self.Processor.makeImage() #just get denoised frame for now
         #TODO: get some raw data from Acquirer and some contours from Processor
-        return data
+        visRaw = self.Visual.plotRaw(data)
+        return visRaw
+
+    def getPlotContours(self):
+        ''' add neuron shapes to raw plot
+        '''
+        return self.Visual.plotContours(self.Processor.getCoords())
+
+    def getPlotCoM(self):
+        return self.Visual.plotCoM(self.Processor.getCoords())
+
+    def selectNeurons(self, x, y):
+        ''' Get plot coords, need to translate to neurons
+        '''
+        self.Visual.selectNeurons(x, y, self.Processor.getCoords())
+        return self.Visual.getSelected()
 
     def destroyNexus(self):
         ''' Method that calls the internal method

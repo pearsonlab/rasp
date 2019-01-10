@@ -9,6 +9,7 @@ from caiman.source_extraction.cnmf.utilities import detrend_df_f
 from caiman.source_extraction.cnmf.online_cnmf import OnACID
 from caiman.source_extraction.cnmf.params import CNMFParams
 from caiman.motion_correction import motion_correct_iteration_fast, tile_and_correct
+from caiman.utils.visualization import get_contours
 import caiman as cm
 from os.path import expanduser
 import os
@@ -72,7 +73,7 @@ class CaimanProcessor(Processor):
 
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/zf1.h5'], #/Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -192,14 +193,19 @@ class CaimanProcessor(Processor):
         b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
         f = self.onAc.estimates.C_on[:nb, :self.frame_number]
+        
         self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
         #   self.client.replace(dF, output)
+        self.coords = get_contours(A, self.onAc.dims)
         #TODO: instead of get from Nexus, put into store
 
     def getEstimates(self):
         ''' ests contains C or dF_f; just neural data
         '''
         return self.ests
+
+    def getCoords(self):
+        return self.coords
     
     def getTime(self):
         ''' returns what frame we have/are processing

@@ -7,6 +7,7 @@ import numpy as np
 import pylab
 import time
 import pyqtgraph
+from pyqtgraph import EllipseROI, PolyLineROI
 from threading import Thread
 from multiprocessing import Process
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
@@ -41,9 +42,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             plt.getAxis('bottom').setTickSpacing(major=50, minor=50)
             plt.setLabel('bottom', "Frames")
             plt.setLabel('left', "Temporal traces")
-        # self.grplot_3.getAxis('bottom').setTickSpacing(major=50, minor=50)
-        # self.grplot_3.setLabel('bottom', "Frames")
-        # self.grplot_3.setLabel('left', "Temporal traces")
         self.updateLines()
         
         self.nexus = Nexus('NeuralNexus')
@@ -56,8 +54,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.pushButton_3.clicked.connect(_call(self.update))
         self.pushButton.clicked.connect(_call(self._loadParams))
         self.checkBox.stateChanged.connect(self.update) #TODO: call outside process or restric to checkbox update
-    
-    
+        self.rawplot.getImageItem().mouseClickEvent = self.mouseClick
+
     def _loadParams(self):
         ''' Button event to load parameters from file
             File location determined from user input
@@ -70,7 +68,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         except FileNotFoundError as e:
             logger.error('File not found {}'.format(e))
             #raise FileNotFoundError
-    
     
     def _runProcess(self):
         '''Run ImageProcessor in separate thread
@@ -85,26 +82,42 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def update(self):
         ''' Update visualization while running
         '''
-
+        #plot lines
         self.updateLines()
 
         #plot video
+        self.updateVideo()
+
+        #re-update
+        if self.checkBox.isChecked():
+            QtCore.QTimer.singleShot(100, self.update)
+    
+    def updateVideo(self):
         image = None
         try:
             image = self.nexus.getPlotRaw()
         except Exception as e:
             logger.error('Oh no {0}'.format(e))
-
         if image is not None:
             self.rawplot.setImage(image.T)
-
-        #re-update
-        if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(100, self.update)
+        
+        #try:
+            #neurCom = self.nexus.getPlotCoM()
+            #penCont=pyqtgraph.mkPen(width=1, color='b')
+            #for c in neurCom:
+                #TODO: offload this to visual class
+                #TODO: and only add item if it doesn't yet exist
+                #shp = shp[~np.isnan(shp).any(axis=-1)]
+                #positions = tuple(map(tuple,shp))
+                #self.rawplot.getView().addItem(CircleROI(positions, closed=True, pos=self.selected[0].T-5, pen=penCont))
+            #    self.rawplot.getView().addItem(CircleROI(pos = np.array([c[1], c[0]])-5, size=10, movable=False, pen=penCont))
+        #except Exception as e:
+        #    logger.error('Something {0}'.format(e))
 
     def updateLines(self):
         ''' Helper function to plot the line traces
             of the activity of the selected neurons.
+            TODO: separate updates for each plot?
         '''
         #plot traces
         pen=pyqtgraph.mkPen(width=2, color='r')
@@ -121,6 +134,21 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.c1.setData(X, Y[0], pen=pen)
             self.c2.setData(X, Y[1], pen=pen2)
             self.c3.setData(X, Y[2], pen=pen3)
+
+    def mouseClick(self, event):
+        '''Clicked on raw image to select neurons
+        '''
+        #TODO: make this unclickable until finished updated plot (?)
+        event.accept()
+        mousePoint = event.pos()
+        self.selected = self.nexus.selectNeurons(int(mousePoint.x()), int(mousePoint.y()))
+        selectedraw = np.zeros(2)
+        selectedraw[0] = int(mousePoint.x())
+        selectedraw[1] = int(mousePoint.y())
+        print('selectedRaw is ', selectedraw, ' but found selected is ', self.selected)
+        ROIpen1=pyqtgraph.mkPen(width=1, color='r')
+        if np.count_nonzero(self.selected[0]) > 0:
+            self.rawplot.getView().addItem(CircleROI(pos = self.selected[0]-5, size=10, movable=False, pen=ROIpen1))
 
     def closeEvent(self, event):
         '''Clicked x/close on window
@@ -141,6 +169,17 @@ def _call(fnc, *args, **kwargs):
         return fnc(*args, **kwargs)
     return _callback
 
+class CircleROI(EllipseROI):
+    def __init__(self, pos, size, **args):
+        pyqtgraph.ROI.__init__(self, pos, size, **args)
+        self.aspectLocked = True
+
+class PolyROI(PolyLineROI):
+    def __init__(self, positions, pos, **args):
+        closed = True
+        print('got positions ', positions)
+        pyqtgraph.ROI.__init__(self, positions, closed, pos, **args)
+        #self.aspectLocked = True
 
 if __name__=="__main__":
     app = QtGui.QApplication(sys.argv)
