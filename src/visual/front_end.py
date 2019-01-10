@@ -100,7 +100,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #re-update
         if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(100, self.update)
+            QtCore.QTimer.singleShot(150, self.update)
 
     def updateLines(self):
         ''' Helper function to plot the line traces
