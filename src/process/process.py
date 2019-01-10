@@ -94,6 +94,8 @@ class CaimanProcessor(Processor):
                    'dist_shape_update': True,
                    'min_num_trial': 10,
                    'show_movie': False,
+                   'update_freq': 500,
+                    'minibatch_shape': 200,
                    'output': 'outputEstimates'}
         self.client.put(params_dict, 'params_dict')
         #TODO: return code    
@@ -142,6 +144,10 @@ class CaimanProcessor(Processor):
         #TODO: Error handling for if these parameters don't work
             #should implement in Tweak (?) or getting too complicated for users.
         self.process_time = []
+        self.putAnalysis_time = []
+        self.procFrame_time = [] #aka t_motion
+        self.detect_time = []
+        self.shape_time = []
         proc_params = self.client.get('params_dict')
         fnames = proc_params['fnames']
         output = proc_params['output']
@@ -157,9 +163,9 @@ class CaimanProcessor(Processor):
                     t = time.time()
                     frame = self._processFrame(frame, self.frame_number)
                     self._fitFrame(self.frame_number, frame.reshape(-1, order='F'))
-                    self.process_time.append(time.time()-t)
                     #if frame_count % 5 == 0: 
                     self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
+                    self.process_time.append([time.time()-t])
                     self.frame_number += 1
             if self.onAc.params.get('online', 'normalize'):
                 # normalize final estimates for this set of files. Useful?
@@ -178,7 +184,16 @@ class CaimanProcessor(Processor):
         #TODO: determine a SINGLE location for params. Internal vs logged?
         #self.client.replace(self.params, 'params_dict')
         logger.info('Updated init batch after first run')
-        #print('times ', self.process_time)
+
+        self.shape_time = np.array(self.onAc.t_shapes)
+        self.detect_time = np.array(self.onAc.t_detect)
+
+        np.savetxt('timing/process_time.txt', np.array(self.process_time))
+        np.savetxt('timing/shape_time.txt', self.shape_time)
+        np.savetxt('timing/detect_time.txt', self.detect_time)
+        np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
+        np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
+
         print('mean time per frame ', np.mean(self.process_time))
 
 
@@ -187,6 +202,7 @@ class CaimanProcessor(Processor):
             into the output location specified
             TODO rewrite output input
         '''
+        t = time.time()
         # Just store dF/F traces for now
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
@@ -195,6 +211,7 @@ class CaimanProcessor(Processor):
         f = self.onAc.estimates.C_on[:nb, :self.frame_number]
         
         self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
+        self.putAnalysis_time.append([time.time()-t])
         #   self.client.replace(dF, output)
         self.coords = get_contours(A, self.onAc.dims)
         #TODO: instead of get from Nexus, put into store
@@ -261,6 +278,7 @@ class CaimanProcessor(Processor):
             Raises NaNFrameException if a frame contains NaN
             Returns the normalized/etc modified frame
         '''
+        t=time.time()
         if np.isnan(np.sum(frame)):
             raise NaNFrameException
         frame = frame.astype(np.float32) #or require float32 from image acquistion
@@ -289,7 +307,7 @@ class CaimanProcessor(Processor):
             frame_cor = frame
         if self.onAc.params.get('online', 'normalize'):
             frame_cor = frame_cor/self.onAc.img_norm
-    
+        self.procFrame_time.append([time.time()-t])
         return frame_cor
 
 
