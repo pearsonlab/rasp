@@ -149,7 +149,7 @@ class CaimanProcessor(Processor):
         self.detect_time = []
         self.shape_time = []
         proc_params = self.client.get('params_dict')
-        fnames = proc_params['fnames']
+        #fnames = proc_params['fnames']
         output = proc_params['output']
         self.fnames = self._checkFrames(fnames)
         if self.fnames is not None:
