@@ -11,7 +11,7 @@ class StoreDependentTestCase(TestCase):
         '''
         self.p = subprocess.Popen(['plasma_store',
                               '-s', '/tmp/store',
-                              '-m', str(1000000)],
+                              '-m', str(10000000)],
                               stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
 
