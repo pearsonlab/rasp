@@ -1,7 +1,7 @@
 from unittest import TestCase
 #from test.test_utils import StoreDependentTestCase
-from nexus.store import Limbo
-from nexus.nexus import Nexus
+from src.nexus.store import Limbo
+from src.nexus.nexus import Nexus
 from multiprocessing import Process
 
 class Nexus_Setup(TestCase):

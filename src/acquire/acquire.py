@@ -55,8 +55,8 @@ class FileAcquirer(Acquirer):
            grab frame, save, put in store
         '''
         if(self.frame_num < len(self.data)):
-            id = self.client.put(self.getFrame(self.frame_num), 'curr_frame')
+            id = self.client.replace(self.getFrame(self.frame_num), 'curr_frame')
             self.frame_num += 1
         else:
-            logger.error('Done with all available frames')
+            logger.error('Done with all available frames: {0}'.format(self.frame_num))
 

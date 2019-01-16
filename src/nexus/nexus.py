@@ -9,7 +9,7 @@ from nexus import store
 from nexus.tweak import Tweak
 from process.process import CaimanProcessor
 from acquire.acquire import FileAcquirer
-from visual.visual import Visual
+from visual.visual import CaimanVisual
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class Nexus():
     
         self.visName = self.tweak.visName
         self.visLimbo = store.Limbo(self.visName)
-        self.Visual = Visual(self.visName, self.visLimbo)
+        self.Visual = CaimanVisual(self.visName, self.visLimbo)
 
         self.procName = self.tweak.procName
         self.procLimbo = store.Limbo(self.procName)
@@ -51,21 +51,32 @@ class Nexus():
         self.acqLimbo = store.Limbo(self.acqName)
         self.Acquirer = FileAcquirer(self.acqName, self.acqLimbo)
 
-
     def setupProcessor(self):
         '''Setup process parameters
         '''
         self.Processor = self.Processor.setupProcess()
+
+    def setupAcquirer(self, filename):
+        ''' Load data from file
+        '''
+        self.Acquirer.setupAcquirer(filename)
 
     def runProcessor(self):
         '''Run the processor continually on input frames
         '''
         self.Processor.client.reset() #Reset client to limbo...FIXME
         t = time.time()
+        frame_loc = self.Acquirer.client.getStored()['curr_frame']
+        self.Processor.client.updateStored('frame', frame_loc)
         self.Processor.runProcess()
         frames = self.Processor.getTime()
         print('time for ', frames, ' frames is ', time.time()-t, ' s')
         logger.warning('Done running process')
+
+    def runAcquirer(self):
+        ''' Run the acquirer continually 
+        '''
+        self.Acquirer.runAcquirer()
 
     def getEstimates(self):
         '''Get estimates aka neural Activity

@@ -112,7 +112,7 @@ class Limbo(StoreInterface):
         # Check/confirm we need to replace
         if object_name in self.stored:
             logger.info('replacing '+object_name)
-            self.saveSubstore(object_name)
+            #self.saveSubstore(object_name) #TODO
             old_id = self.stored[object_name]
             self.delete(object_name)
           #  newconn = plasma.connect('/tmp/store', '', 0)
@@ -247,7 +247,7 @@ class Limbo(StoreInterface):
         ''' Save the entire store to disk
             Uses pickle, should extend to mmap, hd5f, ...
         '''
-
+        raise NotImplementedError
 
     def saveTweak(self, tweak_ids, fileName='/home/tweak_dump'):
         ''' Save current Tweak object containing parameters
@@ -267,7 +267,7 @@ class Limbo(StoreInterface):
         ''' Save portion of store based on keys
             to disk
         '''
-        pass
+        raise NotImplementedError
 
 
 

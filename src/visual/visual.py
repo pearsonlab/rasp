@@ -8,8 +8,16 @@ from math import floor
 import logging; logger = logging.getLogger(__name__)
 
 class Visual():
-    '''Class for displaying data
-        TODO: Make specific caiman-type implementation, vs general framework
+    '''Abstract lass for displaying data
+    '''
+    def plotEstimates(self):
+        ''' Always need to plot some kind of estimates
+        '''
+        raise NotImplementedError
+
+
+class CaimanVisual(Visual):
+    ''' Class for displaying data from caiman processor
     '''
 
     def __init__(self, name, client):
@@ -19,7 +27,7 @@ class Visual():
         self.com1 = np.zeros(2)
         self.com2 = np.zeros(2)
         self.com3 = np.zeros(2)
-
+        self.neurons = []
 
     def plotEstimates(self, ests, frame_number):
         ''' Take numpy estimates and t=frame_number
@@ -44,17 +52,16 @@ class Visual():
             TODO: pick a subgraph (0-2) to plot that neuron (input)
                 ie, self.plots[0] = new_ind for ests
         '''
-        print('got here')
         neurons = [o['neuron_id']-1 for o in coords]
         com = np.array([o['CoM'] for o in coords])
-        dist = cdist(com, [np.array([x, y])]) #transposed orig image?? FIXME
+        dist = cdist(com, [np.array([y, x])])
         if np.min(dist) < 50:
             selected = neurons[np.argmin(dist)]
             self.plots[0] = selected
             self.com1 = com[selected] #np.array([com[selected][1], com[selected][0]])
-            print('selected neuron #', selected, ' located at ', self.com1)
         else:
             logger.info('No neurons nearby where you clicked')
+            self.com1 = com[0]
 
     def getSelected(self):
         ''' Returns list of 3 coordinates for plotted selections
@@ -80,6 +87,9 @@ class Visual():
     def plotCoM(self, coords):
         ''' Provide contours to plot atop raw image
         '''
-        return [o['CoM'] for o in coords]
-
-
+        newNeur = None
+        if len(self.neurons) < len(coords):
+            #print('adding ', len(coords)-len(self.neurons), ' neurons')
+            newNeur = [o['CoM'] for o in coords[len(self.neurons):]]
+            self.neurons.extend(newNeur)
+        return newNeur

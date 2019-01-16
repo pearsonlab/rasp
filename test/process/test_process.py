@@ -26,6 +26,5 @@ class Caiman_Setup(StoreDependentTestCase):
         print('time is ', time.time()-t)
         self.assertTrue(1)
 
-
     def tearDown(self):
         super(Caiman_Setup, self).tearDown()

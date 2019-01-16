@@ -12,7 +12,7 @@ class Acquirer_Setup(StoreDependentTestCase):
         super(Acquirer_Setup, self).setUp()
         self.limbo = Limbo()
         self.acq = FileAcquirer('acq', self.limbo)
-        self.acq.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/zf1.h5')
+        self.acq.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
 
     # def test_init(self):
     #     #self.acq.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/zf1.h5')
@@ -22,12 +22,13 @@ class Acquirer_Setup(StoreDependentTestCase):
         #self.acq.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/zf1.h5')
         frame = self.acq.getFrame(1)
         print(frame.shape)
-        self.assertTrue(frame.shape==(500,800))
+        self.assertTrue(frame.shape==(440,256))
 
     def test_store_frame(self):
-        self.acq.runAcquirer()
+        for _ in range(1010):
+            self.acq.runAcquirer()
         frame = self.limbo.get('curr_frame')
-        self.assertTrue(frame.shape==(500,800))
+        self.assertTrue(frame.shape==(440,256))
 
     def tearDown(self):
         super(Acquirer_Setup, self).tearDown()

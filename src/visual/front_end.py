@@ -34,6 +34,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.checkBox.setChecked(True)
 
         #init line plot
+        self.flag = True
         self.c1 = self.grplot.plot()
         self.c2 = self.grplot_2.plot()
         self.c3 = self.grplot_3.plot()
@@ -43,6 +44,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             plt.setLabel('bottom', "Frames")
             plt.setLabel('left', "Temporal traces")
         self.updateLines()
+        self.activePlot = 'r'
         
         self.nexus = Nexus('NeuralNexus')
         self.nexus.createNexus()
@@ -75,9 +77,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.t = Thread(target=self.nexus.runProcessor)
         self.t.daemon = True
         self.t.start()
-
         #TODO: grey out button until self.t is done, but allow other buttons to be active
-
 
     def update(self):
         ''' Update visualization while running
@@ -100,19 +100,18 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             logger.error('Oh no {0}'.format(e))
         if image is not None:
             self.rawplot.setImage(image.T)
-        
-        #try:
-            #neurCom = self.nexus.getPlotCoM()
-            #penCont=pyqtgraph.mkPen(width=1, color='b')
-            #for c in neurCom:
-                #TODO: offload this to visual class
-                #TODO: and only add item if it doesn't yet exist
-                #shp = shp[~np.isnan(shp).any(axis=-1)]
-                #positions = tuple(map(tuple,shp))
-                #self.rawplot.getView().addItem(CircleROI(positions, closed=True, pos=self.selected[0].T-5, pen=penCont))
-            #    self.rawplot.getView().addItem(CircleROI(pos = np.array([c[1], c[0]])-5, size=10, movable=False, pen=penCont))
-        #except Exception as e:
-        #    logger.error('Something {0}'.format(e))
+
+        penCont=pyqtgraph.mkPen(width=1, color='b')
+        try:
+            neurCom = self.nexus.getPlotCoM()
+            if neurCom: #add neurons, need to add contours to graph
+                for c in neurCom:
+                    #TODO: delete and re-add circle for all (?) neurons if they've moved beyond a 
+                    # certain distance (set via params...)
+                    self.rawplot.getView().addItem(CircleROI(pos = np.array([c[1], c[0]])-5, size=10, movable=False, pen=penCont))
+            #TODO: keep track of added neurons and likely not update positions, only add new ones.
+        except Exception as e:
+            logger.error('Something {0}'.format(e))
 
     def updateLines(self):
         ''' Helper function to plot the line traces
@@ -134,6 +133,12 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.c1.setData(X, Y[0], pen=pen)
             self.c2.setData(X, Y[1], pen=pen2)
             self.c3.setData(X, Y[2], pen=pen3)
+            
+            if(self.flag):
+                self.selected = self.nexus.getPlotCoM()
+                print('selected is ', self.selected)
+                self._updateRedCirc()
+                self.flag = False
 
     def mouseClick(self, event):
         '''Clicked on raw image to select neurons
@@ -141,14 +146,31 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         #TODO: make this unclickable until finished updated plot (?)
         event.accept()
         mousePoint = event.pos()
+        print('Clicked ', mousePoint)
         self.selected = self.nexus.selectNeurons(int(mousePoint.x()), int(mousePoint.y()))
         selectedraw = np.zeros(2)
         selectedraw[0] = int(mousePoint.x())
         selectedraw[1] = int(mousePoint.y())
-        print('selectedRaw is ', selectedraw, ' but found selected is ', self.selected)
+        #print('selectedRaw is ', selectedraw, ' and found selected is ', self.selected)
+        self._updateRedCirc()
+            
+
+    def _updateRedCirc(self):
+        ''' Circle neuron whose activity is in top (red) graph
+            Default is neuron #0 from initialize
+            #TODO: raise error if no neurons found (for all plotting..)
+            #TODO: add arg instead of self.selected
+        '''
         ROIpen1=pyqtgraph.mkPen(width=1, color='r')
+        if self.flag:
+            self.red_circ = CircleROI(pos = np.array([self.selected[0][1], self.selected[0][0]])-5, size=10, movable=False, pen=ROIpen1)
+            self.rawplot.getView().addItem(self.red_circ)
         if np.count_nonzero(self.selected[0]) > 0:
-            self.rawplot.getView().addItem(CircleROI(pos = self.selected[0]-5, size=10, movable=False, pen=ROIpen1))
+            self.rawplot.getView().removeItem(self.red_circ)
+            self.red_circ = CircleROI(pos = np.array([self.selected[0][1], self.selected[0][0]])-5, size=10, movable=False, pen=ROIpen1)
+            self.rawplot.getView().addItem(self.red_circ)
+
+
 
     def closeEvent(self, event):
         '''Clicked x/close on window

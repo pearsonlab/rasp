@@ -3,7 +3,7 @@ import pickle
 import cv2
 import numpy as np
 import scipy.sparse
-from nexus.store import Limbo
+from nexus.store import Limbo, CannotGetObjectError
 from caiman.source_extraction import cnmf
 from caiman.source_extraction.cnmf.utilities import detrend_df_f
 from caiman.source_extraction.cnmf.online_cnmf import OnACID
@@ -149,9 +149,10 @@ class CaimanProcessor(Processor):
         self.detect_time = []
         self.shape_time = []
         proc_params = self.client.get('params_dict')
-        #fnames = proc_params['fnames']
         output = proc_params['output']
+        fnames = proc_params['fnames']
         self.fnames = self._checkFrames(fnames)
+        
         if self.fnames is not None:
             # still more to process
             init_batch = [self.params['init_batch']]+[0]*(len(self.fnames)-1)
@@ -188,11 +189,11 @@ class CaimanProcessor(Processor):
         self.shape_time = np.array(self.onAc.t_shapes)
         self.detect_time = np.array(self.onAc.t_detect)
 
-        np.savetxt('timing/process_time.txt', np.array(self.process_time))
-        np.savetxt('timing/shape_time.txt', self.shape_time)
-        np.savetxt('timing/detect_time.txt', self.detect_time)
-        np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
-        np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
+        # np.savetxt('timing/process_time.txt', np.array(self.process_time))
+        # np.savetxt('timing/shape_time.txt', self.shape_time)
+        # np.savetxt('timing/detect_time.txt', self.detect_time)
+        # np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
+        # np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
 
         print('mean time per frame ', np.mean(self.process_time))
 
@@ -271,6 +272,10 @@ class CaimanProcessor(Processor):
         ''' Check to see if we have frames for processing
         '''
         return fnames
+        # try:
+        #     self.fnames = self.client.get('frame')
+        # except CannotGetObjectError:
+        #     logger.error('No frames')
 
 
     def _processFrame(self, frame, frame_number):
