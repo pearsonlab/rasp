@@ -26,8 +26,11 @@ class Nexus_Setup(TestCase):
 
     def test_consecProc(self):
         self.nexus.setupProcessor()
-        for _ in range(1):
-            self.nexus.runProcessor()
+        self.nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
+        #for _ in range(1):
+        #    self.nexus.runProcessor()
+        self.nexus.run()
+        self.nexus.run()
         self.assertTrue(1)
 
     def tearDown(self):

@@ -89,7 +89,7 @@ class Limbo(StoreInterface):
             object_id = self.client.put(object)
             #print('we did a plasma put in put ', object_id)
             self.updateStored(object_name, object_id)
-            logger.error('object successfully stored: '+object_name)
+            logger.info('object successfully stored: '+object_name)
             #print(object_id)
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
@@ -180,7 +180,7 @@ class Limbo(StoreInterface):
             Otherwise throw CannotGetObject to request dict update
             TODO: update for lists of objects
         '''
-        print('trying to get ', object_name)
+        #print('trying to get ', object_name)
         if self.stored.get(object_name) is None:
             logger.error('Never recorded storing this object: '+object_name)
             # Don't know anything about this object, treat as problematic
@@ -204,6 +204,14 @@ class Limbo(StoreInterface):
         #print('trying to get object, ', object_name)
         res = self.client.get(self.stored.get(object_name), 0)
         # Can also use contains() to check
+        if isinstance(res, ObjectNotAvailable):
+            logger.warn('Object {} cannot be found.'.format(object_name))
+            raise ObjectNotFoundError
+        else:
+            return res
+
+    def getID(self, obj_id):
+        res = self.client.get(obj_id,0)
         if isinstance(res, ObjectNotAvailable):
             logger.warn('Object {} cannot be found.'.format(object_name))
             raise ObjectNotFoundError

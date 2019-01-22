@@ -111,12 +111,14 @@ class CaimanProcessor(Processor):
         '''
         return self.onAc.estimates
 
-    def setupProcess(self):
+    def setupProcess(self, q_in):
         ''' Create OnACID object and initialize it
                 (runs initialize online)
             limboClient is a client to the data store server
             TODO: put configParams in store and load here
         '''
+        self.q_in = q_in
+
         self.loadParams()
         self.params = self.client.get('params_dict')
         
@@ -125,7 +127,7 @@ class CaimanProcessor(Processor):
         
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)
-        self.frame_number = self.params['init_batch']
+        self.frame_number = 0 #self.params['init_batch']
         self.onAc.initialize_online()
         self.max_shifts_online = self.onAc.params.get('online', 'max_shifts_online')
 
@@ -148,30 +150,30 @@ class CaimanProcessor(Processor):
         self.procFrame_time = [] #aka t_motion
         self.detect_time = []
         self.shape_time = []
-        proc_params = self.client.get('params_dict')
-        output = proc_params['output']
-        fnames = proc_params['fnames']
-        self.fnames = self._checkFrames(fnames)
+        #proc_params = self.client.get('params_dict')
+        output = self.params['output']
+        init = self.params['init_batch']
+        frame = self._checkFrames()
         
-        if self.fnames is not None:
-            # still more to process
-            init_batch = [self.params['init_batch']]+[0]*(len(self.fnames)-1)
-            for file_count, ffll in enumerate(self.fnames):
-                print('Loading file:', ffll, ' current frame ', self.frame_number)
-                Y = cm.load(ffll, subindices=slice(init_batch[file_count], None, None))
-                # TODO replace load with image grab from store
-                for frame_count, frame in enumerate(Y):
-                    t = time.time()
-                    frame = self._processFrame(frame, self.frame_number)
-                    self._fitFrame(self.frame_number, frame.reshape(-1, order='F'))
-                    #if frame_count % 5 == 0: 
-                    self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
-                    self.process_time.append([time.time()-t])
-                    self.frame_number += 1
-            if self.onAc.params.get('online', 'normalize'):
-                # normalize final estimates for this set of files. Useful?
-                #self._normAnalysis()
-                self.putAnalysis(self.onAc.estimates, output)
+        if frame is not None:
+            #print(frame[0])
+            frame = self.client.getID(frame[0][str(self.frame_number)])
+            #print(self.client.get_all())
+            t = time.time()
+            frame = self._processFrame(frame, self.frame_number+init)
+            self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
+            #if frame_count % 5 == 0: 
+            self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
+            self.process_time.append([time.time()-t])
+            self.frame_number += 1
+        else:
+            raise Exception
+
+    def finalProcess(self, output):    
+        if self.onAc.params.get('online', 'normalize'):
+            # normalize final estimates for this set of files. Useful?
+            #self._normAnalysis()
+            self.putAnalysis(self.onAc.estimates, output)
             #self._finalAnalysis(frame_number)
             #self.putAnalysis(self.finalEstimates, output)
         
@@ -233,6 +235,7 @@ class CaimanProcessor(Processor):
     def makeImage(self):
         '''Create image data for visualiation
             Using caiman code here
+            #TODO: move to CaimanVisual class
         '''
         mn = self.onAc.M - self.onAc.N
         image = None
@@ -268,14 +271,14 @@ class CaimanProcessor(Processor):
         self.finalEstimates.noisyC = self.onAc.estimates.noisyC[:self.onAc.M]
 
 
-    def _checkFrames(self, fnames):
+    def _checkFrames(self):
         ''' Check to see if we have frames for processing
         '''
-        return fnames
-        # try:
-        #     self.fnames = self.client.get('frame')
-        # except CannotGetObjectError:
-        #     logger.error('No frames')
+        try:
+            return self.q_in.get()
+            #return self.client.get('frame')
+        except CannotGetObjectError:
+            logger.error('No frames')
 
 
     def _processFrame(self, frame, frame_number):

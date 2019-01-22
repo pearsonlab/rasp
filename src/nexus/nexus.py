@@ -1,7 +1,8 @@
 import sys
 import time
 import subprocess
-from multiprocessing import Process
+from multiprocessing import Process, Queue
+from threading import Thread
 import numpy as np
 import pyarrow as arrow
 import pyarrow.plasma as plasma
@@ -27,7 +28,7 @@ class Nexus():
         return Tweak(file)
 
     def createNexus(self):
-        self._startStore(100000) #default size should be system-dependent
+        self._startStore(100000000) #default size should be system-dependent
     
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
@@ -46,6 +47,7 @@ class Nexus():
         self.procLimbo = store.Limbo(self.procName)
         self.Processor = CaimanProcessor(self.procName, self.procLimbo)
         self.ests = None #TODO: this should be Activity as general spike estimates
+        self.queue = Queue()
 
         self.acqName = self.tweak.acqName
         self.acqLimbo = store.Limbo(self.acqName)
@@ -54,29 +56,62 @@ class Nexus():
     def setupProcessor(self):
         '''Setup process parameters
         '''
-        self.Processor = self.Processor.setupProcess()
+        self.Processor = self.Processor.setupProcess(self.queue)
 
     def setupAcquirer(self, filename):
         ''' Load data from file
         '''
-        self.Acquirer.setupAcquirer(filename)
+        self.Acquirer.setupAcquirer(filename, self.queue)
 
     def runProcessor(self):
         '''Run the processor continually on input frames
         '''
-        self.Processor.client.reset() #Reset client to limbo...FIXME
-        t = time.time()
-        frame_loc = self.Acquirer.client.getStored()['curr_frame']
-        self.Processor.client.updateStored('frame', frame_loc)
-        self.Processor.runProcess()
-        frames = self.Processor.getTime()
-        print('time for ', frames, ' frames is ', time.time()-t, ' s')
-        logger.warning('Done running process')
+        while True:
+        #self.Processor.client.reset() #Reset client to limbo...FIXME
+        #t = time.time()
+            try: 
+            #frame_loc = self.Acquirer.client.getStored()['curr_frame']
+            #self.Processor.client.updateStored('frame', frame_loc)
+                self.Processor.runProcess()
+            except Exception as e:
+                logger.warning('No available frames for processing: {0}'.format(e))
+                break
+        
+        #frames = self.Processor.getTime()
+        #print('time for ', frames, ' frames is ', time.time()-t, ' s')
+        #logger.warning('Done running process')
 
     def runAcquirer(self):
         ''' Run the acquirer continually 
         '''
-        self.Acquirer.runAcquirer()
+        while True:
+            self.Acquirer.runAcquirer()
+            if self.Acquirer.data is None:
+                break
+
+    def run(self):
+        t=time.time()
+        #while True:
+        #    self.runAcquirer()
+        #    if self.Acquirer.data is not None:
+        #        self.runProcessor()
+        #    else:
+        #        logger.warning('No more data')
+        #        break
+        self.t1 = Process(target=self.runAcquirer)
+        self.t1.daemon = True
+        #self.t.start()        
+        self.t2 = Process(target=self.runProcessor)
+        self.t2.daemon = True
+
+        self.t1.start()
+        self.t2.start()
+
+        self.t2.join()
+        self.t1.join()
+
+        logger.warning('Done with available frames')
+        print('total time ', time.time()-t)
 
     def getEstimates(self):
         '''Get estimates aka neural Activity

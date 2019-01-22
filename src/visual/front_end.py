@@ -51,6 +51,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #Currently running initialize here        
         self.nexus.setupProcessor()
+        self.nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
 
         self.pushButton_3.clicked.connect(_call(self._runProcess))
         self.pushButton_3.clicked.connect(_call(self.update))
@@ -74,7 +75,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def _runProcess(self):
         '''Run ImageProcessor in separate thread
         '''
-        self.t = Thread(target=self.nexus.runProcessor)
+        self.t = Thread(target=self.nexus.run) #Processor)
         self.t.daemon = True
         self.t.start()
         #TODO: grey out button until self.t is done, but allow other buttons to be active
