@@ -183,7 +183,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.nexus.destroyNexus()
             event.accept()
         else: event.ignore()
-
+            
 
 def _call(fnc, *args, **kwargs):
     ''' Call handler for (external) events

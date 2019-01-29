@@ -59,11 +59,10 @@ class FileAcquirer(Acquirer):
         if(self.frame_num < len(self.data)):
             #id = self.client.replace(self.getFrame(self.frame_num), 'curr_frame')
             id = self.client.put(self.getFrame(self.frame_num), str(self.frame_num))
-            print(self.frame_num, self.client.get_all())
             self.q_out.put([{str(self.frame_num):id}])
             #print('put ', id, ' in store')
             self.frame_num += 1
-            time.sleep(0.01)
+            time.sleep(0.067)
         else:
             logger.error('Done with all available frames: {0}'.format(self.frame_num))
             #self.client.delete('curr_frame')

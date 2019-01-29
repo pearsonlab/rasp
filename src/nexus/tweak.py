@@ -16,10 +16,12 @@ class Tweak():
             self.configFile = configFile
 
         
-        self.visName = {}
-        self.procName = {}
-        self.acqName = {}
+        self.visName = 'visual'
+        self.procName = 'processor'
+        self.acqName = 'acquirer'
 
+    def getConnections(self):
+        return []
 
     def addVisual(self, newVisual):
          # newVisual is a visual object, has a name

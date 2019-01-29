@@ -2,9 +2,7 @@ import sys
 import time
 import subprocess
 from multiprocessing import Process, Queue
-from threading import Thread
 import numpy as np
-import pyarrow as arrow
 import pyarrow.plasma as plasma
 from nexus import store
 from nexus.tweak import Tweak
@@ -25,7 +23,14 @@ class Nexus():
     
     def loadTweak(self, file=None):
         #TODO load from file or user input
-        return Tweak(file)
+        tweak = Tweak()
+
+        for connection in tweak.getConnections():
+            q = Queue()
+            self.queues.append(q)
+            self.connections.update({connection:q})
+
+        return tweak
 
     def createNexus(self):
         self._startStore(100000000) #default size should be system-dependent
@@ -73,10 +78,13 @@ class Nexus():
             #frame_loc = self.Acquirer.client.getStored()['curr_frame']
             #self.Processor.client.updateStored('frame', frame_loc)
                 self.Processor.runProcess()
+                if self.Processor.done:
+                    print('Dropped frames: ', self.Processor.dropped_frames)
+                    print('Total number of dropped frames ', len(self.Processor.dropped_frames))
+                    return
             except Exception as e:
-                logger.warning('No available frames for processing: {0}'.format(e))
+                logger.exception('What happened: {0}'.format(e))
                 break
-        
         #frames = self.Processor.getTime()
         #print('time for ', frames, ' frames is ', time.time()-t, ' s')
         #logger.warning('Done running process')
@@ -91,16 +99,10 @@ class Nexus():
 
     def run(self):
         t=time.time()
-        #while True:
-        #    self.runAcquirer()
-        #    if self.Acquirer.data is not None:
-        #        self.runProcessor()
-        #    else:
-        #        logger.warning('No more data')
-        #        break
+        
         self.t1 = Process(target=self.runAcquirer)
         self.t1.daemon = True
-        #self.t.start()        
+
         self.t2 = Process(target=self.runProcessor)
         self.t2.daemon = True
 
@@ -116,7 +118,8 @@ class Nexus():
     def getEstimates(self):
         '''Get estimates aka neural Activity
         '''
-        return self.Processor.getEstimates()
+        #return self.Processor.getEstimates()
+        return self.limbo.get('outputEstimates')
 
     def getTime(self):
         '''TODO: grabe from input source, not processor

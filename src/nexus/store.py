@@ -93,8 +93,6 @@ class Limbo(StoreInterface):
             #print(object_id)
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
-            print(self.client.list())
-            print(self.stored.keys())
             #raise PlasmaObjectExists
         except Exception as e:
             logger.error('could not store object: {0}'.format(e))
@@ -212,8 +210,8 @@ class Limbo(StoreInterface):
 
     def getID(self, obj_id):
         res = self.client.get(obj_id,0)
-        if isinstance(res, ObjectNotAvailable):
-            logger.warn('Object {} cannot be found.'.format(object_name))
+        if isinstance(res, type):
+            logger.warning('Object {} cannot be found.'.format(obj_id))
             raise ObjectNotFoundError
         else:
             return res

@@ -3,7 +3,7 @@ import pickle
 import cv2
 import numpy as np
 import scipy.sparse
-from nexus.store import Limbo, CannotGetObjectError
+from nexus.store import Limbo, CannotGetObjectError, ObjectNotFoundError
 from caiman.source_extraction import cnmf
 from caiman.source_extraction.cnmf.utilities import detrend_df_f
 from caiman.source_extraction.cnmf.online_cnmf import OnACID
@@ -118,6 +118,8 @@ class CaimanProcessor(Processor):
             TODO: put configParams in store and load here
         '''
         self.q_in = q_in
+        self.done = False
+        self.dropped_frames = []
 
         self.loadParams()
         self.params = self.client.get('params_dict')
@@ -156,18 +158,27 @@ class CaimanProcessor(Processor):
         frame = self._checkFrames()
         
         if frame is not None:
+            self.done = False
             #print(frame[0])
-            frame = self.client.getID(frame[0][str(self.frame_number)])
-            #print(self.client.get_all())
-            t = time.time()
-            frame = self._processFrame(frame, self.frame_number+init)
-            self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
-            #if frame_count % 5 == 0: 
-            self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
-            self.process_time.append([time.time()-t])
-            self.frame_number += 1
+            try:
+                frame = self.client.getID(frame[0][str(self.frame_number)])
+                #print(self.client.get_all())
+                t = time.time()
+                frame = self._processFrame(frame, self.frame_number+init)
+                self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
+                #if frame_count % 5 == 0: 
+                self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
+                self.process_time.append([time.time()-t])
+                self.frame_number += 1
+            except ObjectNotFoundError:
+                logger.error('Frame unavailable from store, droppping')
+                self.dropped_frames.append(self.frame_number)
+                self.frame_number += 1
+            except KeyError as e:
+                logger.error('Key error... {0}'.format(e))
+                print(frame)
         else:
-            raise Exception
+            self.done = True
 
     def finalProcess(self, output):    
         if self.onAc.params.get('online', 'normalize'):
@@ -215,7 +226,9 @@ class CaimanProcessor(Processor):
         
         self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
         self.putAnalysis_time.append([time.time()-t])
-        #   self.client.replace(dF, output)
+        
+        self.client.replace(self.ests, output)
+
         self.coords = get_contours(A, self.onAc.dims)
         #TODO: instead of get from Nexus, put into store
 
@@ -279,6 +292,7 @@ class CaimanProcessor(Processor):
             #return self.client.get('frame')
         except CannotGetObjectError:
             logger.error('No frames')
+            self.done = True
 
 
     def _processFrame(self, frame, frame_number):
