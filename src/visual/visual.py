@@ -39,6 +39,9 @@ class CaimanVisual(Visual):
         else:
             window = frame_number
 
+        if len(ests)<3:
+            return None,None
+
         Y0 = ests[self.plots[0]][frame_number-window:frame_number]
         Y1 = ests[self.plots[1]][frame_number-window:frame_number]
         Y2 = ests[self.plots[2]][frame_number-window:frame_number]

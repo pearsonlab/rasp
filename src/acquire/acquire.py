@@ -2,6 +2,7 @@ import time
 import os
 import h5py
 import numpy as np
+import asyncio
 import logging; logger = logging.getLogger(__name__)
 
 class Acquirer():
@@ -59,9 +60,12 @@ class FileAcquirer(Acquirer):
         if(self.frame_num < len(self.data)):
             #id = self.client.replace(self.getFrame(self.frame_num), 'curr_frame')
             id = self.client.put(self.getFrame(self.frame_num), str(self.frame_num))
-            self.q_out.put([{str(self.frame_num):id}])
-            #print('put ', id, ' in store')
-            self.frame_num += 1
+            try:
+                self.q_out.put([{str(self.frame_num):id}])
+                self.frame_num += 1
+            except Exception as e:
+                logger.error('AAAA: {}'.format(e))
+
             time.sleep(0.067)
         else:
             logger.error('Done with all available frames: {0}'.format(self.frame_num))

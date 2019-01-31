@@ -13,6 +13,7 @@ from caiman.utils.visualization import get_contours
 import caiman as cm
 from os.path import expanduser
 import os
+import asyncio
 import logging; logger = logging.getLogger(__name__)
 
 
@@ -111,15 +112,18 @@ class CaimanProcessor(Processor):
         '''
         return self.onAc.estimates
 
-    def setupProcess(self, q_in):
+    def setupProcess(self, q_in, q_out):
         ''' Create OnACID object and initialize it
                 (runs initialize online)
             limboClient is a client to the data store server
             TODO: put configParams in store and load here
         '''
         self.q_in = q_in
+        self.q_out = q_out
         self.done = False
         self.dropped_frames = []
+        self.coords = None
+        self.ests = None
 
         self.loadParams()
         self.params = self.client.get('params_dict')
@@ -226,10 +230,16 @@ class CaimanProcessor(Processor):
         
         self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
         self.putAnalysis_time.append([time.time()-t])
-        
-        self.client.replace(self.ests, output)
-
         self.coords = get_contours(A, self.onAc.dims)
+        self.image = self.makeImage()
+        # print('ests ', self.ests)
+        # print('coords ', self.coords)
+        # print('image', self.image)
+        self.q_out.put([self.ests, self.coords, self.image])
+
+        #self.client.replace(self.ests, output)
+
+        
         #TODO: instead of get from Nexus, put into store
 
     def getEstimates(self):
@@ -288,7 +298,8 @@ class CaimanProcessor(Processor):
         ''' Check to see if we have frames for processing
         '''
         try:
-            return self.q_in.get()
+            res = self.q_in.get()
+            return res
             #return self.client.get('frame')
         except CannotGetObjectError:
             logger.error('No frames')

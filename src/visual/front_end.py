@@ -99,7 +99,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             image = self.nexus.getPlotRaw()
         except Exception as e:
             logger.error('Oh no {0}'.format(e))
-        if image is not None:
+        if image is not None and np.unique(image).size > 1:
             self.rawplot.setImage(image.T)
 
         penCont=pyqtgraph.mkPen(width=1, color='b')

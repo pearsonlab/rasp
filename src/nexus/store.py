@@ -204,6 +204,7 @@ class Limbo(StoreInterface):
         # Can also use contains() to check
         if isinstance(res, ObjectNotAvailable):
             logger.warn('Object {} cannot be found.'.format(object_name))
+            print(self.client.list())
             raise ObjectNotFoundError
         else:
             return res
