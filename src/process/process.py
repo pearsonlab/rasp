@@ -156,7 +156,6 @@ class CaimanProcessor(Processor):
         frame = self._checkFrames()
         
         if frame is not None:
-            #print(frame[0])
             frame = self.client.getID(frame[0][str(self.frame_number)])
             #print(self.client.get_all())
             t = time.time()

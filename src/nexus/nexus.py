@@ -98,10 +98,10 @@ class Nexus():
         #    else:
         #        logger.warning('No more data')
         #        break
-        self.t1 = Process(target=self.runAcquirer)
+        self.t1 = Thread(target=self.runAcquirer)
         self.t1.daemon = True
         #self.t.start()        
-        self.t2 = Process(target=self.runProcessor)
+        self.t2 = Thread(target=self.runProcessor)
         self.t2.daemon = True
 
         self.t1.start()

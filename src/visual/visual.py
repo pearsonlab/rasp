@@ -38,6 +38,8 @@ class CaimanVisual(Visual):
             window = 300
         else:
             window = frame_number
+        
+        print(ests.shape)
 
         Y0 = ests[self.plots[0]][frame_number-window:frame_number]
         Y1 = ests[self.plots[1]][frame_number-window:frame_number]
