@@ -2,7 +2,6 @@ import sys
 from PyQt5 import QtGui,QtCore
 from PyQt5.QtGui import QColor
 from visual import rasp_ui
-from nexus.nexus import Nexus
 import numpy as np
 import pylab
 import time
@@ -43,15 +42,15 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             plt.getAxis('bottom').setTickSpacing(major=50, minor=50)
             plt.setLabel('bottom', "Frames")
             plt.setLabel('left', "Temporal traces")
-        self.updateLines()
+        #self.updateLines()
         self.activePlot = 'r'
         
-        self.nexus = Nexus('NeuralNexus')
-        self.nexus.createNexus()
+        #self.nexus = Nexus('NeuralNexus')
+        #self.nexus.createNexus()
 
         #Currently running initialize here        
-        self.nexus.setupProcessor()
-        self.nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
+        # self.nexus.setupProcessor()
+        # self.nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
 
         self.pushButton_3.clicked.connect(_call(self._runProcess))
         self.pushButton_3.clicked.connect(_call(self.update))

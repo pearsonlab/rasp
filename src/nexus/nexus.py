@@ -10,8 +10,10 @@ from nexus.tweak import Tweak
 from process.process import CaimanProcessor
 from acquire.acquire import FileAcquirer
 from visual.visual import CaimanVisual
+from visual.front_end import FrontEnd
 from threading import Thread
 import asyncio
+from PyQt5 import QtGui,QtCore
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -125,6 +127,11 @@ class Nexus():
 
         self.t1.start()
         self.t2.start()
+
+        app = QtGui.QApplication(sys.argv)
+        rasp = FrontEnd()
+        rasp.show()
+        app.exec_()
 
         self.t2.join()
         self.t1.join()
@@ -277,8 +284,11 @@ class AsyncQueue(object):
 
 
 if __name__ == '__main__':
-    testNexus = Nexus('test')
-    testNexus.createNexus()
+    nexus = Nexus('test')
+    nexus.createNexus()
+    nexus.setupProcessor()
+    nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
+    nexus.run()
     testNexus.destroyNexus()
     
     
