@@ -87,7 +87,7 @@ class CaimanProcessor(Processor):
                    'init_method': 'bare',
                    'normalize': True,
                    'sniper_mode': False,
-                   'K': 2,
+                   'K': 10,
                    'epochs': 1,
                    'max_shifts_online': np.ceil(10).astype('int'),
                    'pw_rigid': False,

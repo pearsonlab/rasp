@@ -28,7 +28,7 @@ class Nexus():
         return Tweak(file)
 
     def createNexus(self):
-        self._startStore(100000000) #default size should be system-dependent
+        self._startStore(1000000000) #default size should be system-dependent
     
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()

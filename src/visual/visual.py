@@ -28,24 +28,40 @@ class CaimanVisual(Visual):
         self.com2 = np.zeros(2)
         self.com3 = np.zeros(2)
         self.neurons = []
+        self.estsAvg = []
 
     def plotEstimates(self, ests, frame_number):
         ''' Take numpy estimates and t=frame_number
             Create X and Y for plotting, return
         '''
-        if frame_number >= 300:
+        #print('before')
+        avg = self.runAvg(ests)[self.plots[0]]
+        #print('after')
+
+        if frame_number >= 200:
             # TODO: change to init batch here
-            window = 300
+            window = 200
         else:
             window = frame_number
         
-        print(ests.shape)
-
         Y0 = ests[self.plots[0]][frame_number-window:frame_number]
         Y1 = ests[self.plots[1]][frame_number-window:frame_number]
         Y2 = ests[self.plots[2]][frame_number-window:frame_number]
         X = np.arange(0,Y0.size)+(frame_number-window)
-        return X,[Y0,Y1,Y2]
+        return X,[Y0,Y1,Y2],avg
+
+    def runAvg(self, ests):
+        estsAvg = []
+        # TODO: this goes in another class
+        for i in range(ests.shape[0]):
+            tmpList = []
+            for j in range(int(np.floor(ests.shape[1]/100))+1):
+                tmp = np.mean(ests[int(i)][int(j)*100:int(j)*100+100])
+                tmpList.append(tmp)
+            estsAvg.append(tmpList)
+        self.estsAvg = np.array(estsAvg)
+        return self.estsAvg
+
 
     def selectNeurons(self, x, y, coords):
         ''' x and y are coordinates

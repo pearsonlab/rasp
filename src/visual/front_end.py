@@ -1,7 +1,7 @@
 import sys
 from PyQt5 import QtGui,QtCore
 from PyQt5.QtGui import QColor
-from visual import rasp_ui
+from visual import rasp_ui2
 from nexus.nexus import Nexus
 import numpy as np
 import pylab
@@ -16,7 +16,7 @@ from process.process import CaimanProcessor as cp
 import logging; logger = logging.getLogger(__name__)
 
 
-class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
+class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
 
     def __init__(self, parent=None):
         ''' Setup GUI
@@ -37,14 +37,37 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.flag = True
         self.c1 = self.grplot.plot()
         self.c2 = self.grplot_2.plot()
-        self.c3 = self.grplot_3.plot()
-        grplot = [self.grplot, self.grplot_2, self.grplot_3]
+        #self.c3 = self.grplot_3.plot()
+        grplot = [self.grplot, self.grplot_2] #, self.grplot_3]
         for plt in grplot:
             plt.getAxis('bottom').setTickSpacing(major=50, minor=50)
             plt.setLabel('bottom', "Frames")
             plt.setLabel('left', "Temporal traces")
         self.updateLines()
         self.activePlot = 'r'
+
+        #polar plot
+        self.polar = self.grplot_3
+        self.polar.setAspectLocked()
+        # Add polar grid lines
+        self.polar.addLine(x=0, pen=0.2)
+        self.polar.addLine(y=0, pen=0.2)
+        for r in range(1, 8, 2):
+            circle = pyqtgraph.QtGui.QGraphicsEllipseItem(-r, -r, r*2, r*2)
+            circle.setPen(pyqtgraph.mkPen(0.1))
+            self.polar.addItem(circle)
+
+        # make polar data
+        self.theta = np.linspace(0, 2*np.pi, 10)
+        self.theta = np.append(self.theta,0)
+        self.radius = np.zeros(11) #np.random.normal(loc=10, size=10)
+
+        # Transform to cartesian and plot
+        self.x = self.radius * np.cos(self.theta)
+        self.y = self.radius * np.sin(self.theta)
+        self.pp = self.polar.plot()
+        self.pp.setData(self.x, self.y, pen=pyqtgraph.mkPen(color='r'))
+
         
         self.nexus = Nexus('NeuralNexus')
         self.nexus.createNexus()
@@ -124,22 +147,34 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         pen2=pyqtgraph.mkPen(width=2, color='b')
         pen3=pyqtgraph.mkPen(width=2, color='g')
         Y = None
+        avg = None
         try:
             #self.ests = self.nexus.getEstimates()
-            (X, Y) = self.nexus.getPlotEst()
+            (X, Y, avg) = self.nexus.getPlotEst()
         except Exception as e:
-            logger.error('output does not yet exist. error: {}'.format(e))
+            logger.info('output does not yet exist. error: {}'.format(e))
 
         if(Y is not None):
             self.c1.setData(X, Y[0], pen=pen)
             self.c2.setData(X, Y[1], pen=pen2)
-            self.c3.setData(X, Y[2], pen=pen3)
+            #self.c3.setData(X, Y[2], pen=pen3)
             
             if(self.flag):
                 self.selected = self.nexus.getPlotCoM()
                 print('selected is ', self.selected)
                 self._updateRedCirc()
                 self.flag = False
+
+        if(avg is not None):
+            #print(avg[0])
+            #print(avg[0].shape)
+            self.radius = np.zeros(11)
+            self.radius[:len(avg)] = avg
+            #print(self.radius)
+            self.x = self.radius * np.cos(self.theta)
+            self.y = self.radius * np.sin(self.theta)
+            #self.polar.plot(self.x, self.y, pen=pyqtgraph.mkPen(color='r'))
+            self.pp.setData(self.x, self.y, pen=pyqtgraph.mkPen(width=2, color='m'))
 
     def mouseClick(self, event):
         '''Clicked on raw image to select neurons
