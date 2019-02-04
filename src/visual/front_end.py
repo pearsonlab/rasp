@@ -1,4 +1,5 @@
 import sys
+import os
 from PyQt5 import QtGui,QtCore
 from PyQt5.QtGui import QColor
 from visual import rasp_ui2
@@ -74,7 +75,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
 
         #Currently running initialize here        
         self.nexus.setupProcessor()
-        self.nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
+        cwd = os.getcwd()
+        self.nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
 
         self.pushButton_3.clicked.connect(_call(self._runProcess))
         self.pushButton_3.clicked.connect(_call(self.update))
