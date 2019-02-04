@@ -182,6 +182,8 @@ class CaimanProcessor(Processor):
                 logger.error('Key error... {0}'.format(e))
                 print(frame)
         else:
+            logger.error('Done with all available frames: {0}'.format(self.frame_number))
+            self.q_out.put(None)
             self.done = True
 
     def finalProcess(self, output):    

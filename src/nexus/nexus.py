@@ -60,8 +60,8 @@ class Nexus():
         self.image = None
         self.coords = None
 
-        self.queue = Link()
-        self.queueProc = Link()
+        self.queues = {}
+        #self.queues.update({'acq_proc':Link('acq_proc'), 'proc_comm':Link('proc_comm')})
 
         self.acqName = self.tweak.acqName
         self.acqLimbo = store.Limbo(self.acqName)
@@ -70,12 +70,14 @@ class Nexus():
     def setupProcessor(self):
         '''Setup process parameters
         '''
-        self.Processor = self.Processor.setupProcess(self.queue, self.queueProc)
+        self.queues.update({'acq_proc':Link('acq_proc'), 'proc_comm':Link('proc_comm')})
+        self.Processor = self.Processor.setupProcess(self.queues['acq_proc'], self.queues['proc_comm'])
 
     def setupAcquirer(self, filename):
         ''' Load data from file
         '''
-        self.Acquirer.setupAcquirer(filename, self.queue)
+        self.queues.update({'acq_comm':Link('acq_comm')})
+        self.Acquirer.setupAcquirer(filename, self.queues['acq_proc'], self.queues['acq_comm'])
 
     def runProcessor(self):
         '''Run the processor continually on input frames
@@ -87,7 +89,7 @@ class Nexus():
             #frame_loc = self.Acquirer.client.getStored()['curr_frame']
             #self.Processor.client.updateStored('frame', frame_loc)
                 self.Processor.runProcess()
-                self.getEstimates()
+                #self.getEstimates()
                 if self.Processor.done:
                     print('Dropped frames: ', self.Processor.dropped_frames)
                     print('Total number of dropped frames ', len(self.Processor.dropped_frames))
@@ -128,10 +130,14 @@ class Nexus():
         self.t1.start()
         self.t2.start()
 
-        app = QtGui.QApplication(sys.argv)
-        rasp = FrontEnd()
-        rasp.show()
-        app.exec_()
+        #self.poll_future = asyncio.ensure_future(self.pollQueues)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.pollQueues())
+
+        # app = QtGui.QApplication(sys.argv)
+        # rasp = FrontEnd()
+        # rasp.show()
+        # app.exec_()
 
         self.t2.join()
         self.t1.join()
@@ -139,13 +145,28 @@ class Nexus():
         logger.warning('Done with available frames')
         print('total time ', time.time()-t)
 
+    async def pollQueues(self):
+        while True:
+            acq_comm = await self.queues['acq_comm'].get_async()
+            if acq_comm is None:
+                logger.error('Acquirer is finished')
+            proc_comm = await self.queues['proc_comm'].get_async()
+            if proc_comm is not None:
+                (self.ests, self.coords, self.image) = proc_comm
+                #print('image', self.image)
+            else:
+                logger.error('Processor is finished')
+                break
+            await asyncio.sleep(0.01)
+            self.frame += 1
+
     def getEstimates(self):
         '''Get estimates aka neural Activity
         '''
-        (self.ests, self.coords, self.image) = self.queueProc.get()
+        (self.ests, self.coords, self.image) = self.queues['proc_comm'].get()
         #print('ests ', self.ests)
         #print('coords ', self.coords)
-        print('image', self.image)
+        #print('image', self.image)
         self.frame += 1
         #return self.Processor.getEstimates()
         #return self.limbo.get('outputEstimates')
@@ -223,7 +244,7 @@ class Nexus():
             logger.exception('Store cannot be started: {0}'.format(e))
 
 
-def Link():
+def Link(name):
     ''' Abstract constructor for a queue that Nexus uses for
     inter-process/module signaling and information passing
 
@@ -234,15 +255,16 @@ def Link():
 
     #def __init__(self, maxsize=0):
     m = Manager()
-    q = AsyncQueue(m.Queue(maxsize=0))
+    q = AsyncQueue(m.Queue(maxsize=0), name)
     return q
 
 
 class AsyncQueue(object):
-    def __init__(self,q):
+    def __init__(self,q, name):
         self.queue = q
         self.real_executor = None
         self.cancelled_join = False
+        self.name = name
 
     @property
     def _executor(self):
@@ -289,7 +311,7 @@ if __name__ == '__main__':
     nexus.setupProcessor()
     nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
     nexus.run()
-    testNexus.destroyNexus()
+    nexus.destroyNexus()
     
     
     
