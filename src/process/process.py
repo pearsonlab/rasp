@@ -30,6 +30,10 @@ class Processor():
     def runProcess(self):
         # Get image and then process b/t image and estimates
         raise NotImplementedError
+
+    def run(self):
+        # run in continuous mode
+        raise NotImplementedError
     
     def putAnalysis(self):
         # Update the DS with estimates
@@ -139,6 +143,27 @@ class CaimanProcessor(Processor):
 
         return self
 
+    def run(self):
+        '''Run the processor continually on input frames
+        '''
+        self.process_time = []
+        self.putAnalysis_time = []
+        self.procFrame_time = [] #aka t_motion
+        self.detect_time = []
+        self.shape_time = []
+        while True:
+            try: 
+                self.runProcess()
+                if self.done:
+                    print('Dropped frames: ', self.dropped_frames)
+                    print('Total number of dropped frames ', len(self.dropped_frames))
+                    print('mean time per fit frame ', np.mean(self.process_time))
+                    print('(") put analysis, ', np.mean(np.array(self.putAnalysis_time)))
+                    return
+            except Exception as e:
+                logger.exception('What happened: {0}'.format(e))
+                break  
+
     def runProcess(self):
         ''' Run process. Persists running while it has data
             (TODO). Runs once per set of files. Add new function
@@ -151,11 +176,7 @@ class CaimanProcessor(Processor):
         '''
         #TODO: Error handling for if these parameters don't work
             #should implement in Tweak (?) or getting too complicated for users.
-        self.process_time = []
-        self.putAnalysis_time = []
-        self.procFrame_time = [] #aka t_motion
-        self.detect_time = []
-        self.shape_time = []
+        
         #proc_params = self.client.get('params_dict')
         output = self.params['output']
         init = self.params['init_batch']
@@ -167,12 +188,13 @@ class CaimanProcessor(Processor):
             try:
                 frame = self.client.getID(frame[0][str(self.frame_number)])
                 #print(self.client.get_all())
-                t = time.time()
+                #t = time.time()
                 frame = self._processFrame(frame, self.frame_number+init)
+                t = time.time()
                 self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
+                self.process_time.append([time.time()-t])
                 #if frame_count % 5 == 0: 
                 self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
-                self.process_time.append([time.time()-t])
                 self.frame_number += 1
             except ObjectNotFoundError:
                 logger.error('Frame unavailable from store, droppping')
@@ -222,7 +244,7 @@ class CaimanProcessor(Processor):
             into the output location specified
             TODO rewrite output input
         '''
-        t = time.time()
+        #t = time.time()
         # Just store dF/F traces for now
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
@@ -231,14 +253,18 @@ class CaimanProcessor(Processor):
         f = self.onAc.estimates.C_on[:nb, :self.frame_number]
         
         self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
+
+        t=time.time()
+        #self.coords = get_contours(A, self.onAc.dims)
         self.putAnalysis_time.append([time.time()-t])
-        self.coords = get_contours(A, self.onAc.dims)
+
         self.image = self.makeImage()
+        
         # print('ests ', self.ests)
         # print('coords ', self.coords)
         # print('image', self.image)
-        self.q_out.put([self.ests, self.coords, self.image])
-
+        self.q_out.put([self.ests, A, self.onAc.dims, self.image])
+        
         #self.client.replace(self.ests, output)
 
         

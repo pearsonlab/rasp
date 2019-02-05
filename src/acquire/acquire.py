@@ -68,7 +68,7 @@ class FileAcquirer(Acquirer):
             except Exception as e:
                 logger.error('AAAA: {}'.format(e))
 
-            time.sleep(0.067)
+            time.sleep(0.033)
         else:
             logger.error('Done with all available frames: {0}'.format(self.frame_num))
             #self.client.delete('curr_frame')

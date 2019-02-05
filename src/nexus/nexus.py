@@ -1,4 +1,5 @@
 import sys
+import os
 import time
 import subprocess
 from multiprocessing import Process, Queue, Manager, cpu_count
@@ -58,7 +59,8 @@ class Nexus():
         self.Processor = CaimanProcessor(self.procName, self.procLimbo)
         self.ests = None #TODO: this should be Activity as general spike estimates
         self.image = None
-        self.coords = None
+        self.A = None
+        self.dims = None
 
         self.queues = {}
         #self.queues.update({'acq_proc':Link('acq_proc'), 'proc_comm':Link('proc_comm')})
@@ -82,25 +84,7 @@ class Nexus():
     def runProcessor(self):
         '''Run the processor continually on input frames
         '''
-        while True:
-        #self.Processor.client.reset() #Reset client to limbo...FIXME
-        #t = time.time()
-            try: 
-            #frame_loc = self.Acquirer.client.getStored()['curr_frame']
-            #self.Processor.client.updateStored('frame', frame_loc)
-                self.Processor.runProcess()
-                #self.getEstimates()
-                if self.Processor.done:
-                    print('Dropped frames: ', self.Processor.dropped_frames)
-                    print('Total number of dropped frames ', len(self.Processor.dropped_frames))
-                    return
-            except Exception as e:
-                logger.exception('What happened: {0}'.format(e))
-                break
-
-        #frames = self.Processor.getTime()
-        #print('time for ', frames, ' frames is ', time.time()-t, ' s')
-        #logger.warning('Done running process')
+        self.Processor.run()
 
     def runAcquirer(self):
         ''' Run the acquirer continually 
@@ -152,7 +136,7 @@ class Nexus():
                 logger.error('Acquirer is finished')
             proc_comm = await self.queues['proc_comm'].get_async()
             if proc_comm is not None:
-                (self.ests, self.coords, self.image) = proc_comm
+                (self.ests, self.A, self.dims, self.image) = proc_comm
                 #print('image', self.image)
             else:
                 logger.error('Processor is finished')
@@ -163,7 +147,7 @@ class Nexus():
     def getEstimates(self):
         '''Get estimates aka neural Activity
         '''
-        (self.ests, self.coords, self.image) = self.queues['proc_comm'].get()
+        (self.ests, self.A, self.dims, self.image) = self.queues['proc_comm'].get()
         #print('ests ', self.ests)
         #print('coords ', self.coords)
         #print('image', self.image)
@@ -195,16 +179,16 @@ class Nexus():
     def getPlotContours(self):
         ''' add neuron shapes to raw plot
         '''
-        return self.Visual.plotContours(self.coords)
+        return self.Visual.plotContours(self.A, self.dims)
         #self.Processor.getCoords())
 
     def getPlotCoM(self):
-        return self.Visual.plotCoM(self.coords)
+        return self.Visual.plotCoM(self.A, self.dims)
 
     def selectNeurons(self, x, y):
         ''' Get plot coords, need to translate to neurons
         '''
-        self.Visual.selectNeurons(x, y, self.coords)
+        self.Visual.selectNeurons(x, y, self.A, self.dims)
         return self.Visual.getSelected()
 
     def destroyNexus(self):
@@ -309,7 +293,8 @@ if __name__ == '__main__':
     nexus = Nexus('test')
     nexus.createNexus()
     nexus.setupProcessor()
-    nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
+    cwd = os.getcwd()
+    nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
     nexus.run()
     nexus.destroyNexus()
     

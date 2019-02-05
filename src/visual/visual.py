@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 from nexus.store import Limbo
 from scipy.spatial.distance import cdist
+from skimage.measure import find_contours
 from math import floor
 
 import logging; logger = logging.getLogger(__name__)
@@ -82,17 +83,113 @@ class CaimanVisual(Visual):
         #     y = floor(self.com1[1])
         return img
 
-    def plotContours(self, coords):
+    def plotContours(self, A, dims):
         ''' Provide contours to plot atop raw image
         '''
+        coords = self.get_contours(A, dims)
         return [o['coordinates'] for o in coords]
 
-    def plotCoM(self, coords):
+    def plotCoM(self, A, dims):
         ''' Provide contours to plot atop raw image
         '''
         newNeur = None
+        coords = self.get_contours(A, dims) #TODO: just call self.com directly? order matters!
         if len(self.neurons) < len(coords):
             #print('adding ', len(coords)-len(self.neurons), ' neurons')
             newNeur = [o['CoM'] for o in coords[len(self.neurons):]]
             self.neurons.extend(newNeur)
         return newNeur
+
+    def get_contours(self, A, dims, thr=0.9, thr_method='nrg', swap_dim=False):
+        ''' Stripped-down version of visualization get_contours function from caiman'''
+
+        """Gets contour of spatial components and returns their coordinates
+
+        Args:
+            A:   np.ndarray or sparse matrix
+                    Matrix of Spatial components (d x K)
+
+                dims: tuple of ints
+                    Spatial dimensions of movie (x, y[, z])
+
+                thr: scalar between 0 and 1
+                    Energy threshold for computing contours (default 0.9)
+
+                thr_method: [optional] string
+                    Method of thresholding:
+                        'max' sets to zero pixels that have value less than a fraction of the max value
+                        'nrg' keeps the pixels that contribute up to a specified fraction of the energy
+
+        Returns:
+            Coor: list of coordinates with center of mass and
+                    contour plot coordinates (per layer) for each component
+        """
+
+        # if 'csc_matrix' not in str(type(A)):
+        #     A = csc_matrix(A)
+        d, nr = np.shape(A)
+        
+        d1, d2 = dims
+        x, y = np.mgrid[0:d1:1, 0:d2:1]
+
+        coordinates = []
+
+        # get the center of mass of neurons( patches )
+        cm = self.com(A, *dims)
+
+        # for each patches
+        #TODO: this does NOT need to be recomputed except when update_shapes has changes...
+        for i in range(nr):
+            pars = dict()
+            # we compute the cumulative sum of the energy of the Ath component that has been ordered from least to highest
+            patch_data = A.data[A.indptr[i]:A.indptr[i + 1]]
+            indx = np.argsort(patch_data)[::-1]
+            if thr_method == 'nrg':
+                cumEn = np.cumsum(patch_data[indx]**2)
+                # we work with normalized values
+                cumEn /= cumEn[-1]
+                Bvec = np.ones(d)
+                # we put it in a similar matrix
+                Bvec[A.indices[A.indptr[i]:A.indptr[i + 1]][indx]] = cumEn
+            else:
+                if thr_method != 'max':
+                    logger.warning("Unknown threshold method. Choosing max")
+                Bvec = np.zeros(d)
+                Bvec[A.indices[A.indptr[i]:A.indptr[i + 1]]] = patch_data / patch_data.max()
+
+            if swap_dim:
+                Bmat = np.reshape(Bvec, dims, order='C')
+            else:
+                Bmat = np.reshape(Bvec, dims, order='F')
+            pars['coordinates'] = []
+            # for each dimensions we draw the contour
+            for B in (Bmat if len(dims) == 3 else [Bmat]):
+                vertices = find_contours(B.T, thr)
+                # this fix is necessary for having disjoint figures and borders plotted correctly
+                v = np.atleast_2d([np.nan, np.nan])
+                for _, vtx in enumerate(vertices):
+                    num_close_coords = np.sum(np.isclose(vtx[0, :], vtx[-1, :]))
+                    if num_close_coords < 2:
+                        if num_close_coords == 0:
+                            # case angle
+                            newpt = np.round(vtx[-1, :] / [d2, d1]) * [d2, d1]
+                            vtx = np.concatenate((vtx, newpt[np.newaxis, :]), axis=0)
+                        else:
+                            # case one is border
+                            vtx = np.concatenate((vtx, vtx[0, np.newaxis]), axis=0)
+                    v = np.concatenate(
+                        (v, vtx, np.atleast_2d([np.nan, np.nan])), axis=0)
+
+                pars['coordinates'] = v if len(
+                    dims) == 2 else (pars['coordinates'] + [v])
+            pars['CoM'] = np.squeeze(cm[i, :])
+            pars['neuron_id'] = i + 1
+            coordinates.append(pars)
+        return coordinates
+
+    def com(self, A, d1, d2):
+        
+        Coor = np.matrix([np.outer(np.ones(d2), np.arange(d1)).ravel(),
+                            np.outer(np.arange(d2), np.ones(d1)).ravel()], dtype=A.dtype)
+        cm = (Coor * A / A.sum(axis=0)).T
+        return np.array(cm)
