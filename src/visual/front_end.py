@@ -2,7 +2,7 @@ import sys
 import os
 from PyQt5 import QtGui,QtCore
 from PyQt5.QtGui import QColor
-from visual import rasp_ui2
+from visual import rasp_ui_large
 from nexus.nexus import Nexus
 import numpy as np
 import pylab
@@ -17,21 +17,29 @@ from process.process import CaimanProcessor as cp
 import logging; logger = logging.getLogger(__name__)
 
 
-class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
+class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
 
     def __init__(self, parent=None):
         ''' Setup GUI
             Setup and start Nexus
         '''
-        pyqtgraph.setConfigOption('background', QColor(229, 229, 229)) #before loading widget
+        pyqtgraph.setConfigOption('background', QColor(100, 100, 100)) #229, 229, 229)) #before loading widget
         super(FrontEnd, self).__init__(parent)
         
         self.setupUi(self)
-        self.setStyleSheet("QMainWindow {background: 'white';}")
+        pyqtgraph.setConfigOptions(leftButtonPan=False) #TODO: how?
+        #self.setStyleSheet("QMainWindow {background: 'white';}")
                 
-        self.rawplot.ui.histogram.hide()
-        self.rawplot.ui.roiBtn.hide()
-        self.rawplot.ui.menuBtn.hide()
+        #self.rawplot.ui.histogram.hide()
+        #self.rawplot.ui.roiBtn.hide()
+        #self.rawplot.ui.menuBtn.hide()
+
+        # self.raw2View = self.rawplot_2.addPlot()
+        # self.raw2View.setAspectLocked(True)
+        # print('----------------', type(self.raw2View))
+        # self.raw2 = pyqtgraph.ImageItem()
+        # self.raw2View.addItem(self.raw2)
+
         self.checkBox.setChecked(True)
 
         #init line plot
@@ -42,13 +50,34 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
         grplot = [self.grplot, self.grplot_2] #, self.grplot_3]
         for plt in grplot:
             plt.getAxis('bottom').setTickSpacing(major=50, minor=50)
-            plt.setLabel('bottom', "Frames")
-            plt.setLabel('left', "Temporal traces")
+        #    plt.setLabel('bottom', "Frames")
+        #    plt.setLabel('left', "Temporal traces")
         self.updateLines()
         self.activePlot = 'r'
 
         #polar plot
-        self.polar = self.grplot_3
+        self.polarAvg = self.grplot_3
+        self.polarAvg.setAspectLocked()
+        # Add polar grid lines
+        self.polarAvg.addLine(x=0, pen=0.2)
+        self.polarAvg.addLine(y=0, pen=0.2)
+        for r in range(1, 8, 2):
+            circle = pyqtgraph.QtGui.QGraphicsEllipseItem(-r, -r, r*2, r*2)
+            circle.setPen(pyqtgraph.mkPen(0.1))
+            self.polarAvg.addItem(circle)
+
+        # make polar data
+        self.theta = np.linspace(0, 2*np.pi, 10)
+        self.theta = np.append(self.theta,0)
+        self.radius = np.zeros(11) #np.random.normal(loc=10, size=10)
+
+        # Transform to cartesian and plot
+        self.xAvg = self.radius * np.cos(self.theta)
+        self.yAvg = self.radius * np.sin(self.theta)
+        self.ppAvg = self.polarAvg.plot()
+        self.ppAvg.setData(self.xAvg, self.yAvg, pen=pyqtgraph.mkPen(color='r'))
+
+        self.polar = self.grplot_4
         self.polar.setAspectLocked()
         # Add polar grid lines
         self.polar.addLine(x=0, pen=0.2)
@@ -59,9 +88,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
             self.polar.addItem(circle)
 
         # make polar data
-        self.theta = np.linspace(0, 2*np.pi, 10)
-        self.theta = np.append(self.theta,0)
-        self.radius = np.zeros(11) #np.random.normal(loc=10, size=10)
+        #self.theta = np.linspace(0, 2*np.pi, 10)
+        #self.theta = np.append(self.theta,0)
+        #self.radius = np.zeros(11) #np.random.normal(loc=10, size=10)
 
         # Transform to cartesian and plot
         self.x = self.radius * np.cos(self.theta)
@@ -82,7 +111,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
         self.pushButton_3.clicked.connect(_call(self.update))
         self.pushButton.clicked.connect(_call(self._loadParams))
         self.checkBox.stateChanged.connect(self.update) #TODO: call outside process or restric to checkbox update
-        self.rawplot.getImageItem().mouseClickEvent = self.mouseClick
+        self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick
 
     def _loadParams(self):
         ''' Button event to load parameters from file
@@ -126,6 +155,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
             logger.error('Oh no {0}'.format(e))
         if image is not None and np.unique(image).size > 1:
             self.rawplot.setImage(image.T)
+            self.rawplot_2.setImage(image.T)
+            self.rawplot_3.setImage(image.T)
 
         penCont=pyqtgraph.mkPen(width=1, color='b')
         try:
@@ -134,7 +165,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
                 for c in neurCom:
                     #TODO: delete and re-add circle for all (?) neurons if they've moved beyond a 
                     # certain distance (set via params...)
-                    self.rawplot.getView().addItem(CircleROI(pos = np.array([c[1], c[0]])-5, size=10, movable=False, pen=penCont))
+                    self.rawplot_2.getView().addItem(CircleROI(pos = np.array([c[1], c[0]])-5, size=10, movable=False, pen=penCont))
             #TODO: keep track of added neurons and likely not update positions, only add new ones.
         except Exception as e:
             logger.error('Something {0}'.format(e))
@@ -157,15 +188,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
             logger.info('output does not yet exist. error: {}'.format(e))
 
         if(Y is not None):
-            self.c1.setData(X, Y[0], pen=pen)
-            self.c2.setData(X, Y[1], pen=pen2)
-            #self.c3.setData(X, Y[2], pen=pen3)
+            self.c1.setData(X, Y[1], pen=pen)
+            self.c2.setData(X, Y[0], pen=pen2)
             
-            if(self.flag):
-                self.selected = self.nexus.getPlotCoM()
-                print('selected is ', self.selected)
-                self._updateRedCirc()
-                self.flag = False
+            # if(self.flag):
+            #     self.selected = self.nexus.getPlotCoM()
+            #     print('selected is ', self.selected)
+            #     self._updateRedCirc()
+            #     self.flag = False
 
         if(avg is not None):
             #print(avg[0])
@@ -202,11 +232,12 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui2.Ui_MainWindow):
         ROIpen1=pyqtgraph.mkPen(width=1, color='r')
         if self.flag:
             self.red_circ = CircleROI(pos = np.array([self.selected[0][1], self.selected[0][0]])-5, size=10, movable=False, pen=ROIpen1)
-            self.rawplot.getView().addItem(self.red_circ)
+            self.rawplot_2.getView().addItem(self.red_circ)
+            self.flag = False
         if np.count_nonzero(self.selected[0]) > 0:
-            self.rawplot.getView().removeItem(self.red_circ)
+            self.rawplot_2.getView().removeItem(self.red_circ)
             self.red_circ = CircleROI(pos = np.array([self.selected[0][1], self.selected[0][0]])-5, size=10, movable=False, pen=ROIpen1)
-            self.rawplot.getView().addItem(self.red_circ)
+            self.rawplot_2.getView().addItem(self.red_circ)
 
 
 

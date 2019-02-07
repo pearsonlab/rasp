@@ -43,12 +43,18 @@ class CaimanVisual(Visual):
             window = 200
         else:
             window = frame_number
-        
-        Y0 = ests[self.plots[0]][frame_number-window:frame_number]
-        Y1 = ests[self.plots[1]][frame_number-window:frame_number]
-        Y2 = ests[self.plots[2]][frame_number-window:frame_number]
-        X = np.arange(0,Y0.size)+(frame_number-window)
-        return X,[Y0,Y1,Y2],avg
+
+        if ests.shape[1]>0:
+            #print(ests.shape)
+            #print(ests[:,frame_number-window:frame_number])
+            Yavg = np.mean(ests[:,frame_number-window:frame_number], axis=0) 
+            #print('Yavg: ', Yavg)
+            #Y0 = ests[self.plots[0],frame_number-window:frame_number]
+            Y1 = ests[self.plots[0],frame_number-window:frame_number]
+            #print('Y1', Y1)
+            X = np.arange(0,Y1.size)+(frame_number-window)
+            #print('X', X)
+            return X,[Y1,Yavg],avg
 
     def runAvg(self, ests):
         estsAvg = []
