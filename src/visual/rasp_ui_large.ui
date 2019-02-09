@@ -20,6 +20,10 @@
    <property name="styleSheet">
     <string notr="true">#centralwidget { background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgb(50, 50, 50), stop:1 rgba(80, 80, 80, 255)); }
 #checkBox {color: black}
+#label_2 {color: rgb(225, 230, 240)}
+#label_3 {color: rgb(225, 230, 240)}
+#label_4 {color: rgb(225, 230, 240)}
+#label_5 {color: rgb(225, 230, 240)}
 #frame {background-color: rgb(150, 160, 175);
 border-style: outset;
 border-width: 2px;
@@ -37,44 +41,44 @@ border-style: outset;
 border-width: 2px;
 border-radius: 10px;
 border-color: black;
-padding: 6px}
-#frame_4 {background: rgb(229, 229, 229);
+padding: 1px}
+#frame_4 {background: rgb(170, 185, 200);
 border-style: outset;
 border-width: 2px;
 border-radius: 10px;
 border-color: black;
-padding: 6px}
+padding: 1px}
 #frame_5 {background: rgb(229, 229, 229);
 border-style: outset;
 border-width: 2px;
 border-radius: 10px;
 border-color: black;
 padding: 6px}
-#grplot {background: rgb(229, 229, 229);
+#frame_6 {background: rgb(229, 229, 229);
 border-style: outset;
 border-width: 2px;
 border-radius: 10px;
 border-color: black;
 padding: 6px}
-#grplot_2 {background: rgb(229, 229, 229);
+#frame_8 {background: rgb(229, 229, 229);
 border-style: outset;
 border-width: 2px;
 border-radius: 10px;
 border-color: black;
 padding: 6px}
-#grplot_3 {background: rgb(229, 229, 229);
+#frame_7 {background: rgb(229, 229, 229);
 border-style: outset;
 border-width: 2px;
 border-radius: 10px;
 border-color: black;
 padding: 6px}
-#grplot_4 {background: rgb(229, 229, 229);
+#frame_9 {background: rgb(229, 229, 229);
 border-style: outset;
 border-width: 2px;
 border-radius: 10px;
 border-color: black;
-padding: 6px}
-#grplot_5 {background: rgb(229, 229, 229);
+padding: 0px}
+#frame_10 {background: rgb(229, 229, 229);
 border-style: outset;
 border-width: 2px;
 border-radius: 10px;
@@ -124,10 +128,10 @@ padding: 6px
    <widget class="QFrame" name="frame_2">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>260</y>
-      <width>351</width>
-      <height>341</height>
+      <x>20</x>
+      <y>280</y>
+      <width>331</width>
+      <height>321</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -141,8 +145,8 @@ padding: 6px
       <rect>
        <x>10</x>
        <y>10</y>
-       <width>341</width>
-       <height>331</height>
+       <width>321</width>
+       <height>311</height>
       </rect>
      </property>
     </widget>
@@ -226,58 +230,13 @@ Process</string>
      </property>
     </widget>
    </widget>
-   <widget class="QWidget" name="horizontalLayoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>200</x>
-      <y>140</y>
-      <width>401</width>
-      <height>95</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout_3">
-     <item>
-      <widget class="PlotWidget" name="grplot_2"/>
-     </item>
-    </layout>
-   </widget>
-   <widget class="QWidget" name="horizontalLayoutWidget_2">
-    <property name="geometry">
-     <rect>
-      <x>620</x>
-      <y>20</y>
-      <width>111</width>
-      <height>101</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout_4">
-     <item>
-      <widget class="PlotWidget" name="grplot_3"/>
-     </item>
-    </layout>
-   </widget>
-   <widget class="QWidget" name="horizontalLayoutWidget_3">
-    <property name="geometry">
-     <rect>
-      <x>200</x>
-      <y>20</y>
-      <width>401</width>
-      <height>95</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout_5">
-     <item>
-      <widget class="PlotWidget" name="grplot"/>
-     </item>
-    </layout>
-   </widget>
    <widget class="QFrame" name="frame_4">
     <property name="geometry">
      <rect>
       <x>760</x>
-      <y>260</y>
+      <y>280</y>
       <width>341</width>
-      <height>341</height>
+      <height>321</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -292,7 +251,7 @@ Process</string>
        <x>10</x>
        <y>10</y>
        <width>331</width>
-       <height>331</height>
+       <height>311</height>
       </rect>
      </property>
     </widget>
@@ -301,9 +260,9 @@ Process</string>
     <property name="geometry">
      <rect>
       <x>390</x>
-      <y>260</y>
+      <y>280</y>
       <width>341</width>
-      <height>341</height>
+      <height>321</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -318,25 +277,10 @@ Process</string>
        <x>10</x>
        <y>10</y>
        <width>331</width>
-       <height>331</height>
+       <height>311</height>
       </rect>
      </property>
     </widget>
-   </widget>
-   <widget class="QWidget" name="horizontalLayoutWidget_4">
-    <property name="geometry">
-     <rect>
-      <x>620</x>
-      <y>140</y>
-      <width>111</width>
-      <height>101</height>
-     </rect>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout_6">
-     <item>
-      <widget class="PlotWidget" name="grplot_4"/>
-     </item>
-    </layout>
    </widget>
    <widget class="QFrame" name="frame_3">
     <property name="geometry">
@@ -344,7 +288,7 @@ Process</string>
       <x>760</x>
       <y>20</y>
       <width>341</width>
-      <height>221</height>
+      <height>241</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -358,7 +302,7 @@ Process</string>
       <rect>
        <x>30</x>
        <y>70</y>
-       <width>160</width>
+       <width>131</width>
        <height>22</height>
       </rect>
      </property>
@@ -371,7 +315,7 @@ Process</string>
       <rect>
        <x>30</x>
        <y>120</y>
-       <width>160</width>
+       <width>131</width>
        <height>22</height>
       </rect>
      </property>
@@ -404,7 +348,7 @@ Process</string>
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>180</y>
+       <y>190</y>
        <width>115</width>
        <height>32</height>
       </rect>
@@ -421,28 +365,263 @@ Process</string>
       <string>Stimulate</string>
      </property>
     </widget>
-    <widget class="PlotWidget" name="grplot_5">
+    <widget class="QLabel" name="label_6">
      <property name="geometry">
       <rect>
-       <x>220</x>
-       <y>60</y>
-       <width>109</width>
-       <height>99</height>
+       <x>70</x>
+       <y>90</y>
+       <width>71</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Helvetica Neue</family>
+       <pointsize>13</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>Threshold</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_7">
+     <property name="geometry">
+      <rect>
+       <x>70</x>
+       <y>140</y>
+       <width>71</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Helvetica Neue</family>
+       <pointsize>13</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>Direction</string>
+     </property>
+    </widget>
+    <widget class="QFrame" name="frame_10">
+     <property name="geometry">
+      <rect>
+       <x>194</x>
+       <y>64</y>
+       <width>133</width>
+       <height>125</height>
+      </rect>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <widget class="PlotWidget" name="grplot_5">
+      <property name="geometry">
+       <rect>
+        <x>6</x>
+        <y>6</y>
+        <width>121</width>
+        <height>113</height>
+       </rect>
+      </property>
+     </widget>
+    </widget>
+   </widget>
+   <widget class="QLabel" name="label_2">
+    <property name="geometry">
+     <rect>
+      <x>170</x>
+      <y>10</y>
+      <width>131</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Helvetica Neue</family>
+      <pointsize>14</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Population Average</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_3">
+    <property name="geometry">
+     <rect>
+      <x>170</x>
+      <y>134</y>
+      <width>131</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Helvetica Neue</family>
+      <pointsize>14</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Selected Neuron</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_4">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>260</y>
+      <width>131</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Helvetica Neue</family>
+      <pointsize>14</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Raw Frame</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_5">
+    <property name="geometry">
+     <rect>
+      <x>390</x>
+      <y>260</y>
+      <width>131</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Helvetica Neue</family>
+      <pointsize>14</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Processed Frame</string>
+    </property>
+   </widget>
+   <widget class="QFrame" name="frame_6">
+    <property name="geometry">
+     <rect>
+      <x>170</x>
+      <y>30</y>
+      <width>431</width>
+      <height>101</height>
+     </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="PlotWidget" name="grplot">
+     <property name="geometry">
+      <rect>
+       <x>6</x>
+       <y>6</y>
+       <width>419</width>
+       <height>89</height>
       </rect>
      </property>
     </widget>
    </widget>
-   <zorder>frame_2</zorder>
-   <zorder>frame</zorder>
-   <zorder>horizontalLayoutWidget</zorder>
-   <zorder>horizontalLayoutWidget_2</zorder>
-   <zorder>horizontalLayoutWidget_3</zorder>
-   <zorder>grplot_3</zorder>
-   <zorder>frame_4</zorder>
-   <zorder>frame_5</zorder>
-   <zorder>horizontalLayoutWidget_4</zorder>
-   <zorder>grplot_3</zorder>
-   <zorder>frame_3</zorder>
+   <widget class="QFrame" name="frame_7">
+    <property name="geometry">
+     <rect>
+      <x>618</x>
+      <y>30</y>
+      <width>107</width>
+      <height>103</height>
+     </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="PlotWidget" name="grplot_3">
+     <property name="geometry">
+      <rect>
+       <x>6</x>
+       <y>6</y>
+       <width>95</width>
+       <height>89</height>
+      </rect>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QFrame" name="frame_8">
+    <property name="geometry">
+     <rect>
+      <x>170</x>
+      <y>154</y>
+      <width>431</width>
+      <height>101</height>
+     </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="PlotWidget" name="grplot_2">
+     <property name="geometry">
+      <rect>
+       <x>6</x>
+       <y>6</y>
+       <width>419</width>
+       <height>89</height>
+      </rect>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QFrame" name="frame_9">
+    <property name="geometry">
+     <rect>
+      <x>619</x>
+      <y>155</y>
+      <width>105</width>
+      <height>101</height>
+     </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="PlotWidget" name="grplot_4">
+     <property name="geometry">
+      <rect>
+       <x>6</x>
+       <y>6</y>
+       <width>93</width>
+       <height>89</height>
+      </rect>
+     </property>
+    </widget>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
@@ -476,4 +655,21 @@ Process</string>
  </customwidgets>
  <resources/>
  <connections/>
+ <designerdata>
+  <property name="gridDeltaX">
+   <number>2</number>
+  </property>
+  <property name="gridDeltaY">
+   <number>2</number>
+  </property>
+  <property name="gridSnapX">
+   <bool>true</bool>
+  </property>
+  <property name="gridSnapY">
+   <bool>true</bool>
+  </property>
+  <property name="gridVisible">
+   <bool>false</bool>
+  </property>
+ </designerdata>
 </ui>

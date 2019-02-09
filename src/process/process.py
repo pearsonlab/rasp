@@ -30,7 +30,7 @@ class Processor():
         # Get image and then process b/t image and estimates
         raise NotImplementedError
     
-    def putAnalysis(self):
+    def putEstimates(self):
         # Update the DS with estimates
         raise NotImplementedError
 
@@ -45,6 +45,7 @@ class CaimanProcessor(Processor):
         self.name = name
         self.client = client
         self.ests = None #neural activity
+        self.coords = None
 
     def __str__(self):
         return self.name
@@ -160,9 +161,10 @@ class CaimanProcessor(Processor):
             #print(self.client.get_all())
             t = time.time()
             frame = self._processFrame(frame, self.frame_number+init)
+            self.frame = frame.copy()
             self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
             #if frame_count % 5 == 0: 
-            self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
+            self.putEstimates(self.onAc.estimates, output) # currently every frame. User-specified?
             self.process_time.append([time.time()-t])
             self.frame_number += 1
         else:
@@ -172,9 +174,9 @@ class CaimanProcessor(Processor):
         if self.onAc.params.get('online', 'normalize'):
             # normalize final estimates for this set of files. Useful?
             #self._normAnalysis()
-            self.putAnalysis(self.onAc.estimates, output)
+            self.putEstimates(self.onAc.estimates, output)
             #self._finalAnalysis(frame_number)
-            #self.putAnalysis(self.finalEstimates, output)
+            #self.putEstimates(self.finalEstimates, output)
         
         #once runProcess has run once, need to reset init_batch to avoid internal errors
         #currently not logging this change; keeping all internal to caiman
@@ -199,7 +201,7 @@ class CaimanProcessor(Processor):
         print('mean time per frame ', np.mean(self.process_time))
 
 
-    def putAnalysis(self, estimates, output):
+    def putEstimates(self, estimates, output):
         ''' Put whatever estimates we currently have
             into the output location specified
             TODO rewrite output input
@@ -245,7 +247,9 @@ class CaimanProcessor(Processor):
             image = np.minimum((image*255.),255).astype('u1')
         except ValueError as ve:
             logger.info('ValueError: {0}'.format(ve))
-        return image
+
+        cor_frame = (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
+        return cor_frame, image
 
 
     def _finalAnalysis(self, t):

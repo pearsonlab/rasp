@@ -34,9 +34,9 @@ class CaimanVisual(Visual):
         ''' Take numpy estimates and t=frame_number
             Create X and Y for plotting, return
         '''
-        #print('before')
-        avg = self.runAvg(ests)[self.plots[0]]
-        #print('after')
+        stim = self.stimAvg(ests)
+        avg = stim[self.plots[0]]
+        avgAvg = np.array(np.mean(stim, axis=0))
 
         if frame_number >= 200:
             # TODO: change to init batch here
@@ -45,29 +45,26 @@ class CaimanVisual(Visual):
             window = frame_number
 
         if ests.shape[1]>0:
-            #print(ests.shape)
-            #print(ests[:,frame_number-window:frame_number])
             Yavg = np.mean(ests[:,frame_number-window:frame_number], axis=0) 
-            #print('Yavg: ', Yavg)
             #Y0 = ests[self.plots[0],frame_number-window:frame_number]
             Y1 = ests[self.plots[0],frame_number-window:frame_number]
-            #print('Y1', Y1)
             X = np.arange(0,Y1.size)+(frame_number-window)
-            #print('X', X)
-            return X,[Y1,Yavg],avg
+            return X,[Y1,Yavg],avg,avgAvg
 
-    def runAvg(self, ests):
+    def stimAvg(self, ests):
+        ''' For now, avergae over every 100 frames
+        where each 100 frames presents a new stimulus
+        '''
         estsAvg = []
         # TODO: this goes in another class
-        for i in range(ests.shape[0]):
+        for i in range(ests.shape[0]): #for each component
             tmpList = []
-            for j in range(int(np.floor(ests.shape[1]/100))+1):
+            for j in range(int(np.floor(ests.shape[1]/100))+1): #average over stim window
                 tmp = np.mean(ests[int(i)][int(j)*100:int(j)*100+100])
                 tmpList.append(tmp)
             estsAvg.append(tmpList)
-        self.estsAvg = np.array(estsAvg)
+        self.estsAvg = np.array(estsAvg)        
         return self.estsAvg
-
 
     def selectNeurons(self, x, y, coords):
         ''' x and y are coordinates
@@ -92,6 +89,12 @@ class CaimanVisual(Visual):
         '''
         return [self.com1, self.com2, self.com3]
 
+    def getFirstSelect(self):
+        first = None
+        if self.neurons:
+            first = [np.array(self.neurons[0])]
+        return first
+
     def plotRaw(self, img):
         ''' Take img and draw it
             TODO: make more general
@@ -101,7 +104,11 @@ class CaimanVisual(Visual):
         #     #print('self.com ', self.com1, 'img shape ', img.shape)
         #     x = floor(self.com1[0])
         #     y = floor(self.com1[1])
-        return img
+        image = img #np.minimum((img*255.),255).astype('u1')
+        return image
+
+    def plotCompFrame(self, frame):
+        return frame
 
     def plotContours(self, coords):
         ''' Provide contours to plot atop raw image
