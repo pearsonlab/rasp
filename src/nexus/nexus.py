@@ -99,10 +99,10 @@ class Nexus():
         #        logger.warning('No more data')
         #        break
         self.t1 = Thread(target=self.runAcquirer)
-        #self.t1.daemon = True
+        self.t1.daemon = True
         #self.t.start()        
         self.t2 = Thread(target=self.runProcessor)
-        #self.t2.daemon = True
+        self.t2.daemon = True
 
         self.t1.start()
         self.t2.start()
@@ -128,14 +128,17 @@ class Nexus():
         '''
         return self.Visual.plotEstimates(self.getEstimates(), self.getTime())
 
-    def getPlotRaw(self):
+    def getPlotRaw(self, thresh):
         '''Send img to visual to plot
         '''
+        #TMP
+        self.getPlotContours()
+        #TMP
         (raw, both) = self.Processor.makeImage() #just get denoised frame for now
         #TODO: get some raw data from Acquirer and some contours from Processor
         visRaw = self.Visual.plotRaw(raw)
-        visBoth = self.Visual.plotCompFrame(both)
-        return visRaw, visBoth
+        (visColor, visBoth) = self.Visual.plotCompFrame(both, thresh)
+        return visRaw, visColor, visBoth
 
     def getPlotContours(self):
         ''' add neuron shapes to raw plot

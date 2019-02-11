@@ -4,6 +4,7 @@ import cv2
 from nexus.store import Limbo
 from scipy.spatial.distance import cdist
 from math import floor
+import colorsys
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class CaimanVisual(Visual):
         self.com3 = np.zeros(2)
         self.neurons = []
         self.estsAvg = []
+        self.coords = None
 
     def plotEstimates(self, ests, frame_number):
         ''' Take numpy estimates and t=frame_number
@@ -107,13 +109,51 @@ class CaimanVisual(Visual):
         image = img #np.minimum((img*255.),255).astype('u1')
         return image
 
-    def plotCompFrame(self, frame):
-        return frame
+    def plotCompFrame(self, image, thresh):
+        ''' Computes colored frame and nicer background+components frame
+        '''
+        ###color = np.stack([image, image, image], axis=-1).astype(np.uint8).copy()
+        color = np.stack([image, image, image, image], axis=-1)
+        image2 = np.stack([image, image, image, image], axis=-1)
+        image2[...,3] = 100
+        color[...,3] = 255
+        if self.coords is not None:
+            for i,c in enumerate(self.coords):
+                c = np.array(c)
+                ind = c[~np.isnan(c).any(axis=1)].astype(int)
+                ###cv2.fillConvexPoly(color, ind, (255,0,0))
+                color[ind[:,1], ind[:,0], :] = self.tuningColor(i, color[ind[:,1], ind[:,0]])
+                image2[ind[:,1], ind[:,0], :] = self.threshNeuron(i, thresh) #(255,255,255,255)
+        return np.swapaxes(color,0,1), np.swapaxes(image2,0,1)
+
+    def threshNeuron(self, ind, thresh):
+        display = (255,255,255,255)
+        if self.estsAvg[ind] is not None:
+            intensity = np.max(self.estsAvg[ind])
+            #print('thresh ', thresh, ' and inten ', intensity)
+            if thresh > intensity: 
+                display = (255,255,255,0)
+            
+        return display
+
+    def tuningColor(self, ind, inten):
+        if self.estsAvg[ind] is not None:
+            ests = np.array(self.estsAvg[ind])
+            h = np.argmax(ests)*36/360
+            intensity = 1- np.max(inten[0][0])/255.0
+            r, g, b, = colorsys.hls_to_rgb(h, intensity, 0.8)
+            r, g, b = [x*255.0 for x in (r, g, b)]
+            #print((r, g, b)+ (200,))
+            return (r, g, b)+ (intensity*255,)
+        else:
+            return (255,255,255,0)
+        
 
     def plotContours(self, coords):
         ''' Provide contours to plot atop raw image
         '''
-        return [o['coordinates'] for o in coords]
+        self.coords = [o['coordinates'] for o in coords]
+        return self.coords
 
     def plotCoM(self, coords):
         ''' Provide contours to plot atop raw image

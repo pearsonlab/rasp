@@ -297,24 +297,11 @@ Process</string>
     <property name="frameShadow">
      <enum>QFrame::Raised</enum>
     </property>
-    <widget class="QSlider" name="horizontalSlider">
+    <widget class="QSlider" name="slider">
      <property name="geometry">
       <rect>
        <x>30</x>
        <y>70</y>
-       <width>131</width>
-       <height>22</height>
-      </rect>
-     </property>
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-    <widget class="QSlider" name="horizontalSlider_2">
-     <property name="geometry">
-      <rect>
-       <x>30</x>
-       <y>120</y>
        <width>131</width>
        <height>22</height>
       </rect>

@@ -1,18 +1,23 @@
 import sys
 import os
-from PyQt5 import QtGui,QtCore
+from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
+from PyQt5.QtCore import pyqtSignal, Qt
 from visual import rasp_ui_large
 from nexus.nexus import Nexus
 import numpy as np
+from math import floor
 import pylab
 import time
 import pyqtgraph
 from pyqtgraph import EllipseROI, PolyLineROI
+from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 from threading import Thread
 from multiprocessing import Process
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from process.process import CaimanProcessor as cp
+import seaborn
+from matplotlib import cm
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -23,22 +28,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         ''' Setup GUI
             Setup and start Nexus
         '''
-        pyqtgraph.setConfigOption('background', QColor(100, 100, 100)) #229, 229, 229)) #before loading widget
+        pyqtgraph.setConfigOption('background', QColor(100, 100, 100))
         super(FrontEnd, self).__init__(parent)
-        
         self.setupUi(self)
+        self.extraSetup()
         pyqtgraph.setConfigOptions(leftButtonPan=False) #TODO: how?
-        #self.setStyleSheet("QMainWindow {background: 'white';}")
-                
-        #self.rawplot.ui.histogram.hide()
-        #self.rawplot.ui.roiBtn.hide()
-        #self.rawplot.ui.menuBtn.hide()
-
-        # self.raw2View = self.rawplot_2.addPlot()
-        # self.raw2View.setAspectLocked(True)
-        # print('----------------', type(self.raw2View))
-        # self.raw2 = pyqtgraph.ImageItem()
-        # self.raw2View.addItem(self.raw2)
 
         self.customizePlots()
         
@@ -55,6 +49,13 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         self.pushButton.clicked.connect(_call(self._loadParams))
         self.checkBox.stateChanged.connect(self.update) #TODO: call outside process or restric to checkbox update
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick
+        self.slider.valueChanged.connect(_call(self.sliderMoved))
+
+    def extraSetup(self):
+        self.slider2 = QRangeSlider(self.frame_3)
+        self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
+        #self.slider2.setOrientation(QtCore.Qt.Horizontal)
+        self.slider2.setObjectName("slider2")
 
     def customizePlots(self):
         #self.rawplot.ui.histogram.hide()
@@ -112,6 +113,21 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         self.polar1.setData(x, y)
         self.polar2.setData(x, y)
 
+        for r in range(10, 12, 2):
+                circle = pyqtgraph.QtGui.QGraphicsEllipseItem(-r, -r, r*2, r*2)
+                circle.setPen(pyqtgraph.mkPen(0.1))
+                polars[2].addItem(circle)
+        self.polar3 = polars[2].plot()
+
+        #sliders
+        self.slider.setMinimum(0)
+        self.slider.setMaximum(12)
+        # self.slider2.setMinimum(0)
+        # self.slider2.setMaximum(359)
+
+        #videos
+        #self.rawplot_2.setPredefinedGradient('thermal')
+
     def _loadParams(self):
         ''' Button event to load parameters from file
             File location determined from user input
@@ -128,7 +144,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
     def _runProcess(self):
         '''Run ImageProcessor in separate thread
         '''
-        self.t = Thread(target=self.nexus.run) #Processor)
+        self.t = Thread(target=self.nexus.run)
         self.t.daemon = True
         self.t.start()
         #TODO: grey out button until self.t is done, but allow other buttons to be active
@@ -149,13 +165,13 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
     def updateVideo(self):
         image = None
         try:
-            raw, image = self.nexus.getPlotRaw()
+            raw, color, image = self.nexus.getPlotRaw(self.slider.value())
         except Exception as e:
             logger.error('Oh no {0}'.format(e))
         if image is not None and np.unique(image).size > 1:
             self.rawplot.setImage(raw.T)
-            self.rawplot_2.setImage(image.T)
-            self.rawplot_3.setImage(image.T)
+            self.rawplot_2.setImage(color)
+            self.rawplot_3.setImage(image)
 
         # NOTE: not plotting blue circles at the moment.
         # penCont=pyqtgraph.mkPen(width=1, color='b')
@@ -175,14 +191,12 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
             of the activity of the selected neurons.
             TODO: separate updates for each plot?
         '''
-        #plot traces
         pen=pyqtgraph.mkPen(width=2, color='w')
         pen2=pyqtgraph.mkPen(width=2, color='r')
         Y = None
         avg = None
         avgAvg = None
         try:
-            #self.ests = self.nexus.getEstimates()
             (X, Y, avg, avgAvg) = self.nexus.getPlotEst()
         except Exception as e:
             logger.info('output does not yet exist. error: {}'.format(e))
@@ -193,10 +207,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
             
             if(self.flag):
                 self.selected = self.nexus.getFirstSelect()
-                print('selected is ', self.selected)
                 if self.selected is not None:
                     self._updateRedCirc()
-                    #self.flag = False
 
         if(avg is not None):
             self.radius = np.zeros(11)
@@ -218,14 +230,26 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         #TODO: make this unclickable until finished updated plot (?)
         event.accept()
         mousePoint = event.pos()
-        print('Clicked ', mousePoint)
+        #print('Clicked ', mousePoint)
         self.selected = self.nexus.selectNeurons(int(mousePoint.x()), int(mousePoint.y()))
         selectedraw = np.zeros(2)
         selectedraw[0] = int(mousePoint.x())
         selectedraw[1] = int(mousePoint.y())
-        #print('selectedRaw is ', selectedraw, ' and found selected is ', self.selected)
         self._updateRedCirc()
-            
+
+    def sliderMoved(self):
+        val = self.slider.value()
+        radius = np.full(11, val)
+        x = radius * np.cos(self.theta)
+        y = radius * np.sin(self.theta)
+        self.polar3.setData(x, y, pen=pyqtgraph.mkPen(width=2, color='g'))
+
+    def slider2Moved(self):
+        val = self.slider.value()
+        radius = np.full(11, val)
+        x = radius * np.cos(self.theta)
+        y = radius * np.sin(self.theta)
+        self.polar3.setData(x, y, pen=pyqtgraph.mkPen(width=2, color='g'))
 
     def _updateRedCirc(self):
         ''' Circle neuron whose activity is in top (red) graph
@@ -274,6 +298,83 @@ class PolyROI(PolyLineROI):
         print('got positions ', positions)
         pyqtgraph.ROI.__init__(self, positions, closed, pos, **args)
         #self.aspectLocked = True
+
+class QRangeSlider(QtWidgets.QWidget):
+
+    rangeChanged = pyqtSignal(tuple, name='rangeChanged')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        #self._width_offset = kwargs.pop('widthOffset', 18)
+
+        self._minimum = 0
+        self._maximum = 180
+
+        self._layout = QtWidgets.QHBoxLayout()
+        self._layout.setSpacing(0)
+        self.setLayout(self._layout)
+
+        self._min_slider = QtWidgets.QSlider(Qt.Horizontal)
+        self._min_slider.setInvertedAppearance(True)
+
+#        self._layout.addWidget(self._min_slider)
+        self._max_slider = QtWidgets.QSlider(Qt.Horizontal)
+
+        # install update handlers
+        for slider in [self._min_slider, self._max_slider]:
+            slider.blockSignals(True)
+            slider.valueChanged.connect(self._value_changed)
+            slider.rangeChanged.connect(self._update_layout)
+
+            self._layout.addWidget(slider)
+ 
+        # initialize to reasonable defaults
+        self._min_slider.setValue(1 * self._min_slider.maximum())
+        self._max_slider.setValue(1 * self._max_slider.maximum())
+
+        self._update_layout()
+
+    def _value_changed(self, *args):
+        self._update_layout()
+        self.rangeChanged.emit(self.range())
+
+    def _update_layout(self, *args):
+        for slider in [self._min_slider, self._max_slider]:
+            slider.blockSignals(True)
+
+        mid = floor((self._max_slider.value()-self._min_slider.value())/ 2) #int((self._min_slider.value() + self._max_slider.value()) / 2)
+
+        self._min_slider.setMaximum(self._min_slider.maximum() + mid)
+        self._min_slider.setValue(self._min_slider.value() + mid)
+        self._max_slider.setMaximum(self._max_slider.maximum() - mid)
+        self._max_slider.setValue(self._max_slider.value() - mid)
+        #self._max_slider.setMinimum(mid)
+
+        for slider in [self._min_slider, self._max_slider]:
+            slider.blockSignals(False)
+
+        self._layout.setStretch(0, self._min_slider.maximum())
+        self._layout.setStretch(1, self._max_slider.maximum())
+
+    def lowerSlider(self):
+        return self._min_slider
+
+    def upperSlider(self):
+        return self._max_slider
+
+    def range(self):
+        return (self._min_slider.value(), self._max_slider.value())
+
+    def setRange(self, lower, upper):
+        for slider in [self._min_slider, self._max_slider]:
+            slider.blockSignals(True)
+
+        # self._min_slider.setValue(lower)
+        # self._max_slider.setValue(upper)
+
+        self._update_layout()
+        
 
 if __name__=="__main__":
     app = QtGui.QApplication(sys.argv)
