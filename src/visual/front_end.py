@@ -4,7 +4,6 @@ from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import pyqtSignal, Qt
 from visual import rasp_ui_large
-from nexus.nexus import Nexus
 import numpy as np
 from math import floor
 import pylab
@@ -35,13 +34,12 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
 
         self.customizePlots()
         
-        self.nexus = Nexus('NeuralNexus')
-        self.nexus.createNexus()
+        #self.nexus = Nexus('NeuralNexus')
+        #self.nexus.createNexus()
 
         #Currently running initialize here        
-        self.nexus.setupProcessor()
-        cwd = os.getcwd()
-        self.nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
+        # self.nexus.setupProcessor()
+        # self.nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
 
         self.pushButton_3.clicked.connect(_call(self._runProcess))
         self.pushButton_3.clicked.connect(_call(self.update))
@@ -263,7 +261,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
             self.nexus.destroyNexus()
             event.accept()
         else: event.ignore()
-
+            
 
 def _call(fnc, *args, **kwargs):
     ''' Call handler for (external) events

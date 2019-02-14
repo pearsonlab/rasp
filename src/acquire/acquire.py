@@ -2,6 +2,7 @@ import time
 import os
 import h5py
 import numpy as np
+import asyncio
 import logging; logger = logging.getLogger(__name__)
 
 class Acquirer():
@@ -31,12 +32,13 @@ class FileAcquirer(Acquirer):
         self.frame_num = 0
         self.data = None
 
-    def setupAcquirer(self, filename, q_out):
+    def setupAcquirer(self, filename, q_out, q_comm):
         '''Get file names from config or user input
            Open file stream
            #TODO: implement more than h5 files
         '''
         self.q_out = q_out
+        self.comm = q_comm
         if os.path.exists(filename):
             n, ext = os.path.splitext(filename)[:2]
             if ext == '.h5' or ext == '.hdf5':
@@ -59,14 +61,18 @@ class FileAcquirer(Acquirer):
         if(self.frame_num < len(self.data)):
             #id = self.client.replace(self.getFrame(self.frame_num), 'curr_frame')
             id = self.client.put(self.getFrame(self.frame_num), str(self.frame_num))
-            #print(self.frame_num, self.client.get_all())
-            self.q_out.put([{str(self.frame_num):id}])
-            #print('put ', self.frame_num, ' in store')
-            self.frame_num += 1
-            time.sleep(0.08)
+            try:
+                self.q_out.put([{str(self.frame_num):id}])
+                self.comm.put([self.frame_num])
+                self.frame_num += 1
+            except Exception as e:
+                logger.error('AAAA: {}'.format(e))
+
+            time.sleep(0.033)
         else:
             logger.error('Done with all available frames: {0}'.format(self.frame_num))
             #self.client.delete('curr_frame')
             self.data = None
             self.q_out.put(None)
+            self.comm.put(None)
 
