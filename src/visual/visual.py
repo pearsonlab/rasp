@@ -5,6 +5,7 @@ from nexus.store import Limbo
 from scipy.spatial.distance import cdist
 from skimage.measure import find_contours
 from math import floor
+import colorsys
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -29,25 +30,44 @@ class CaimanVisual(Visual):
         self.com2 = np.zeros(2)
         self.com3 = np.zeros(2)
         self.neurons = []
+        self.estsAvg = []
+        self.coords = None
 
     def plotEstimates(self, ests, frame_number):
         ''' Take numpy estimates and t=frame_number
             Create X and Y for plotting, return
         '''
-        if frame_number >= 300:
+        stim = self.stimAvg(ests)
+        avg = stim[self.plots[0]]
+        avgAvg = np.array(np.mean(stim, axis=0))
+
+        if frame_number >= 200:
             # TODO: change to init batch here
-            window = 300
+            window = 200
         else:
             window = frame_number
 
-        if len(ests)<3:
-            return None,None
+        if ests.shape[1]>0:
+            Yavg = np.mean(ests[:,frame_number-window:frame_number], axis=0) 
+            #Y0 = ests[self.plots[0],frame_number-window:frame_number]
+            Y1 = ests[self.plots[0],frame_number-window:frame_number]
+            X = np.arange(0,Y1.size)+(frame_number-window)
+            return X,[Y1,Yavg],avg,avgAvg
 
-        Y0 = ests[self.plots[0]][frame_number-window:frame_number]
-        Y1 = ests[self.plots[1]][frame_number-window:frame_number]
-        Y2 = ests[self.plots[2]][frame_number-window:frame_number]
-        X = np.arange(0,Y0.size)+(frame_number-window)
-        return X,[Y0,Y1,Y2]
+    def stimAvg(self, ests):
+        ''' For now, avergae over every 100 frames
+        where each 100 frames presents a new stimulus
+        '''
+        estsAvg = []
+        # TODO: this goes in another class
+        for i in range(ests.shape[0]): #for each component
+            tmpList = []
+            for j in range(int(np.floor(ests.shape[1]/100))+1): #average over stim window
+                tmp = np.mean(ests[int(i)][int(j)*100:int(j)*100+100])
+                tmpList.append(tmp)
+            estsAvg.append(tmpList)
+        self.estsAvg = np.array(estsAvg)        
+        return self.estsAvg
 
     def selectNeurons(self, x, y, coords):
         ''' x and y are coordinates
@@ -72,6 +92,12 @@ class CaimanVisual(Visual):
         '''
         return [self.com1, self.com2, self.com3]
 
+    def getFirstSelect(self):
+        first = None
+        if self.neurons:
+            first = [np.array(self.neurons[0])]
+        return first
+
     def plotRaw(self, img):
         ''' Take img and draw it
             TODO: make more general
@@ -81,7 +107,48 @@ class CaimanVisual(Visual):
         #     #print('self.com ', self.com1, 'img shape ', img.shape)
         #     x = floor(self.com1[0])
         #     y = floor(self.com1[1])
-        return img
+        image = img #np.minimum((img*255.),255).astype('u1')
+        return image
+
+    def plotCompFrame(self, image, thresh):
+        ''' Computes colored frame and nicer background+components frame
+        '''
+        ###color = np.stack([image, image, image], axis=-1).astype(np.uint8).copy()
+        color = np.stack([image, image, image, image], axis=-1)
+        image2 = np.stack([image, image, image, image], axis=-1)
+        image2[...,3] = 100
+        color[...,3] = 255
+        if self.coords is not None:
+            for i,c in enumerate(self.coords):
+                c = np.array(c)
+                ind = c[~np.isnan(c).any(axis=1)].astype(int)
+                ###cv2.fillConvexPoly(color, ind, (255,0,0))
+                color[ind[:,1], ind[:,0], :] = self.tuningColor(i, color[ind[:,1], ind[:,0]])
+                image2[ind[:,1], ind[:,0], :] = self.threshNeuron(i, thresh) #(255,255,255,255)
+        return np.swapaxes(color,0,1), np.swapaxes(image2,0,1)
+
+    def threshNeuron(self, ind, thresh):
+        display = (255,255,255,255)
+        if self.estsAvg[ind] is not None:
+            intensity = np.max(self.estsAvg[ind])
+            #print('thresh ', thresh, ' and inten ', intensity)
+            if thresh > intensity: 
+                display = (255,255,255,0)
+            
+        return display
+
+    def tuningColor(self, ind, inten):
+        if self.estsAvg[ind] is not None:
+            ests = np.array(self.estsAvg[ind])
+            h = np.argmax(ests)*36/360
+            intensity = 1- np.max(inten[0][0])/255.0
+            r, g, b, = colorsys.hls_to_rgb(h, intensity, 0.8)
+            r, g, b = [x*255.0 for x in (r, g, b)]
+            #print((r, g, b)+ (200,))
+            return (r, g, b)+ (intensity*255,)
+        else:
+            return (255,255,255,0)
+        
 
     def plotContours(self, A, dims):
         ''' Provide contours to plot atop raw image

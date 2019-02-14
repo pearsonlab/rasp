@@ -166,15 +166,23 @@ class Nexus():
         #self.getEstimates()
         return self.Visual.plotEstimates(self.ests, self.getTime())
 
-    def getPlotRaw(self):
+    def getPlotRaw(self, thresh):
         '''Send img to visual to plot
         '''
-        #data = self.Processor.makeImage() #just get denoised frame for now
-        #TODO: get some raw data from Acquirer and some contours from Processor
-        print('other image ', self.image)
-        visRaw = self.Visual.plotRaw(self.image)
-        print('vis raw frame ', visRaw)
-        return visRaw
+        # #TMP
+        #     # self.getPlotContours()
+        #     # #TMP
+        #     # (raw, both) = self.Processor.makeImage() #just get denoised frame for now
+        #     # #TODO: get some raw data from Acquirer and some contours from Processor
+        #     # visRaw = self.Visual.plotRaw(raw)
+        #     # (visColor, visBoth) = self.Visual.plotCompFrame(both, thresh)
+        #     # return visRaw, visColor, visBoth
+        # #data = self.Processor.makeImage() #just get denoised frame for now
+        # #TODO: get some raw data from Acquirer and some contours from Processor
+        # print('other image ', self.image)
+        # visRaw = self.Visual.plotRaw(self.image)
+        # print('vis raw frame ', visRaw)
+        # return visRaw
 
     def getPlotContours(self):
         ''' add neuron shapes to raw plot
@@ -190,6 +198,9 @@ class Nexus():
         '''
         self.Visual.selectNeurons(x, y, self.A, self.dims)
         return self.Visual.getSelected()
+
+    def getFirstSelect(self):
+        return self.Visual.getFirstSelect()
 
     def destroyNexus(self):
         ''' Method that calls the internal method
