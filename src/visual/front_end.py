@@ -16,7 +16,6 @@ from threading import Thread
 from multiprocessing import Process
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from process.process import CaimanProcessor as cp
-import seaborn
 from matplotlib import cm
 
 import logging; logger = logging.getLogger(__name__)
@@ -54,20 +53,10 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
         self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
-        #self.slider2.setOrientation(QtCore.Qt.Horizontal)
         self.slider2.setObjectName("slider2")
 
     def customizePlots(self):
-        #self.rawplot.ui.histogram.hide()
-        #self.rawplot.ui.roiBtn.hide()
-        #self.rawplot.ui.menuBtn.hide()
-
-        # self.raw2View = self.rawplot_2.addPlot()
-        # self.raw2View.setAspectLocked(True)
-        # print('----------------', type(self.raw2View))
-        # self.raw2 = pyqtgraph.ImageItem()
-        # self.raw2View.addItem(self.raw2)
-
+        
         self.checkBox.setChecked(True)
 
         #init line plot
@@ -122,11 +111,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         #sliders
         self.slider.setMinimum(0)
         self.slider.setMaximum(12)
-        # self.slider2.setMinimum(0)
-        # self.slider2.setMaximum(359)
-
-        #videos
-        #self.rawplot_2.setPredefinedGradient('thermal')
 
     def _loadParams(self):
         ''' Button event to load parameters from file
@@ -177,7 +161,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         # penCont=pyqtgraph.mkPen(width=1, color='b')
         try:
             self.neurCom = self.nexus.getPlotCoM()
-        #     if self.neurCom: #add neurons, need to add contours to graph
+        #     if self.neurCom: #added neurons, need to add contours to graph
         #         for c in self.neurCom:
         #             #TODO: delete and re-add circle for all (?) neurons if they've moved beyond a 
         #             # certain distance (set via params...)
@@ -230,7 +214,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         #TODO: make this unclickable until finished updated plot (?)
         event.accept()
         mousePoint = event.pos()
-        #print('Clicked ', mousePoint)
         self.selected = self.nexus.selectNeurons(int(mousePoint.x()), int(mousePoint.y()))
         selectedraw = np.zeros(2)
         selectedraw[0] = int(mousePoint.x())
@@ -297,7 +280,6 @@ class PolyROI(PolyLineROI):
         closed = True
         print('got positions ', positions)
         pyqtgraph.ROI.__init__(self, positions, closed, pos, **args)
-        #self.aspectLocked = True
 
 class QRangeSlider(QtWidgets.QWidget):
 
@@ -318,7 +300,6 @@ class QRangeSlider(QtWidgets.QWidget):
         self._min_slider = QtWidgets.QSlider(Qt.Horizontal)
         self._min_slider.setInvertedAppearance(True)
 
-#        self._layout.addWidget(self._min_slider)
         self._max_slider = QtWidgets.QSlider(Qt.Horizontal)
 
         # install update handlers
@@ -343,13 +324,12 @@ class QRangeSlider(QtWidgets.QWidget):
         for slider in [self._min_slider, self._max_slider]:
             slider.blockSignals(True)
 
-        mid = floor((self._max_slider.value()-self._min_slider.value())/ 2) #int((self._min_slider.value() + self._max_slider.value()) / 2)
+        mid = floor((self._max_slider.value()-self._min_slider.value())/ 2)
 
         self._min_slider.setMaximum(self._min_slider.maximum() + mid)
         self._min_slider.setValue(self._min_slider.value() + mid)
         self._max_slider.setMaximum(self._max_slider.maximum() - mid)
         self._max_slider.setValue(self._max_slider.value() - mid)
-        #self._max_slider.setMinimum(mid)
 
         for slider in [self._min_slider, self._max_slider]:
             slider.blockSignals(False)
