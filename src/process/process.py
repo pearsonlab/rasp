@@ -166,17 +166,13 @@ class CaimanProcessor(Processor):
                 break  
 
     def runProcess(self):
-        ''' Run process. Persists running while it has data
-            (TODO). Runs once per set of files. Add new function
-            to run continually.
-            Frames is a location in the DS that this process
-            needs to check for more data (TODO)
+        ''' Run process. Runs once per frame.
             Output is a location in the DS to continually
             place the Estimates results, with ref number that
-            corresponds to the frame number (DONE)
+            corresponds to the frame number (TODO)
         '''
         #TODO: Error handling for if these parameters don't work
-            #should implement in Tweak (?) or getting too complicated for users.
+            #should implement in Tweak (?) or getting too complicated for users..
         
         #proc_params = self.client.get('params_dict')
         output = self.params['output']

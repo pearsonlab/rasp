@@ -20,10 +20,13 @@ import logging; logger = logging.getLogger(__name__)
 
 class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
 
-    def __init__(self, parent=None):
+    def __init__(self, visual, comm, parent=None):
         ''' Setup GUI
             Setup and start Nexus
         '''
+        self.visual = visual #Visual class that provides plots and images
+        self.comm = comm #Link back to Nexus for transmitting signals
+
         pyqtgraph.setConfigOption('background', QColor(100, 100, 100))
         super(FrontEnd, self).__init__(parent)
         self.setupUi(self)
@@ -31,13 +34,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         pyqtgraph.setConfigOptions(leftButtonPan=False) #TODO: how?
 
         self.customizePlots()
-        
-        #self.nexus = Nexus('NeuralNexus')
-        #self.nexus.createNexus()
-
-        #Currently running initialize here        
-        # self.nexus.setupProcessor()
-        # self.nexus.setupAcquirer('/Users/hawkwings/Documents/Neuro/RASP/rasp/data/Tolias_mesoscope_1.hdf5')
 
         self.pushButton_3.clicked.connect(_call(self._runProcess))
         self.pushButton_3.clicked.connect(_call(self.update))
@@ -124,9 +120,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
     def _runProcess(self):
         '''Run ImageProcessor in separate thread
         '''
-        self.t = Thread(target=self.nexus.run)
-        self.t.daemon = True
-        self.t.start()
+        self.comm.put(['run'])
         #TODO: grey out button until self.t is done, but allow other buttons to be active
 
     def update(self):
@@ -136,7 +130,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         self.updateLines()
 
         #plot video
-        self.updateVideo()
+        #self.updateVideo()
 
         #re-update
         if self.checkBox.isChecked():
@@ -157,16 +151,16 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
 
         # NOTE: not plotting blue circles at the moment.
         # penCont=pyqtgraph.mkPen(width=1, color='b')
-        try:
-            self.neurCom = self.nexus.getPlotCoM()
+        # try:
+        #     self.neurCom = self.nexus.getPlotCoM()
         #     if self.neurCom: #added neurons, need to add contours to graph
         #         for c in self.neurCom:
         #             #TODO: delete and re-add circle for all (?) neurons if they've moved beyond a 
         #             # certain distance (set via params...)
         #             self.rawplot_2.getView().addItem(CircleROI(pos = np.array([c[1], c[0]])-5, size=10, movable=False, pen=penCont))
         #     #TODO: keep track of added neurons and likely not update positions, only add new ones.
-        except Exception as e:
-            logger.error('Something {0}'.format(e))
+        # except Exception as e:
+        #     logger.error('Something {0}'.format(e))
 
     def updateLines(self):
         ''' Helper function to plot the line traces
@@ -256,6 +250,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         confirm = QMessageBox.question(self, 'Message', 'Quit without saving?',
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if confirm == QMessageBox.Yes:
+            self.comm.put(['quit'])
             #self.nexus.destroyNexus()
             event.accept()
         else: event.ignore()

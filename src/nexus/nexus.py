@@ -9,7 +9,7 @@ import pyarrow.plasma as plasma
 from nexus import store
 from nexus.tweak import Tweak
 from acquire.acquire import FileAcquirer
-from visual.visual import CaimanVisual
+from visual.visual import CaimanVisual, DisplayVisual
 from visual.front_end import FrontEnd
 from threading import Thread
 import asyncio
@@ -42,6 +42,8 @@ class Nexus():
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
         self.limbo.subscribe()
+
+        self.queues = {}
         
         # Create connections to the store based on module name
         # Instatiate modules and give them Limbo client connections
@@ -51,6 +53,11 @@ class Nexus():
         self.visName = self.tweak.visName
         self.visLimbo = store.Limbo(self.visName)
         self.Visual = CaimanVisual(self.visName, self.visLimbo)
+
+        self.GUI = DisplayVisual('GUI')
+        self.GUI.setVisual(self.Visual)
+        self.queues.update({'gui_comm':Link('gui_comm')})
+        self.GUI.setLink(self.queues['gui_comm'])
 
         self.runInit() #must be run before import caiman
 
@@ -64,12 +71,15 @@ class Nexus():
         self.A = None
         self.dims = None
 
-        self.queues = {}
         #self.queues.update({'acq_proc':Link('acq_proc'), 'proc_comm':Link('proc_comm')})
 
         self.acqName = self.tweak.acqName
         self.acqLimbo = store.Limbo(self.acqName)
         self.Acquirer = FileAcquirer(self.acqName, self.acqLimbo)
+
+        self.goFlag = False
+        self.quitFlag = False
+        self.flags = ['run', 'quit']
 
     def setupProcessor(self):
         '''Setup process parameters
@@ -96,8 +106,7 @@ class Nexus():
             if self.Acquirer.data is None:
                 break
 
-    def run(self):
-        t=time.time()
+    def startNexus(self):
         self.frame = 0
 
         self.t1 = Process(target=self.runAcquirer)
@@ -105,12 +114,15 @@ class Nexus():
         self.t2 = Process(target=self.runProcessor)
         #self.t2.daemon = True
 
-        self.t1.start()
-        self.t2.start()
-
         #self.poll_future = asyncio.ensure_future(self.pollQueues)
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.pollQueues())
+
+    def run(self):
+        t = time.time()
+
+        self.t1.start()
+        self.t2.start()
 
         self.t2.join()
         self.t1.join()
@@ -121,12 +133,15 @@ class Nexus():
         self.t3.join()
 
     def runInit(self):
-        self.t3 = Process(target=self.Visual.runGUI)
+        self.t3 = Process(target=self.GUI.runGUI)
         #self.t3.daemon = True
         self.t3.start()
 
     async def pollQueues(self):
-        while True:
+        while not self.quitFlag:
+            gui_comm = await self.queues['gui_comm'].get_async()
+            if gui_comm:
+                self.processGuiSignal(gui_comm[0])
             acq_comm = await self.queues['acq_comm'].get_async()
             if acq_comm is None:
                 logger.error('Acquirer is finished')
@@ -139,6 +154,23 @@ class Nexus():
                 break
             await asyncio.sleep(0.01)
             self.frame += 1
+
+    def processGuiSignal(self, flag):
+        '''Receive flags from the Front End as user input
+            List of flags: 0 = run(), 1 = ..
+        '''
+        print('received signal '+flag)
+        if flag in self.flags:
+            if flag == self.flags[0]: #start running
+                #self.goFlag = True
+                print('running!')
+                self.run()
+            elif flag == self.flags[1]: #quit
+                print('quitting!')
+                self.quitFlag = True
+                self.destroyNexus()
+        else:
+            logger.error('Signal received from Nexus but cannot identify {}'.format(flag))
 
     def getEstimates(self):
         '''Get estimates aka neural Activity
@@ -295,7 +327,8 @@ if __name__ == '__main__':
     nexus.setupProcessor()
     cwd = os.getcwd()
     nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
-    nexus.run()
+    nexus.startNexus() #start polling, create processes
+#    nexus.run()
     nexus.destroyNexus()
     
     

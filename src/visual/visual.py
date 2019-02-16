@@ -13,6 +13,25 @@ import sys
 
 import logging; logger = logging.getLogger(__name__)
 
+class DisplayVisual():
+    def __init__(self, name):
+        self.name = name
+
+    def runGUI(self):
+        logger.info('Loading FrontEnd')
+        self.app = QtWidgets.QApplication([])
+        self.rasp = FrontEnd(self.visual, self.link)
+        self.rasp.show()
+        self.app.exec_()
+        logger.info('GUI ready')
+
+    def setVisual(self, Visual):
+        self.visual = Visual
+
+    def setLink(self, link):
+        self.link = link
+
+
 class Visual():
     '''Abstract lass for displaying data
     '''
@@ -37,13 +56,13 @@ class CaimanVisual(Visual):
         self.estsAvg = []
         self.coords = None
 
-    def runGUI(self):
-        logger.info('Loading FrontEnd')
-        self.app = QtWidgets.QApplication([])
-        self.rasp = FrontEnd()
-        self.rasp.show()
-        self.app.exec_()
-        logger.info('GUI ready')
+    # def runGUI(self):
+    #     logger.info('Loading FrontEnd')
+    #     self.app = QtWidgets.QApplication([])
+    #     self.rasp = FrontEnd()
+    #     self.rasp.show()
+    #     self.app.exec_()
+    #     logger.info('GUI ready')
 
     def plotEstimates(self, ests, frame_number):
         ''' Take numpy estimates and t=frame_number
