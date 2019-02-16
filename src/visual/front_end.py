@@ -4,17 +4,15 @@ from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import pyqtSignal, Qt
 from visual import rasp_ui_large
+from nexus.store import Limbo
 import numpy as np
 from math import floor
-import pylab
 import time
 import pyqtgraph
 from pyqtgraph import EllipseROI, PolyLineROI
-from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 from threading import Thread
 from multiprocessing import Process
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
-from process.process import CaimanProcessor as cp
 from matplotlib import cm
 
 import logging; logger = logging.getLogger(__name__)
@@ -258,7 +256,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         confirm = QMessageBox.question(self, 'Message', 'Quit without saving?',
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if confirm == QMessageBox.Yes:
-            self.nexus.destroyNexus()
+            #self.nexus.destroyNexus()
             event.accept()
         else: event.ignore()
             

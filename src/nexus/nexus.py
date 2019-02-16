@@ -8,13 +8,11 @@ import numpy as np
 import pyarrow.plasma as plasma
 from nexus import store
 from nexus.tweak import Tweak
-from process.process import CaimanProcessor
 from acquire.acquire import FileAcquirer
 from visual.visual import CaimanVisual
 from visual.front_end import FrontEnd
 from threading import Thread
 import asyncio
-from PyQt5 import QtGui,QtCore
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -54,8 +52,12 @@ class Nexus():
         self.visLimbo = store.Limbo(self.visName)
         self.Visual = CaimanVisual(self.visName, self.visLimbo)
 
+        self.runInit() #must be run before import caiman
+
         self.procName = self.tweak.procName
         self.procLimbo = store.Limbo(self.procName)
+
+        from process.process import CaimanProcessor
         self.Processor = CaimanProcessor(self.procName, self.procLimbo)
         self.ests = None #TODO: this should be Activity as general spike estimates
         self.image = None
@@ -97,17 +99,9 @@ class Nexus():
     def run(self):
         t=time.time()
         self.frame = 0
-        #self.acq_future = asyncio.ensure_future(self.runAcquirer())  
-        #self.proc_future = asyncio.ensure_future(self.runProcessor())  
-
-        #results2 = await asyncio.gather(*[self.proc_future], return_exceptions=True)
-
-        #loop = asyncio.get_event_loop()
-        #loop.run_until_complete(self.proc_future)
 
         self.t1 = Process(target=self.runAcquirer)
         #self.t1.daemon = True
-
         self.t2 = Process(target=self.runProcessor)
         #self.t2.daemon = True
 
@@ -118,16 +112,18 @@ class Nexus():
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.pollQueues())
 
-        # app = QtGui.QApplication(sys.argv)
-        # rasp = FrontEnd()
-        # rasp.show()
-        # app.exec_()
-
         self.t2.join()
         self.t1.join()
 
         logger.warning('Done with available frames')
         print('total time ', time.time()-t)
+
+        self.t3.join()
+
+    def runInit(self):
+        self.t3 = Process(target=self.Visual.runGUI)
+        #self.t3.daemon = True
+        self.t3.start()
 
     async def pollQueues(self):
         while True:
@@ -148,9 +144,6 @@ class Nexus():
         '''Get estimates aka neural Activity
         '''
         (self.ests, self.A, self.dims, self.image) = self.queues['proc_comm'].get()
-        #print('ests ', self.ests)
-        #print('coords ', self.coords)
-        #print('image', self.image)
         self.frame += 1
         #return self.Processor.getEstimates()
         #return self.limbo.get('outputEstimates')
@@ -206,8 +199,6 @@ class Nexus():
         ''' Method that calls the internal method
             to kill the process running the store (plasma server)
         '''
-        #self.t1.kill()
-        #self.t2.kill()
         self._closeStore()
 
     def _closeStore(self):
@@ -219,7 +210,6 @@ class Nexus():
             logger.info('Store closed successfully')
         except Exception as e:
             logger.exception('Cannot close store {0}'.format(e))
-
 
     def _startStore(self, size):
         ''' Start a subprocess that runs the plasma store
@@ -248,7 +238,6 @@ def Link(name):
     or asynchronous (put_async, get_async) using async executors
     '''
 
-    #def __init__(self, maxsize=0):
     m = Manager()
     q = AsyncQueue(m.Queue(maxsize=0), name)
     return q

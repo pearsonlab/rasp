@@ -185,10 +185,8 @@ class CaimanProcessor(Processor):
         
         if frame is not None:
             self.done = False
-            #print(frame[0])
             try:
                 frame = self.client.getID(frame[0][str(self.frame_number)])
-                #print(self.client.get_all())
                 #t = time.time()
                 frame = self._processFrame(frame, self.frame_number+init)
                             #self.frame = frame.copy()
@@ -196,7 +194,7 @@ class CaimanProcessor(Processor):
                 self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
                 self.process_time.append([time.time()-t])
                 #if frame_count % 5 == 0: 
-                self.putAnalysis(self.onAc.estimates, output) # currently every frame. User-specified?
+                self.putEstimates(self.onAc.estimates, output) # currently every frame. User-specified?
                 self.frame_number += 1
             except ObjectNotFoundError:
                 logger.error('Frame unavailable from store, droppping')
@@ -247,7 +245,7 @@ class CaimanProcessor(Processor):
             TODO rewrite output input
         '''
         #t = time.time()
-        # Just store dF/F traces for now
+        # Just store C traces for now
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
         b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
@@ -262,14 +260,9 @@ class CaimanProcessor(Processor):
 
         self.image = self.makeImage()
         
-        # print('ests ', self.ests)
-        # print('coords ', self.coords)
-        # print('image', self.image)
         self.q_out.put([self.ests, A, self.onAc.dims, self.image])
         
         #self.client.replace(self.ests, output)
-
-        
         #TODO: instead of get from Nexus, put into store
 
     def getEstimates(self):
@@ -300,7 +293,7 @@ class CaimanProcessor(Processor):
         except ValueError as ve:
             logger.info('ValueError: {0}'.format(ve))
 
-        cor_frame = (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
+        cor_frame = None #TODO: (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
         return cor_frame, image
 
 
@@ -375,8 +368,6 @@ class CaimanProcessor(Processor):
         self.procFrame_time.append([time.time()-t])
         return frame_cor
 
-
-
     def _fitFrame(self, frame_number, frame):
         ''' Do the heavy lifting here. CNMF, etc
             Updates self.onAc.estimates
@@ -386,7 +377,6 @@ class CaimanProcessor(Processor):
         except Exception as e:
             print('Message: {0}'.format(e))
             raise Exception
-
 
     def _normAnalysis(self):
         ''' Modifies in place Ab!

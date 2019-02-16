@@ -6,6 +6,10 @@ from scipy.spatial.distance import cdist
 from skimage.measure import find_contours
 from math import floor
 import colorsys
+from PyQt5 import QtGui, QtWidgets
+import pyqtgraph as pg
+from visual.front_end import FrontEnd
+import sys
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -32,6 +36,14 @@ class CaimanVisual(Visual):
         self.neurons = []
         self.estsAvg = []
         self.coords = None
+
+    def runGUI(self):
+        logger.info('Loading FrontEnd')
+        self.app = QtWidgets.QApplication([])
+        self.rasp = FrontEnd()
+        self.rasp.show()
+        self.app.exec_()
+        logger.info('GUI ready')
 
     def plotEstimates(self, ests, frame_number):
         ''' Take numpy estimates and t=frame_number
@@ -260,3 +272,24 @@ class CaimanVisual(Visual):
                             np.outer(np.arange(d2), np.ones(d1)).ravel()], dtype=A.dtype)
         cm = (Coor * A / A.sum(axis=0)).T
         return np.array(cm)
+
+def runVis():
+    logger.error('trying to run')
+    app = QtWidgets.QApplication([]) #.instance() #(sys.argv)
+    print('type ', type(app))
+    logger.error('trying to run after app')
+    rasp = FrontEnd()
+    rasp.show()
+    #logger.error('before exec')
+    app.exec_()
+    #logger.error('after exec')
+
+if __name__=="__main__":
+    vis = CaimanVisual('name', 'client')
+    from multiprocessing import Process
+    p = Process(target=runVis)
+    p.start()
+    input("Type any key to quit.")
+    print("Waiting for graph window process to join...")
+    p.join()
+    print("Process joined successfully. C YA !")
