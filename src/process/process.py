@@ -23,6 +23,23 @@ class Processor():
        Needs to output spikes estimates over time
        Will likely change specifications in the future
     '''
+    def __init__(self, name, client):
+        self.name = name
+        self.client = client
+
+    def __str__(self):
+        return self.name
+
+    def setStore(self, client):
+        '''Set client interface to the store
+        '''
+        self.client = client
+
+    def setLink(self, link):
+        pass
+        #TODO: set explicit links (q_in, q_out, q_comm in/out)
+        # or provide list of Links...?
+
     def setupProcess(self):
         # Essenitally the registration process
         raise NotImplementedError
@@ -46,20 +63,11 @@ class CaimanProcessor(Processor):
        interface with our pipeline.
        Uses code from caiman/source_extraction/cnmf/online_cnmf.py
     '''
-    def __init__(self, name, client):
-        self.name = name
-        self.client = client
+    def __init__(self, *args):
+        super().__init__(*args)
         self.ests = None #neural activity
         self.coords = None
 
-    def __str__(self):
-        return self.name
-
-    def setStore(self, client):
-        '''Set client interface to the store
-        '''
-        self.client = client
-    
     def loadParams(self, param_file=None):
         ''' Load parameters from file or 'defaults' into store
             TODO: accept user input from GUI
@@ -159,7 +167,6 @@ class CaimanProcessor(Processor):
                     print('Dropped frames: ', self.dropped_frames)
                     print('Total number of dropped frames ', len(self.dropped_frames))
                     print('mean time per fit frame ', np.mean(self.process_time))
-                    print('(") put analysis, ', np.mean(np.array(self.putAnalysis_time)))
                     return
             except Exception as e:
                 logger.exception('What happened: {0}'.format(e))

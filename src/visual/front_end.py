@@ -104,6 +104,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         self.slider.setMinimum(0)
         self.slider.setMaximum(12)
 
+        #videos
+        #self.rawplot.ui.histogram.vb.setLimits(yMin=-0.1, yMax=1.1)
+
     def _loadParams(self):
         ''' Button event to load parameters from file
             File location determined from user input
@@ -145,7 +148,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         except Exception as e:
             logger.error('Oh no {0}'.format(e))
         if image is not None and np.unique(image).size > 1:
-            self.rawplot.setImage(raw.T)
+            self.rawplot.setImage(raw.T, autoHistogramRange=False)
             self.rawplot_2.setImage(color)
             self.rawplot_3.setImage(image)
 

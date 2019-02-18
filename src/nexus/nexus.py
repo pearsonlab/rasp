@@ -16,6 +16,10 @@ import asyncio
 
 import logging; logger = logging.getLogger(__name__)
 
+# TODO: Provide function in abstract classes (?) where Nexus can give/set Links
+# This would be for dynamically adding new Links for user-defined modules beyond
+# the q_in/q_out and q_comm queues. [Future feature]
+
 class Nexus():
     ''' Main server class for handling objects in RASP
     '''
@@ -31,8 +35,19 @@ class Nexus():
 
         # for connection in tweak.getConnections():
         #     q = Queue()
-        #     self.queues.append(q)
         #     self.connections.update({connection:q})
+        #     self.queues.append(q)
+        ''' For each connection:
+            create a Link with a name (purpose), start, and end
+            Start links to one module's name, end to the other. 
+            Nexus gives start_module the Link as a q_in,
+              and end_module the Link as a q_out
+            Nexus maintains dict of name and associated Link. 
+            Nexus also has list of Links that it is itself connected to 
+              for communication purposes. 
+            OR
+            For each connection, create 2 Links. Nexus acts as intermediary. 
+        '''
 
         return tweak
 
@@ -44,6 +59,7 @@ class Nexus():
         self.limbo.subscribe()
 
         self.queues = {}
+        self.modules = {} # needed?
         
         # Create connections to the store based on module name
         # Instatiate modules and give them Limbo client connections
@@ -53,10 +69,12 @@ class Nexus():
         self.visName = self.tweak.visName
         self.visLimbo = store.Limbo(self.visName)
         self.Visual = CaimanVisual(self.visName, self.visLimbo)
+        self.modules.update({self.visName:self.Visual}) # needed? TODO
 
-        self.GUI = DisplayVisual('GUI')
+        self.guiName = 'GUI'
+        self.GUI = DisplayVisual(self.guiName)
         self.GUI.setVisual(self.Visual)
-        self.queues.update({'gui_comm':Link('gui_comm')})
+        self.queues.update({'gui_comm':Link('gui_comm', self.guiName, self.name)})
         self.GUI.setLink(self.queues['gui_comm'])
 
         self.runInit() #must be run before import caiman
@@ -77,20 +95,20 @@ class Nexus():
         self.acqLimbo = store.Limbo(self.acqName)
         self.Acquirer = FileAcquirer(self.acqName, self.acqLimbo)
 
-        self.goFlag = False
         self.quitFlag = False
         self.flags = ['run', 'quit']
 
     def setupProcessor(self):
         '''Setup process parameters
         '''
-        self.queues.update({'acq_proc':Link('acq_proc'), 'proc_comm':Link('proc_comm')})
+        self.queues.update({'acq_proc':Link('acq_proc', self.acqName, self.procName), 
+                            'proc_comm':Link('proc_comm', self.procName, self.name)})
         self.Processor = self.Processor.setupProcess(self.queues['acq_proc'], self.queues['proc_comm'])
 
     def setupAcquirer(self, filename):
         ''' Load data from file
         '''
-        self.queues.update({'acq_comm':Link('acq_comm')})
+        self.queues.update({'acq_comm':Link('acq_comm', self.acqName, self.name)})
         self.Acquirer.setupAcquirer(filename, self.queues['acq_proc'], self.queues['acq_comm'])
 
     def runProcessor(self):
@@ -162,7 +180,6 @@ class Nexus():
         print('received signal '+flag)
         if flag in self.flags:
             if flag == self.flags[0]: #start running
-                #self.goFlag = True
                 print('running!')
                 self.run()
             elif flag == self.flags[1]: #quit
@@ -232,6 +249,7 @@ class Nexus():
             to kill the process running the store (plasma server)
         '''
         self._closeStore()
+        logger.warning('Killed the central store')
 
     def _closeStore(self):
         ''' Internal method to kill the subprocess
@@ -261,7 +279,7 @@ class Nexus():
             logger.exception('Store cannot be started: {0}'.format(e))
 
 
-def Link(name):
+def Link(name, start, end):
     ''' Abstract constructor for a queue that Nexus uses for
     inter-process/module signaling and information passing
 
@@ -271,16 +289,27 @@ def Link(name):
     '''
 
     m = Manager()
-    q = AsyncQueue(m.Queue(maxsize=0), name)
+    q = AsyncQueue(m.Queue(maxsize=0), name, start, end)
     return q
 
 
 class AsyncQueue(object):
-    def __init__(self,q, name):
+    def __init__(self,q, name, start, end):
         self.queue = q
         self.real_executor = None
         self.cancelled_join = False
+
+        # Notate what this queue is and from where to where
+        # is it passing information
         self.name = name
+        self.start = start
+        self.end = end
+
+    def getStart(self):
+        return self.start
+    
+    def getEnd(self):
+        return self.end
 
     @property
     def _executor(self):
