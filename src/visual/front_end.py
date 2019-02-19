@@ -3,7 +3,7 @@ import os
 from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import pyqtSignal, Qt
-from visual import rasp_ui_large
+from visual import rasp_ui_huge as rasp_ui
 from nexus.store import Limbo
 import numpy as np
 from math import floor
@@ -18,7 +18,7 @@ from matplotlib import cm
 import logging; logger = logging.getLogger(__name__)
 
 
-class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
+class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def __init__(self, visual, comm, parent=None):
         ''' Setup GUI
@@ -43,11 +43,13 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
 
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
         self.slider.valueChanged.connect(_call(self.sliderMoved)) #Threshold for magnitude selection
+       
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
-        self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
+        self.slider2.setGeometry(QtCore.QRect(55, 120, 155, 50))  #(20, 100, 155, 50))
         self.slider2.setObjectName("slider2")
+        self.slider2.rangeChanged.connect(_call(self.slider2Moved)) #Threshold for angular selection
 
     def customizePlots(self):
         
@@ -73,6 +75,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         theta = np.append(theta,0)
         self.theta = theta
         radius = np.zeros(11)
+        self.thresh_r = radius + 1
         x = radius * np.cos(theta)
         y = radius * np.sin(theta)
 
@@ -140,19 +143,21 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
 
         #re-update
         if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(5, self.update)
+            QtCore.QTimer.singleShot(50, self.update)
     
     def updateVideo(self):
         ''' TODO: Bug on clicking ROI --> trace and report to pyqtgraph
         '''
         image = None
         try:
-            raw, color, image = self.visual.plotCompFrame(self.slider.value()) #self.nexus.getPlotRaw(self.slider.value())
+            raw, color, image = self.visual.plotCompFrame(self.thresh_r)
             if raw is not None and np.unique(raw).size > 1:
                 self.rawplot.setImage(raw.T, autoHistogramRange=False)
-                self.rawplot.ui.histogram.vb.setLimits(yMin=0.05, yMax=0.55)
+                self.rawplot.ui.histogram.vb.setLimits(yMin=0.02, yMax=0.55)
                 self.rawplot_2.setImage(color)
+                self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
                 self.rawplot_3.setImage(image)
+                self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
             logger.error('Oh no {0}'.format(e))
@@ -222,16 +227,30 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
 
     def sliderMoved(self):
         val = self.slider.value()
-        radius = np.full(11, val)
-        x = radius * np.cos(self.theta)
-        y = radius * np.sin(self.theta)
-        self.polar3.setData(x, y, pen=pyqtgraph.mkPen(width=2, color='g'))
+        if np.count_nonzero(self.thresh_r) == 0:
+            r = np.full(11,val)
+        else:
+            r = self.thresh_r
+            r[np.nonzero(r)] = val
+        self.updateThreshGraph(r)
 
     def slider2Moved(self):
-        val = self.slider.value()
-        radius = np.full(11, val)
-        x = radius * np.cos(self.theta)
-        y = radius * np.sin(self.theta)
+        r1,r2 = self.slider2.range()
+        r = np.full(11, self.slider.value())
+        r1 = 4*np.pi*(r1-4)/360
+        r2 = 4*np.pi*(r2-4)/360
+        t1 = np.argmin(np.abs(np.array(r1)-self.theta))
+        t2 = np.argmin(np.abs(np.array(r2)-self.theta))
+        r[0:t1] = 0
+        r[t2+1:11] = 0
+        self.updateThreshGraph(r)
+
+    def updateThreshGraph(self, r):
+        self.thresh_r = r
+        if np.count_nonzero(r) == 11:
+            r[10] = 0
+        x = r * np.cos(self.theta)
+        y = r * np.sin(self.theta)
         self.polar3.setData(x, y, pen=pyqtgraph.mkPen(width=2, color='g'))
 
     def _updateRedCirc(self):
@@ -249,7 +268,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
             self.rawplot_2.getView().removeItem(self.red_circ)
             self.red_circ = CircleROI(pos = np.array([self.selected[0][1], self.selected[0][0]])-5, size=10, movable=False, pen=ROIpen1)
             self.rawplot_2.getView().addItem(self.red_circ)
-
 
     def closeEvent(self, event):
         '''Clicked x/close on window
@@ -294,6 +312,9 @@ class QRangeSlider(QtWidgets.QWidget):
         self._minimum = 0
         self._maximum = 180
 
+        self.min_max = 99
+        self.max_max = 99
+
         self._layout = QtWidgets.QHBoxLayout()
         self._layout.setSpacing(0)
         self.setLayout(self._layout)
@@ -327,9 +348,9 @@ class QRangeSlider(QtWidgets.QWidget):
 
         mid = floor((self._max_slider.value()-self._min_slider.value())/ 2)
 
-        self._min_slider.setMaximum(self._min_slider.maximum() + mid)
+        self.setMax_min(self._min_slider.maximum() + mid)
         self._min_slider.setValue(self._min_slider.value() + mid)
-        self._max_slider.setMaximum(self._max_slider.maximum() - mid)
+        self.setMax_max(self._max_slider.maximum() - mid)
         self._max_slider.setValue(self._max_slider.value() - mid)
 
         for slider in [self._min_slider, self._max_slider]:
@@ -338,6 +359,20 @@ class QRangeSlider(QtWidgets.QWidget):
         self._layout.setStretch(0, self._min_slider.maximum())
         self._layout.setStretch(1, self._max_slider.maximum())
 
+    def setMax_min(self, value):
+        self._min_slider.setMaximum(value)
+        self.min_max = value
+
+    def setMax_max(self, value):
+        self._max_slider.setMaximum(value)
+        self.max_max = value
+
+    def getMax_min(self):
+        return self.min_max
+
+    def getMax_max(self):
+        return self.max_max
+
     def lowerSlider(self):
         return self._min_slider
 
@@ -345,7 +380,7 @@ class QRangeSlider(QtWidgets.QWidget):
         return self._max_slider
 
     def range(self):
-        return (self._min_slider.value(), self._max_slider.value())
+        return (self.getMax_min() - self._min_slider.value(), 180 - (self.getMax_max() - self._max_slider.value()))
 
     def setRange(self, lower, upper):
         for slider in [self._min_slider, self._max_slider]:
