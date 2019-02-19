@@ -13,6 +13,8 @@ from visual.visual import CaimanVisual, DisplayVisual
 from visual.front_end import FrontEnd
 from threading import Thread
 import asyncio
+import concurrent
+import functools
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -65,6 +67,8 @@ class Nexus():
         # Instatiate modules and give them Limbo client connections
         self.tweakLimbo = store.Limbo('tweak')
         self.tweak = self.loadTweak(self.tweakLimbo)
+
+        self.procName = self.tweak.procName
     
         self.visName = self.tweak.visName
         self.visLimbo = store.Limbo(self.visName)
@@ -74,12 +78,12 @@ class Nexus():
         self.guiName = 'GUI'
         self.GUI = DisplayVisual(self.guiName)
         self.GUI.setVisual(self.Visual)
+        self.setupVisual()
         self.queues.update({'gui_comm':Link('gui_comm', self.guiName, self.name)})
         self.GUI.setLink(self.queues['gui_comm'])
 
         self.runInit() #must be run before import caiman
 
-        self.procName = self.tweak.procName
         self.procLimbo = store.Limbo(self.procName)
 
         from process.process import CaimanProcessor
@@ -102,14 +106,19 @@ class Nexus():
         '''Setup process parameters
         '''
         self.queues.update({'acq_proc':Link('acq_proc', self.acqName, self.procName), 
-                            'proc_comm':Link('proc_comm', self.procName, self.name)})
-        self.Processor = self.Processor.setupProcess(self.queues['acq_proc'], self.queues['proc_comm'])
+                            'proc_comm':Link('proc_comm', self.procName, self.visName)})
+        self.Processor = self.Processor.setupProcess(self.queues['acq_proc'], self.queues['proc_vis'], self.queues['proc_comm'])
 
     def setupAcquirer(self, filename):
         ''' Load data from file
         '''
         self.queues.update({'acq_comm':Link('acq_comm', self.acqName, self.name)})
         self.Acquirer.setupAcquirer(filename, self.queues['acq_proc'], self.queues['acq_comm'])
+
+    def setupVisual(self):
+        self.queues.update({'vis_comm':Link('vis_comm', self.visName, self.name),
+                            'proc_vis':Link('proc_vis', self.procName, self.visName)})
+        self.GUI.visual.setupVisual(self.queues['proc_vis'], self.queues['vis_comm'])
 
     def runProcessor(self):
         '''Run the processor continually on input frames
@@ -132,23 +141,26 @@ class Nexus():
         self.t2 = Process(target=self.runProcessor)
         #self.t2.daemon = True
 
-        #self.poll_future = asyncio.ensure_future(self.pollQueues)
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.pollQueues())
 
     def run(self):
-        t = time.time()
+        print('Starting processes')
+        self.t = time.time()
 
         self.t1.start()
         self.t2.start()
 
+    def quit(self):
         self.t2.join()
         self.t1.join()
 
         logger.warning('Done with available frames')
-        print('total time ', time.time()-t)
+        print('total time ', time.time()-self.t)
 
         self.t3.join()
+
+        self.destroyNexus()
 
     def runInit(self):
         self.t3 = Process(target=self.GUI.runGUI)
@@ -156,21 +168,45 @@ class Nexus():
         self.t3.start()
 
     async def pollQueues(self):
-        while not self.quitFlag:
-            gui_comm = await self.queues['gui_comm'].get_async()
-            if gui_comm:
-                self.processGuiSignal(gui_comm[0])
-            acq_comm = await self.queues['acq_comm'].get_async()
-            if acq_comm is None:
-                logger.error('Acquirer is finished')
-            proc_comm = await self.queues['proc_comm'].get_async()
-            if proc_comm is not None:
-                (self.ests, self.A, self.dims, self.image) = proc_comm
-                #print('image', self.image)
-            else:
-                logger.error('Processor is finished')
-                break
-            await asyncio.sleep(0.01)
+        gui_fut = None
+        acq_fut = None
+        proc_fut = None
+        polling = [self.queues['gui_comm'], self.queues['acq_comm'], self.queues['proc_comm']]
+        tasks = []
+        for q in polling:
+            tasks.append(asyncio.ensure_future(q.get_async()))
+
+        while True:   
+
+            #print('pending tasks: ',len(tasks))
+
+            done, pending = await asyncio.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)
+            #TODO: actually kill pending tasks
+
+            if tasks[0] in done or polling[0].status == 'done':
+                #r = gui_fut.result()
+                r = polling[0].result
+                print('GUI signal: ', r)
+                self.processGuiSignal(r[0])
+
+                tasks[0] = (asyncio.ensure_future(polling[0].get_async()))
+
+            if tasks[1] in done or polling[1].status == 'done': #catch tasks that complete await wait/gather
+                r = polling[1].result
+                if r is None:
+                    logger.info('Acquirer is finished')
+                else:
+                    tasks[1] = (asyncio.ensure_future(polling[1].get_async()))
+
+            if tasks[2] in done or polling[2].status == 'done':
+                r = polling[2].result
+                if r is None:
+                    logger.info('Processor is finished')
+                    self.quit()
+                    break
+                else:
+                    tasks[2] = (asyncio.ensure_future(polling[0].get_async()))
+
             self.frame += 1
 
     def processGuiSignal(self, flag):
@@ -185,28 +221,14 @@ class Nexus():
             elif flag == self.flags[1]: #quit
                 print('quitting!')
                 self.quitFlag = True
-                self.destroyNexus()
+                self.quit()
         else:
             logger.error('Signal received from Nexus but cannot identify {}'.format(flag))
-
-    def getEstimates(self):
-        '''Get estimates aka neural Activity
-        '''
-        (self.ests, self.A, self.dims, self.image) = self.queues['proc_comm'].get()
-        self.frame += 1
-        #return self.Processor.getEstimates()
-        #return self.limbo.get('outputEstimates')
 
     def getTime(self):
         '''TODO: grabe from input source, not processor
         '''
         return self.frame #self.Processor.getTime()
-
-    def getPlotEst(self):
-        '''Get X,Y to plot estimates from visual
-        '''
-        #self.getEstimates()
-        return self.Visual.plotEstimates(self.ests, self.getTime())
 
     def getPlotRaw(self, thresh):
         '''Send img to visual to plot
@@ -241,13 +263,12 @@ class Nexus():
         self.Visual.selectNeurons(x, y, self.A, self.dims)
         return self.Visual.getSelected()
 
-    def getFirstSelect(self):
-        return self.Visual.getFirstSelect()
-
     def destroyNexus(self):
         ''' Method that calls the internal method
             to kill the process running the store (plasma server)
         '''
+        loop = asyncio.get_event_loop()
+        loop.stop()
         self._closeStore()
         logger.warning('Killed the central store')
 
@@ -304,6 +325,8 @@ class AsyncQueue(object):
         self.name = name
         self.start = start
         self.end = end
+        self.status = 'pending'
+        self.result = None
 
     def getStart(self):
         return self.start
@@ -337,17 +360,24 @@ class AsyncQueue(object):
 
     async def get_async(self):
         loop = asyncio.get_event_loop()
-        res  = await loop.run_in_executor(self._executor, self.get)
-        return res
+        self.status = 'pending'
+        try:
+            self.result = await loop.run_in_executor(self._executor, self.get)
+            #print('got something', self.name)
+            self.status = 'done'
+            return self.result
+        except Exception as e:
+            pass
+            #print('except ', e)
 
-    # def cancel_join_thread(self):
-    #     self._cancelled_join = True
-    #     self._queue.cancel_join_thread()
+    def cancel_join_thread(self):
+        self._cancelled_join = True
+        self._queue.cancel_join_thread()
 
-    # def join_thread(self):
-    #     self._queue.join_thread()
-    #     if self._real_executor and not self._cancelled_join:
-    #         self._real_executor.shutdown()
+    def join_thread(self):
+        self._queue.join_thread()
+        if self._real_executor and not self._cancelled_join:
+            self._real_executor.shutdown()
 
 
 if __name__ == '__main__':

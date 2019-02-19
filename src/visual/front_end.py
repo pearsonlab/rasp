@@ -35,12 +35,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
 
         self.customizePlots()
 
-        self.pushButton_3.clicked.connect(_call(self._runProcess))
-        self.pushButton_3.clicked.connect(_call(self.update))
-        self.pushButton.clicked.connect(_call(self._loadParams))
-        self.checkBox.stateChanged.connect(self.update) #TODO: call outside process or restric to checkbox update
-        self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick
-        self.slider.valueChanged.connect(_call(self.sliderMoved))
+        self.pushButton_3.clicked.connect(_call(self._runProcess)) #Tell Nexus to start
+        self.pushButton_3.clicked.connect(_call(self.update)) #Update front-end graphics
+        self.pushButton.clicked.connect(_call(self._loadParams)) #File Dialog, then tell Nexus to load tweak
+        self.checkBox.stateChanged.connect(self.update) #Show live front-end updates
+        
+
+        self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
+        self.slider.valueChanged.connect(_call(self.sliderMoved)) #Threshold for magnitude selection
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
@@ -105,7 +107,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         self.slider.setMaximum(12)
 
         #videos
-        #self.rawplot.ui.histogram.vb.setLimits(yMin=-0.1, yMax=1.1)
+#        self.rawplot.ui.histogram.vb.disableAutoRange()
+        self.rawplot.ui.histogram.vb.setLimits(yMin=-0.1, yMax=200)
 
     def _loadParams(self):
         ''' Button event to load parameters from file
@@ -133,24 +136,26 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         self.updateLines()
 
         #plot video
-        #self.updateVideo()
+        self.updateVideo()
 
         #re-update
         if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(100, self.update)
+            QtCore.QTimer.singleShot(5, self.update)
     
     def updateVideo(self):
         ''' TODO: Bug on clicking ROI --> trace and report to pyqtgraph
         '''
         image = None
         try:
-            raw, color, image = self.nexus.getPlotRaw(self.slider.value())
+            raw, color, image = self.visual.plotCompFrame(self.slider.value()) #self.nexus.getPlotRaw(self.slider.value())
+            if raw is not None and np.unique(raw).size > 1:
+                self.rawplot.setImage(raw.T, autoHistogramRange=False)
+                self.rawplot.ui.histogram.vb.setLimits(yMin=0.05, yMax=0.55)
+                self.rawplot_2.setImage(color)
+                self.rawplot_3.setImage(image)
+
         except Exception as e:
             logger.error('Oh no {0}'.format(e))
-        if image is not None and np.unique(image).size > 1:
-            self.rawplot.setImage(raw.T, autoHistogramRange=False)
-            self.rawplot_2.setImage(color)
-            self.rawplot_3.setImage(image)
 
         # NOTE: not plotting blue circles at the moment.
         # penCont=pyqtgraph.mkPen(width=1, color='b')
@@ -176,16 +181,16 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         avg = None
         avgAvg = None
         try:
-            (X, Y, avg, avgAvg) = self.nexus.getPlotEst()
+            (X, Y, avg, avgAvg) = self.visual.plotEstimates()
         except Exception as e:
-            logger.info('output does not yet exist. error: {}'.format(e))
+            logger.error('output does not yet exist. error: {}'.format(e))
 
         if(Y is not None):
             self.c1.setData(X, Y[1], pen=pen)
             self.c2.setData(X, Y[0], pen=pen2)
             
             if(self.flag):
-                self.selected = self.nexus.getFirstSelect()
+                self.selected = self.visual.getFirstSelect()
                 if self.selected is not None:
                     self._updateRedCirc()
 
@@ -209,7 +214,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui_large.Ui_MainWindow):
         #TODO: make this unclickable until finished updated plot (?)
         event.accept()
         mousePoint = event.pos()
-        self.selected = self.nexus.selectNeurons(int(mousePoint.x()), int(mousePoint.y()))
+        self.selected = self.visual.selectNeurons(int(mousePoint.x()), int(mousePoint.y()))
         selectedraw = np.zeros(2)
         selectedraw[0] = int(mousePoint.x())
         selectedraw[1] = int(mousePoint.y())

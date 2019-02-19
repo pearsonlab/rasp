@@ -125,14 +125,15 @@ class CaimanProcessor(Processor):
         '''
         return self.onAc.estimates
 
-    def setupProcess(self, q_in, q_out):
+    def setupProcess(self, q_in, q_vis, q_comm):
         ''' Create OnACID object and initialize it
                 (runs initialize online)
             limboClient is a client to the data store server
             TODO: put configParams in store and load here
         '''
         self.q_in = q_in
-        self.q_out = q_out
+        self.q_vis = q_vis
+        self.q_comm = q_comm
         self.done = False
         self.dropped_frames = []
         self.coords = None
@@ -192,7 +193,7 @@ class CaimanProcessor(Processor):
                 frame = self.client.getID(frame[0][str(self.frame_number)])
                 #t = time.time()
                 frame = self._processFrame(frame, self.frame_number+init)
-                            #self.frame = frame.copy()
+                self.frame = frame.copy()
                 t = time.time()
                 self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
                 self.process_time.append([time.time()-t])
@@ -208,7 +209,7 @@ class CaimanProcessor(Processor):
                 print(frame)
         else:
             logger.error('Done with all available frames: {0}'.format(self.frame_number))
-            self.q_out.put(None)
+            self.q_comm.put(None)
             self.done = True
 
     def finalProcess(self, output):    
@@ -261,10 +262,9 @@ class CaimanProcessor(Processor):
         #self.coords = get_contours(A, self.onAc.dims)
         self.putAnalysis_time.append([time.time()-t])
 
-        self.image = self.makeImage()
-        
-        self.q_out.put([self.ests, A, self.onAc.dims, self.image])
-        
+        self.image, self.cor_frame = self.makeImage()
+        self.q_vis.put([self.ests, A, self.onAc.dims, self.image, self.cor_frame])
+
         #self.client.replace(self.ests, output)
         #TODO: instead of get from Nexus, put into store
 
@@ -296,8 +296,9 @@ class CaimanProcessor(Processor):
         except ValueError as ve:
             logger.info('ValueError: {0}'.format(ve))
 
-        cor_frame = None #TODO: (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
-        return cor_frame, image
+        cor_frame = (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
+        return image, cor_frame
+        #return image
 
 
     def _finalAnalysis(self, t):

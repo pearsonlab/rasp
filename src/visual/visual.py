@@ -27,8 +27,10 @@ class DisplayVisual():
 
     def setVisual(self, Visual):
         self.visual = Visual
+        print('inside display, visual name is ', self.visual.name)
 
     def setLink(self, link):
+        print('setting link ', link)
         self.link = link
 
 
@@ -40,7 +42,6 @@ class Visual():
         '''
         raise NotImplementedError
 
-
 class CaimanVisual(Visual):
     ''' Class for displaying data from caiman processor
     '''
@@ -48,6 +49,7 @@ class CaimanVisual(Visual):
     def __init__(self, name, client):
         self.name = name
         self.client = client
+
         self.plots = [0,1,2]
         self.com1 = np.zeros(2)
         self.com2 = np.zeros(2)
@@ -55,35 +57,47 @@ class CaimanVisual(Visual):
         self.neurons = []
         self.estsAvg = []
         self.coords = None
+        self.frame = 0
+        self.q_in = None
+        self.q_comm = None
+        self.image = None
+        self.raw = None
 
-    # def runGUI(self):
-    #     logger.info('Loading FrontEnd')
-    #     self.app = QtWidgets.QApplication([])
-    #     self.rasp = FrontEnd()
-    #     self.rasp.show()
-    #     self.app.exec_()
-    #     logger.info('GUI ready')
+    def setupVisual(self, q_in, q_comm):
+        ''' Setup Links
+        '''
+        self.q_in = q_in
+        self.q_comm = q_comm
 
-    def plotEstimates(self, ests, frame_number):
+    def plotEstimates(self):
         ''' Take numpy estimates and t=frame_number
             Create X and Y for plotting, return
         '''
-        stim = self.stimAvg(ests)
-        avg = stim[self.plots[0]]
-        avgAvg = np.array(np.mean(stim, axis=0))
+        try:
+            (ests, self.A, self.dims, self.image, self.raw) = self.q_in.get(timeout=1)
+            self.coords = self.get_contours(self.A, self.dims)
+            self.frame += 1
 
-        if frame_number >= 200:
-            # TODO: change to init batch here
-            window = 200
-        else:
-            window = frame_number
+            stim = self.stimAvg(ests)
+            avg = stim[self.plots[0]]
+            avgAvg = np.array(np.mean(stim, axis=0))
 
-        if ests.shape[1]>0:
-            Yavg = np.mean(ests[:,frame_number-window:frame_number], axis=0) 
-            #Y0 = ests[self.plots[0],frame_number-window:frame_number]
-            Y1 = ests[self.plots[0],frame_number-window:frame_number]
-            X = np.arange(0,Y1.size)+(frame_number-window)
-            return X,[Y1,Yavg],avg,avgAvg
+            if self.frame >= 200:
+                # TODO: change to init batch here
+                window = 200
+            else:
+                window = self.frame
+
+            if ests.shape[1]>0:
+                Yavg = np.mean(ests[:,self.frame-window:self.frame], axis=0) 
+                #Y0 = ests[self.plots[0],frame_number-window:frame_number]
+                Y1 = ests[self.plots[0],self.frame-window:self.frame]
+                X = np.arange(0,Y1.size)+(self.frame-window)
+                return X,[Y1,Yavg],avg,avgAvg
+        
+        except Exception as e:
+            print('probably timeout ', e)
+            return None
 
     def stimAvg(self, ests):
         ''' For now, avergae over every 100 frames
@@ -100,13 +114,14 @@ class CaimanVisual(Visual):
         self.estsAvg = np.array(estsAvg)        
         return self.estsAvg
 
-    def selectNeurons(self, x, y, coords):
+    def selectNeurons(self, x, y):
         ''' x and y are coordinates
             identifies which neuron is closest to this point
             and updates plotEstimates to use that neuron
             TODO: pick a subgraph (0-2) to plot that neuron (input)
                 ie, self.plots[0] = new_ind for ests
         '''
+        coords = self.get_contours(self.A, self.dims)
         neurons = [o['neuron_id']-1 for o in coords]
         com = np.array([o['CoM'] for o in coords])
         dist = cdist(com, [np.array([y, x])])
@@ -117,10 +132,6 @@ class CaimanVisual(Visual):
         else:
             logger.info('No neurons nearby where you clicked')
             self.com1 = com[0]
-
-    def getSelected(self):
-        ''' Returns list of 3 coordinates for plotted selections
-        '''
         return [self.com1, self.com2, self.com3]
 
     def getFirstSelect(self):
@@ -141,22 +152,24 @@ class CaimanVisual(Visual):
         image = img #np.minimum((img*255.),255).astype('u1')
         return image
 
-    def plotCompFrame(self, image, thresh):
+    def plotCompFrame(self, thresh):
         ''' Computes colored frame and nicer background+components frame
         '''
         ###color = np.stack([image, image, image], axis=-1).astype(np.uint8).copy()
+        image = self.image
         color = np.stack([image, image, image, image], axis=-1)
         image2 = np.stack([image, image, image, image], axis=-1)
         image2[...,3] = 100
         color[...,3] = 255
         if self.coords is not None:
-            for i,c in enumerate(self.coords):
+            coords = [o['coordinates'] for o in self.coords]
+            for i,c in enumerate(coords):
                 c = np.array(c)
                 ind = c[~np.isnan(c).any(axis=1)].astype(int)
                 ###cv2.fillConvexPoly(color, ind, (255,0,0))
                 color[ind[:,1], ind[:,0], :] = self.tuningColor(i, color[ind[:,1], ind[:,0]])
                 image2[ind[:,1], ind[:,0], :] = self.threshNeuron(i, thresh) #(255,255,255,255)
-        return np.swapaxes(color,0,1), np.swapaxes(image2,0,1)
+        return self.raw, np.swapaxes(color,0,1), np.swapaxes(image2,0,1)
 
     def threshNeuron(self, ind, thresh):
         display = (255,255,255,255)
@@ -180,7 +193,6 @@ class CaimanVisual(Visual):
         else:
             return (255,255,255,0)
         
-
     def plotContours(self, A, dims):
         ''' Provide contours to plot atop raw image
         '''
