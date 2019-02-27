@@ -15,6 +15,7 @@ from os.path import expanduser
 import os
 import asyncio
 import logging; logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class Processor():
@@ -120,10 +121,10 @@ class CaimanProcessor(Processor):
         '''
         return {}
 
-    def getImageData(self):
-        ''' Return OnACID estimates for visualization
-        '''
-        return self.onAc.estimates
+    # def getImageData(self):
+    #     ''' Return OnACID estimates for visualization
+    #     '''
+    #     return self.onAc.estimates
 
     def setupProcess(self, q_in, q_vis, q_comm):
         ''' Create OnACID object and initialize it
@@ -165,6 +166,7 @@ class CaimanProcessor(Processor):
             try: 
                 self.runProcess()
                 if self.done:
+                    logger.info('Done running Process')
                     print('Dropped frames: ', self.dropped_frames)
                     print('Total number of dropped frames ', len(self.dropped_frames))
                     print('mean time per fit frame ', np.mean(self.process_time))
@@ -206,7 +208,6 @@ class CaimanProcessor(Processor):
                 self.frame_number += 1
             except KeyError as e:
                 logger.error('Key error... {0}'.format(e))
-                print(frame)
         else:
             logger.error('Done with all available frames: {0}'.format(self.frame_number))
             self.q_comm.put(None)
@@ -252,9 +253,9 @@ class CaimanProcessor(Processor):
         # Just store C traces for now
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
-        b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
+        #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
-        f = self.onAc.estimates.C_on[:nb, :self.frame_number]
+        #f = self.onAc.estimates.C_on[:nb, :self.frame_number]
         
         self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
@@ -262,8 +263,17 @@ class CaimanProcessor(Processor):
         #self.coords = get_contours(A, self.onAc.dims)
         self.putAnalysis_time.append([time.time()-t])
 
-        self.image, self.cor_frame = self.makeImage()
-        self.q_vis.put([self.ests, A, self.onAc.dims, self.image, self.cor_frame])
+        image, cor_frame = self.makeImage()
+        dims = self.onAc.dims
+        #self.q_vis.put([self.ests, A, self.onAc.dims, self.image, self.cor_frame])
+        ids = []
+        ids.append(self.client.put(np.array(C), str(self.frame_number)))
+        ids.append(self.client.put(A.toarray(), 'A'+str(self.frame_number)))
+        ids.append(self.client.put(dims, 'dims'+str(self.frame_number)))
+        ids.append(self.client.put(image, 'image'+str(self.frame_number)))
+        ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
+
+        self.q_vis.put(ids)
 
         #self.client.replace(self.ests, output)
         #TODO: instead of get from Nexus, put into store
