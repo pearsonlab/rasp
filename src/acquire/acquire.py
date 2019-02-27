@@ -4,6 +4,8 @@ import h5py
 import numpy as np
 import asyncio
 import logging; logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 class Acquirer():
     '''Abstract class for the image acquirer component

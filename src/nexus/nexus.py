@@ -15,12 +15,27 @@ from threading import Thread
 import asyncio
 import concurrent
 import functools
+import signal
 
-import logging; logger = logging.getLogger(__name__)
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logging.basicConfig(filename='logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()), 
+                    filemode='w', 
+                    format='%(asctime)s | %(levelname)-8s | %(name)s | %(lineno)04d | %(message)s')
+
+#fh = logging.FileHandler('logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()))
+#formatter = logging.Formatter('%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s')
+#fh.setFormatter(formatter)
+#logger.addHandler(fh)
 
 # TODO: Provide function in abstract classes (?) where Nexus can give/set Links
 # This would be for dynamically adding new Links for user-defined modules beyond
 # the q_in/q_out and q_comm queues. [Future feature]
+
+# TODO: Set up limbo.notify in async function (?)
 
 class Nexus():
     ''' Main server class for handling objects in RASP
@@ -54,7 +69,7 @@ class Nexus():
         return tweak
 
     def createNexus(self):
-        self._startStore(1000000000) #default size should be system-dependent
+        self._startStore(2000000000) #default size should be system-dependent
     
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
@@ -62,6 +77,7 @@ class Nexus():
 
         self.queues = {}
         self.modules = {} # needed?
+        self.processes = []
         
         # Create connections to the store based on module name
         # Instatiate modules and give them Limbo client connections
@@ -88,10 +104,6 @@ class Nexus():
 
         from process.process import CaimanProcessor
         self.Processor = CaimanProcessor(self.procName, self.procLimbo)
-        self.ests = None #TODO: this should be Activity as general spike estimates
-        self.image = None
-        self.A = None
-        self.dims = None
 
         #self.queues.update({'acq_proc':Link('acq_proc'), 'proc_comm':Link('proc_comm')})
 
@@ -131,44 +143,57 @@ class Nexus():
     def runAcquirer(self):
         ''' Run the acquirer continually 
         '''
+        # TODO: rewrite to make like Processor.run()
         while True:
             self.Acquirer.runAcquirer()
             if self.Acquirer.data is None:
                 break
 
     def startNexus(self):
-        self.frame = 0
-
         self.t1 = Process(target=self.runAcquirer)
-        #self.t1.daemon = True
+        self.t1.daemon = True
         self.t2 = Process(target=self.runProcessor)
-        #self.t2.daemon = True
+        self.t2.daemon = True
 
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.pollQueues())
+
+        signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+        for s in signals:
+            loop.add_signal_handler(
+                s, lambda s=s: asyncio.create_task(stop_polling(s, loop)))
+
+        loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
 
     def run(self):
-        print('Starting processes')
+        logger.info('Starting processes')
         self.t = time.time()
 
-        self.t1.start()
-        self.t2.start()
+        self.processes.extend([self.t1, self.t2])
+        
+        for t in self.processes:
+            t.start()
 
     def quit(self):
-        self.t2.join()
-        self.t1.join()
+        logger.warning('Killing child processes')
+        
+        self.processes.append(self.t3)
+        for t in self.processes:
+            if t.is_alive():
+                t.terminate()
+            t.join()
 
         logger.warning('Done with available frames')
         print('total time ', time.time()-self.t)
 
-        self.t3.join()
+        #self.t3.join()
 
         self.destroyNexus()
 
     def runInit(self):
         self.t3 = Process(target=self.GUI.runGUI)
-        #self.t3.daemon = True
+        self.t3.daemon = True
         self.t3.start()
+        logger.info('Started Front End')
 
     async def pollQueues(self):
         gui_fut = None
@@ -179,7 +204,7 @@ class Nexus():
         for q in polling:
             tasks.append(asyncio.ensure_future(q.get_async()))
 
-        while True:   
+        while not self.quitFlag:   
 
             #print('pending tasks: ',len(tasks))
 
@@ -189,7 +214,6 @@ class Nexus():
             if tasks[0] in done or polling[0].status == 'done':
                 #r = gui_fut.result()
                 r = polling[0].result
-                print('GUI signal: ', r)
                 self.processGuiSignal(r[0])
 
                 tasks[0] = (asyncio.ensure_future(polling[0].get_async()))
@@ -210,70 +234,67 @@ class Nexus():
                 else:
                     tasks[2] = (asyncio.ensure_future(polling[0].get_async()))
 
-            self.frame += 1
+        logger.warning('Shutting down polling')
+
 
     def processGuiSignal(self, flag):
         '''Receive flags from the Front End as user input
             List of flags: 0 = run(), 1 = ..
         '''
-        print('received signal '+flag)
+        logger.info('Received signal from GUI: '+flag)
         if flag in self.flags:
             if flag == self.flags[0]: #start running
-                print('running!')
+                logger.info('Begin run!')
                 self.run()
             elif flag == self.flags[1]: #quit
-                print('quitting!')
+                logger.warning('Quitting the program!')
                 self.quitFlag = True
                 self.quit()
         else:
             logger.error('Signal received from Nexus but cannot identify {}'.format(flag))
 
-    def getTime(self):
-        '''TODO: grabe from input source, not processor
-        '''
-        return self.frame #self.Processor.getTime()
+    # def getTime(self):
+    #     '''TODO: grabe from input source, not processor
+    #     '''
+    #     return self.frame #self.Processor.getTime()
 
-    def getPlotRaw(self, thresh):
-        '''Send img to visual to plot
-        '''
-        # #TMP
-        #     # self.getPlotContours()
-        #     # #TMP
-        #     # (raw, both) = self.Processor.makeImage() #just get denoised frame for now
-        #     # #TODO: get some raw data from Acquirer and some contours from Processor
-        #     # visRaw = self.Visual.plotRaw(raw)
-        #     # (visColor, visBoth) = self.Visual.plotCompFrame(both, thresh)
-        #     # return visRaw, visColor, visBoth
-        # #data = self.Processor.makeImage() #just get denoised frame for now
-        # #TODO: get some raw data from Acquirer and some contours from Processor
-        # print('other image ', self.image)
-        # visRaw = self.Visual.plotRaw(self.image)
-        # print('vis raw frame ', visRaw)
-        # return visRaw
+    # def getPlotContours(self):
+    #     ''' add neuron shapes to raw plot
+    #     '''
+    #     return self.Visual.plotContours(self.A, self.dims)
+    #     #self.Processor.getCoords())
 
-    def getPlotContours(self):
-        ''' add neuron shapes to raw plot
-        '''
-        return self.Visual.plotContours(self.A, self.dims)
-        #self.Processor.getCoords())
+    # def getPlotCoM(self):
+    #     return self.Visual.plotCoM(self.A, self.dims)
 
-    def getPlotCoM(self):
-        return self.Visual.plotCoM(self.A, self.dims)
-
-    def selectNeurons(self, x, y):
-        ''' Get plot coords, need to translate to neurons
-        '''
-        self.Visual.selectNeurons(x, y, self.A, self.dims)
-        return self.Visual.getSelected()
+    # def selectNeurons(self, x, y):
+    #     ''' Get plot coords, need to translate to neurons
+    #     '''
+    #     self.Visual.selectNeurons(x, y, self.A, self.dims)
+    #     return self.Visual.getSelected()
 
     def destroyNexus(self):
         ''' Method that calls the internal method
             to kill the process running the store (plasma server)
         '''
-        loop = asyncio.get_event_loop()
-        loop.stop()
+        logger.warning('Destroying Nexus')
+
+        # loop = asyncio.get_event_loop()
+        # loop.stop()
+        
+        # tasks = [t for t in asyncio.all_tasks() if t is not
+        #      asyncio.current_task()]
+
+        # [task.cancel() for task in tasks]
+
+        # logger.info('Canceling outstanding tasks')
+        # asyncio.gather(*tasks)
+        # loop.stop()
+        # logger.info('Shutdown complete.')
+        
         self._closeStore()
         logger.warning('Killed the central store')
+
 
     def _closeStore(self):
         ''' Internal method to kill the subprocess
@@ -302,6 +323,19 @@ class Nexus():
         except Exception as e:
             logger.exception('Store cannot be started: {0}'.format(e))
 
+    async def stop_polling(signal, loop):
+        logging.info(f'Received exit signal {signal.name}...')
+        
+        tasks = [t for t in asyncio.all_tasks() if t is not
+                asyncio.current_task()]
+
+        [task.cancel() for task in tasks]
+
+        logging.info('Canceling outstanding tasks')
+        await asyncio.gather(*tasks)
+        loop.stop()
+        logging.info('Shutdown complete.')
+    
 
 def Link(name, start, end):
     ''' Abstract constructor for a queue that Nexus uses for
@@ -366,11 +400,11 @@ class AsyncQueue(object):
         self.status = 'pending'
         try:
             self.result = await loop.run_in_executor(self._executor, self.get)
-            #print('got something', self.name)
+            logger.debug('Link '+self.name+' received input: '+self.result)
             self.status = 'done'
             return self.result
         except Exception as e:
-            pass
+            pass #TODO
             #print('except ', e)
 
     def cancel_join_thread(self):
@@ -392,7 +426,7 @@ if __name__ == '__main__':
     nexus.startNexus() #start polling, create processes
 #    nexus.run()
     nexus.destroyNexus()
-    
+    #os._exit(0)
     
     
     

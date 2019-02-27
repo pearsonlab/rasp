@@ -10,8 +10,11 @@ from PyQt5 import QtGui, QtWidgets
 import pyqtgraph as pg
 from visual.front_end import FrontEnd
 import sys
+from scipy.sparse import csc_matrix
 
 import logging; logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 class DisplayVisual():
     def __init__(self, name):
@@ -20,10 +23,13 @@ class DisplayVisual():
     def runGUI(self):
         logger.info('Loading FrontEnd')
         self.app = QtWidgets.QApplication([])
+        screen_resolution = self.app.desktop().screenGeometry()
+        print('---------- Screen resolution: ', screen_resolution)
         self.rasp = FrontEnd(self.visual, self.link)
         self.rasp.show()
-        self.app.exec_()
         logger.info('GUI ready')
+        self.app.exec_()
+        logger.info('Done running GUI')
 
     def setVisual(self, Visual):
         self.visual = Visual
@@ -77,8 +83,13 @@ class CaimanVisual(Visual):
             Create X and Y for plotting, return
         '''
         try:
-            (ests, A, dims, self.image, self.raw) = self.q_in.get(timeout=1)
-
+            #(ests, A, dims, self.image, self.raw) = self.q_in.get(timeout=1)
+            ids = self.q_in.get(timeout=1)
+            res = []
+            for id in ids:
+                res.append(self.client.getID(id))
+            (ests, A, dims, self.image, self.raw) = res
+            
             self.coords = self._updateCoords(A, dims)
             #self.coords = self.get_contours(self.A, self.dims)
             
@@ -221,8 +232,6 @@ class CaimanVisual(Visual):
 
         return self.coords  #Not really necessary
         
-
-
     # def plotContours(self, A, dims):
     #     ''' Provide contours to plot atop raw image
     #     '''
@@ -265,8 +274,8 @@ class CaimanVisual(Visual):
                     contour plot coordinates (per layer) for each component
         """
 
-        # if 'csc_matrix' not in str(type(A)):
-        #     A = csc_matrix(A)
+        if 'csc_matrix' not in str(type(A)):
+            A = csc_matrix(A)
         d, nr = np.shape(A)
         
         d1, d2 = dims

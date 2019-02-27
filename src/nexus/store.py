@@ -10,7 +10,7 @@ import subprocess
 from multiprocessing import Pool
 
 import logging; logger=logging.getLogger(__name__)
-
+logger.setLevel(logging.INFO)
 
 class StoreInterface():
     '''General interface for a store
@@ -70,11 +70,18 @@ class Limbo(StoreInterface):
         ''' Subscribe to a section? of the ds for singals
             Throws unknown errors
         '''
-
         try: 
             self.client.subscribe()
         except Exception as e:
             logger.error('Unknown error: {}'.format(e))
+            raise Exception
+
+    def notify(self):
+        try:
+            notification_info = self.client.get_next_notification()
+            recv_objid, recv_dsize, recv_msize = notification_info
+        except Exception as e:
+            logger.exception('Notification error: {}'.format(e))
             raise Exception
 
 
@@ -87,16 +94,16 @@ class Limbo(StoreInterface):
         object_id = None
         try:
             object_id = self.client.put(object)
-            #print('we did a plasma put in put ', object_id)
+            #print('we did a plasma put: ', object_name)
             self.updateStored(object_name, object_id)
-            logger.info('object successfully stored: '+object_name)
+            logger.debug('object successfully stored: '+object_name)
             #print(object_id)
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
             #raise PlasmaObjectExists
         except Exception as e:
             logger.error('could not store object: {0}'.format(e))
-            print('size ', sys.getsizeof(object))
+            #print('size ', sys.getsizeof(object), 'object_name ', object_name)
         return object_id
     
     
@@ -109,7 +116,7 @@ class Limbo(StoreInterface):
 
         # Check/confirm we need to replace
         if object_name in self.stored:
-            logger.info('replacing '+object_name)
+            logger.debug('replacing '+object_name)
             #self.saveSubstore(object_name) #TODO
             old_id = self.stored[object_name]
             self.delete(object_name)
@@ -190,7 +197,6 @@ class Limbo(StoreInterface):
     def get_all(self):
         ''' Get a listing of all objects in the store
         '''
-        #print(self.client.list())
         return self.client.list()
 
 
@@ -203,8 +209,8 @@ class Limbo(StoreInterface):
         res = self.client.get(self.stored.get(object_name), 0)
         # Can also use contains() to check
         if isinstance(res, ObjectNotAvailable):
-            logger.warn('Object {} cannot be found.'.format(object_name))
-            print(self.client.list())
+            logger.warning('Object {} cannot be found.'.format(object_name))
+            #print(self.client.list())
             raise ObjectNotFoundError
         else:
             return res
