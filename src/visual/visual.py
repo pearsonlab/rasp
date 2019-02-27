@@ -64,6 +64,7 @@ class CaimanVisual(Visual):
         self.raw = None
         self.A = None
         self.dims = None
+        self.flip = False
 
     def setupVisual(self, q_in, q_comm):
         ''' Setup Links
@@ -77,7 +78,7 @@ class CaimanVisual(Visual):
         '''
         try:
             (ests, A, dims, self.image, self.raw) = self.q_in.get(timeout=1)
-            
+
             self.coords = self._updateCoords(A, dims)
             #self.coords = self.get_contours(self.A, self.dims)
             
@@ -123,9 +124,8 @@ class CaimanVisual(Visual):
         ''' x and y are coordinates
             identifies which neuron is closest to this point
             and updates plotEstimates to use that neuron
-            TODO: pick a subgraph (0-2) to plot that neuron (input)
-                ie, self.plots[0] = new_ind for ests
         '''
+        #TODO: flip x and y if self.flip = True
         coords = self.coords
         neurons = [o['neuron_id']-1 for o in coords]
         com = np.array([o['CoM'] for o in coords])
@@ -135,7 +135,7 @@ class CaimanVisual(Visual):
             self.plots[0] = selected
             self.com1 = com[selected]
         else:
-            logger.info('No neurons nearby where you clicked')
+            logger.error('No neurons nearby where you clicked')
             self.com1 = com[0]
         return [self.com1, self.com2, self.com3]
 
@@ -149,6 +149,7 @@ class CaimanVisual(Visual):
         ''' Computes colored frame and nicer background+components frame
         '''
         image = self.image
+        raw = self.raw
         color = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
         #color = np.stack([image, image, image, image], axis=-1)
         image2 = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
@@ -165,7 +166,15 @@ class CaimanVisual(Visual):
                 cv2.fillConvexPoly(image2, ind, self._threshNeuron(i, thresh_r))
         #color = np.concatenate((color, image), axis=3)
         #color[...,3] = 255
-        return self.raw, np.swapaxes(color,0,1), np.swapaxes(image2,0,1)
+
+        if self.image.shape[0] < self.image.shape[1]:
+                self.flip = True
+                raw = raw.T
+        else:
+            np.swapaxes(color,0,1)
+            np.swapaxes(image2,0,1)
+
+        return np.flipud(raw), np.rot90(color,2), np.rot90(image2, 2)
 
     def _threshNeuron(self, ind, thresh_r):
         thresh = np.max(thresh_r)

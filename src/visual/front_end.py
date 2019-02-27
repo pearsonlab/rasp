@@ -17,6 +17,7 @@ from matplotlib import cm
 
 import logging; logger = logging.getLogger(__name__)
 
+#TODO: Behavioral stimuli/timing as input, dynamic calculation of tuning curves != 11 
 
 class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 

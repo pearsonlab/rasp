@@ -40,6 +40,7 @@ class FileAcquirer(Acquirer):
         self.q_out = q_out
         self.comm = q_comm
         if os.path.exists(filename):
+            print('Looking for ', filename)
             n, ext = os.path.splitext(filename)[:2]
             if ext == '.h5' or ext == '.hdf5':
                 with h5py.File(filename, 'r') as file:
@@ -47,6 +48,7 @@ class FileAcquirer(Acquirer):
                     self.data = file[keys[0]].value #only one dset per file atm
                         #frames = np.array(dset).squeeze() #not needed?
                     print('data is ', len(self.data))
+        else: raise FileNotFoundError
 
     def getFrame(self, num):
         ''' Can be live acquistion from disk (?) #TODO

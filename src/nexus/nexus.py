@@ -113,7 +113,10 @@ class Nexus():
         ''' Load data from file
         '''
         self.queues.update({'acq_comm':Link('acq_comm', self.acqName, self.name)})
-        self.Acquirer.setupAcquirer(filename, self.queues['acq_proc'], self.queues['acq_comm'])
+        try:
+            self.Acquirer.setupAcquirer(filename, self.queues['acq_proc'], self.queues['acq_comm'])
+        except FileNotFoundError:
+            logger.error('Dataset not found at {}'.format(filename))
 
     def setupVisual(self):
         self.queues.update({'vis_comm':Link('vis_comm', self.visName, self.name),
@@ -385,7 +388,7 @@ if __name__ == '__main__':
     nexus.createNexus()
     nexus.setupProcessor()
     cwd = os.getcwd()
-    nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
+    nexus.setupAcquirer(cwd+'/data/zf1.h5')
     nexus.startNexus() #start polling, create processes
 #    nexus.run()
     nexus.destroyNexus()

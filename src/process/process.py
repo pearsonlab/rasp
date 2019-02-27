@@ -87,7 +87,7 @@ class CaimanProcessor(Processor):
 
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': [cwd+'/data/zf1.h5'],      #Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -148,6 +148,7 @@ class CaimanProcessor(Processor):
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)
         self.frame_number = 0 #self.params['init_batch']
+        #TODO: Need to rewrite init online as well to receive individual frames.
         self.onAc.initialize_online()
         self.max_shifts_online = self.onAc.params.get('online', 'max_shifts_online')
 
