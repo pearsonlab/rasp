@@ -13,7 +13,8 @@ from caiman.utils.visualization import get_contours
 import caiman as cm
 from os.path import expanduser
 import os
-import asyncio
+from queue import Empty
+
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -45,18 +46,14 @@ class Processor():
         # Essenitally the registration process
         raise NotImplementedError
 
-    def runProcess(self):
-        # Get image and then process b/t image and estimates
-        raise NotImplementedError
-
     def run(self):
+        # Get image and then process b/t image and estimates
         # run in continuous mode
         raise NotImplementedError
     
     def putEstimates(self):
         # Update the DS with estimates
         raise NotImplementedError
-
 
 
 class CaimanProcessor(Processor):
@@ -88,7 +85,7 @@ class CaimanProcessor(Processor):
 
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/zf1.h5'],      #Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -98,7 +95,7 @@ class CaimanProcessor(Processor):
                    'ds_factor': 1,
                    'nb': 2,
                    'motion_correct': True,
-                   'init_batch': 200,
+                   'init_batch': 5,
                    'init_method': 'bare',
                    'normalize': True,
                    'sniper_mode': False,
@@ -110,7 +107,7 @@ class CaimanProcessor(Processor):
                    'min_num_trial': 10,
                    'show_movie': False,
                    'update_freq': 500,
-                    'minibatch_shape': 200,
+                   'minibatch_shape': 5,
                    'output': 'outputEstimates'}
         self.client.put(params_dict, 'params_dict')
         #TODO: return code    
@@ -121,12 +118,7 @@ class CaimanProcessor(Processor):
         '''
         return {}
 
-    # def getImageData(self):
-    #     ''' Return OnACID estimates for visualization
-    #     '''
-    #     return self.onAc.estimates
-
-    def setupProcess(self, q_in, q_vis, q_comm):
+    def setupProcess(self, q_in, q_vis, q_comm_in, q_comm_out):
         ''' Create OnACID object and initialize it
                 (runs initialize online)
             limboClient is a client to the data store server
@@ -134,7 +126,8 @@ class CaimanProcessor(Processor):
         '''
         self.q_in = q_in
         self.q_vis = q_vis
-        self.q_comm = q_comm
+        self.q_comm_in = q_comm_in
+        self.q_comm_out = q_comm_out
         self.done = False
         self.dropped_frames = []
         self.coords = None
@@ -163,18 +156,27 @@ class CaimanProcessor(Processor):
         self.procFrame_time = [] #aka t_motion
         self.detect_time = []
         self.shape_time = []
+        self.flag = False
         while True:
+            if self.flag: #if we have received run signal
+                try: 
+                    self.runProcess()
+                    if self.done:
+                        logger.info('Done running Process')
+                        print('Dropped frames: ', self.dropped_frames)
+                        print('Total number of dropped frames ', len(self.dropped_frames))
+                        print('mean time per fit frame ', np.mean(self.process_time))
+                        return
+                except Exception as e:
+                    logger.exception('What happened: {0}'.format(e))
+                    break  
             try: 
-                self.runProcess()
-                if self.done:
-                    logger.info('Done running Process')
-                    print('Dropped frames: ', self.dropped_frames)
-                    print('Total number of dropped frames ', len(self.dropped_frames))
-                    print('mean time per fit frame ', np.mean(self.process_time))
-                    return
-            except Exception as e:
-                logger.exception('What happened: {0}'.format(e))
-                break  
+                signal = self.q_comm_in.get(timeout=1)
+                if signal[0] == 'run': 
+                    self.flag = True
+                    logger.warning('Received run signal, begin running process')
+            except Empty as e:
+                pass #no signal from Nexus
 
     def runProcess(self):
         ''' Run process. Runs once per frame.
@@ -211,7 +213,7 @@ class CaimanProcessor(Processor):
                 logger.error('Key error... {0}'.format(e))
         else:
             logger.error('Done with all available frames: {0}'.format(self.frame_number))
-            self.q_comm.put(None)
+            self.q_comm_out.put(None)
             self.done = True
 
     def finalProcess(self, output):    
@@ -275,9 +277,6 @@ class CaimanProcessor(Processor):
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
         self.q_vis.put(ids)
-
-        #self.client.replace(self.ests, output)
-        #TODO: instead of get from Nexus, put into store
 
     def getEstimates(self):
         ''' ests contains C or dF_f; just neural data

@@ -33,7 +33,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         super(FrontEnd, self).__init__(parent)
         self.setupUi(self)
         self.extraSetup()
-        pyqtgraph.setConfigOptions(leftButtonPan=False) #TODO: how?
+        pyqtgraph.setConfigOptions(leftButtonPan=False)
 
         self.customizePlots()
 
@@ -55,7 +55,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.slider2.rangeChanged.connect(_call(self.slider2Moved)) #Threshold for angular selection
 
     def customizePlots(self):
-        
         self.checkBox.setChecked(True)
 
         #init line plot
@@ -65,8 +64,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.c2 = self.grplot_2.plot()
         grplot = [self.grplot, self.grplot_2]
         for plt in grplot:
-        #    plt.hideAxis('left')
-        #    plt.hideAxis('bottom')
             plt.getAxis('bottom').setTickSpacing(major=50, minor=50)
         #    plt.setLabel('bottom', "Frames")
         #    plt.setLabel('left', "Temporal traces")
@@ -124,7 +121,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         fname = QFileDialog.getOpenFileName(self, 'Open file', '/home')
             #TODO: make default home folder system-independent
         try:
-            self.nexus.loadTweak(fname[0])
+            self._loadTweak(fname[0])
         except FileNotFoundError as e:
             logger.error('File not found {}'.format(e))
             #raise FileNotFoundError
@@ -134,6 +131,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         '''
         self.comm.put(['run'])
         #TODO: grey out button until self.t is done, but allow other buttons to be active
+
+    def _loadTweak(self, file):
+        self.comm.put(['load', file])
 
     def update(self):
         ''' Update visualization while running
@@ -164,19 +164,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         except Exception as e:
             logger.error('Oh no {0}'.format(e))
-
-        # NOTE: not plotting blue circles at the moment.
-        # penCont=pyqtgraph.mkPen(width=1, color='b')
-        # try:
-        #     self.neurCom = self.nexus.getPlotCoM()
-        #     if self.neurCom: #added neurons, need to add contours to graph
-        #         for c in self.neurCom:
-        #             #TODO: delete and re-add circle for all (?) neurons if they've moved beyond a 
-        #             # certain distance (set via params...)
-        #             self.rawplot_2.getView().addItem(CircleROI(pos = np.array([c[1], c[0]])-5, size=10, movable=False, pen=penCont))
-        #     #TODO: keep track of added neurons and likely not update positions, only add new ones.
-        # except Exception as e:
-        #     logger.error('Something {0}'.format(e))
 
     def updateLines(self):
         ''' Helper function to plot the line traces
@@ -280,7 +267,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if confirm == QMessageBox.Yes:
             self.comm.put(['quit'])
-            #self.nexus.destroyNexus()
             event.accept()
         else: event.ignore()
             

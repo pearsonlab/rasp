@@ -77,12 +77,13 @@ class Nexus():
 
         self.queues = {}
         self.modules = {} # needed?
+        self.flags = {}
         self.processes = []
         
         # Create connections to the store based on module name
         # Instatiate modules and give them Limbo client connections
         self.tweakLimbo = store.Limbo('tweak')
-        self.tweak = self.loadTweak(self.tweakLimbo)
+        self.tweak = self.loadTweak() #self.tweakLimbo)
 
         self.procName = self.tweak.procName
     
@@ -99,27 +100,26 @@ class Nexus():
         self.GUI.setLink(self.queues['gui_comm'])
 
         self.runInit() #must be run before import caiman
+        self.t = time.time()
 
         self.procLimbo = store.Limbo(self.procName)
 
         from process.process import CaimanProcessor
         self.Processor = CaimanProcessor(self.procName, self.procLimbo)
 
-        #self.queues.update({'acq_proc':Link('acq_proc'), 'proc_comm':Link('proc_comm')})
-
         self.acqName = self.tweak.acqName
         self.acqLimbo = store.Limbo(self.acqName)
         self.Acquirer = FileAcquirer(self.acqName, self.acqLimbo)
 
-        self.quitFlag = False
-        self.flags = ['run', 'quit']
+        self.flags.update({'quit':False, 'run':False, 'load':False})
 
     def setupProcessor(self):
         '''Setup process parameters
         '''
         self.queues.update({'acq_proc':Link('acq_proc', self.acqName, self.procName), 
-                            'proc_comm':Link('proc_comm', self.procName, self.visName)})
-        self.Processor = self.Processor.setupProcess(self.queues['acq_proc'], self.queues['proc_vis'], self.queues['proc_comm'])
+                            'proc_comm':Link('proc_comm', self.procName, self.name),
+                            'proc_signal':Link('proc_signal', self.name, self.procName)})
+        self.Processor = self.Processor.setupProcess(self.queues['acq_proc'], self.queues['proc_vis'], self.queues['proc_signal'], self.queues['proc_comm'])
 
     def setupAcquirer(self, filename):
         ''' Load data from file
@@ -143,11 +143,7 @@ class Nexus():
     def runAcquirer(self):
         ''' Run the acquirer continually 
         '''
-        # TODO: rewrite to make like Processor.run()
-        while True:
-            self.Acquirer.runAcquirer()
-            if self.Acquirer.data is None:
-                break
+        self.Acquirer.run()
 
     def startNexus(self):
         self.t1 = Process(target=self.runAcquirer)
@@ -173,6 +169,8 @@ class Nexus():
         for t in self.processes:
             t.start()
 
+        self.queues['proc_signal'].put('run')
+
     def quit(self):
         logger.warning('Killing child processes')
         
@@ -184,8 +182,6 @@ class Nexus():
 
         logger.warning('Done with available frames')
         print('total time ', time.time()-self.t)
-
-        #self.t3.join()
 
         self.destroyNexus()
 
@@ -204,17 +200,18 @@ class Nexus():
         for q in polling:
             tasks.append(asyncio.ensure_future(q.get_async()))
 
-        while not self.quitFlag:   
+        while not self.flags['quit']:   
 
             #print('pending tasks: ',len(tasks))
 
             done, pending = await asyncio.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)
             #TODO: actually kill pending tasks
+            #TODO: tasks as dict vs list indexing so we can associate a task with the module/Link
 
             if tasks[0] in done or polling[0].status == 'done':
                 #r = gui_fut.result()
                 r = polling[0].result
-                self.processGuiSignal(r[0])
+                self.processGuiSignal(r)
 
                 tasks[0] = (asyncio.ensure_future(polling[0].get_async()))
 
@@ -236,62 +233,31 @@ class Nexus():
 
         logger.warning('Shutting down polling')
 
-
     def processGuiSignal(self, flag):
         '''Receive flags from the Front End as user input
-            List of flags: 0 = run(), 1 = ..
+            List of flags: 0 = run(), 1 = quit, 2 = load tweak
         '''
-        logger.info('Received signal from GUI: '+flag)
-        if flag in self.flags:
-            if flag == self.flags[0]: #start running
+        logger.info('Received signal from GUI: '+flag[0])
+        if flag[0] in self.flags.keys():
+            if flag[0] == 'run':
                 logger.info('Begin run!')
+                self.flags['run'] = True
                 self.run()
-            elif flag == self.flags[1]: #quit
+            elif flag[0] == 'quit':
                 logger.warning('Quitting the program!')
-                self.quitFlag = True
+                self.flags['quit'] = True
                 self.quit()
+            elif flag[0] == 'load':
+                logger.info('Loading Tweak config from file '+flag[1])
+                self.loadTweak(flag[1])
         else:
             logger.error('Signal received from Nexus but cannot identify {}'.format(flag))
-
-    # def getTime(self):
-    #     '''TODO: grabe from input source, not processor
-    #     '''
-    #     return self.frame #self.Processor.getTime()
-
-    # def getPlotContours(self):
-    #     ''' add neuron shapes to raw plot
-    #     '''
-    #     return self.Visual.plotContours(self.A, self.dims)
-    #     #self.Processor.getCoords())
-
-    # def getPlotCoM(self):
-    #     return self.Visual.plotCoM(self.A, self.dims)
-
-    # def selectNeurons(self, x, y):
-    #     ''' Get plot coords, need to translate to neurons
-    #     '''
-    #     self.Visual.selectNeurons(x, y, self.A, self.dims)
-    #     return self.Visual.getSelected()
 
     def destroyNexus(self):
         ''' Method that calls the internal method
             to kill the process running the store (plasma server)
         '''
         logger.warning('Destroying Nexus')
-
-        # loop = asyncio.get_event_loop()
-        # loop.stop()
-        
-        # tasks = [t for t in asyncio.all_tasks() if t is not
-        #      asyncio.current_task()]
-
-        # [task.cancel() for task in tasks]
-
-        # logger.info('Canceling outstanding tasks')
-        # asyncio.gather(*tasks)
-        # loop.stop()
-        # logger.info('Shutdown complete.')
-        
         self._closeStore()
         logger.warning('Killed the central store')
 
@@ -422,10 +388,10 @@ if __name__ == '__main__':
     nexus.createNexus()
     nexus.setupProcessor()
     cwd = os.getcwd()
-    nexus.setupAcquirer(cwd+'/data/zf1.h5')
+    nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
     nexus.startNexus() #start polling, create processes
 #    nexus.run()
-    nexus.destroyNexus()
+#    nexus.destroyNexus()
     #os._exit(0)
     
     
