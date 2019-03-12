@@ -14,42 +14,18 @@ import caiman as cm
 from os.path import expanduser
 import os
 from queue import Empty
+from nexus.module import Module, Spike
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class Processor():
+class Processor(Module):
     '''Abstract class for the processor component
        Needs to take an image from data store (DS)
        Needs to output spikes estimates over time
        Will likely change specifications in the future
     '''
-    def __init__(self, name, client):
-        self.name = name
-        self.client = client
-
-    def __str__(self):
-        return self.name
-
-    def setStore(self, client):
-        '''Set client interface to the store
-        '''
-        self.client = client
-
-    def setLink(self, link):
-        pass
-        #TODO: set explicit links (q_in, q_out, q_comm in/out)
-        # or provide list of Links...?
-
-    def setupProcess(self):
-        # Essenitally the registration process
-        raise NotImplementedError
-
-    def run(self):
-        # Get image and then process b/t image and estimates
-        # run in continuous mode
-        raise NotImplementedError
     
     def putEstimates(self):
         # Update the DS with estimates
@@ -118,16 +94,12 @@ class CaimanProcessor(Processor):
         '''
         return {}
 
-    def setupProcess(self, q_in, q_vis, q_comm_in, q_comm_out):
+    def setup(self):
         ''' Create OnACID object and initialize it
                 (runs initialize online)
             limboClient is a client to the data store server
             TODO: put configParams in store and load here
         '''
-        self.q_in = q_in
-        self.q_vis = q_vis
-        self.q_comm_in = q_comm_in
-        self.q_comm_out = q_comm_out
         self.done = False
         self.dropped_frames = []
         self.coords = None
@@ -171,10 +143,13 @@ class CaimanProcessor(Processor):
                     logger.exception('What happened: {0}'.format(e))
                     break  
             try: 
-                signal = self.q_comm_in.get(timeout=1)
-                if signal[0] == 'run': 
+                signal = self.q_sig.get(timeout=1)
+                if signal == Spike.run(): 
                     self.flag = True
                     logger.warning('Received run signal, begin running process')
+                elif signal == Spike.quit():
+                    logger.warning('Received quit signal, aborting')
+                    break
             except Empty as e:
                 pass #no signal from Nexus
 
@@ -213,7 +188,7 @@ class CaimanProcessor(Processor):
                 logger.error('Key error... {0}'.format(e))
         else:
             logger.error('Done with all available frames: {0}'.format(self.frame_number))
-            self.q_comm_out.put(None)
+            self.q_comm.put(None)
             self.done = True
 
     def finalProcess(self, output):    
@@ -268,7 +243,7 @@ class CaimanProcessor(Processor):
 
         image, cor_frame = self.makeImage()
         dims = self.onAc.dims
-        #self.q_vis.put([self.ests, A, self.onAc.dims, self.image, self.cor_frame])
+        #self.q_out.put([self.ests, A, self.onAc.dims, self.image, self.cor_frame])
         ids = []
         ids.append(self.client.put(np.array(C), str(self.frame_number)))
         ids.append(self.client.put(A.toarray(), 'A'+str(self.frame_number)))
@@ -276,7 +251,7 @@ class CaimanProcessor(Processor):
         ids.append(self.client.put(image, 'image'+str(self.frame_number)))
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
-        self.q_vis.put(ids)
+        self.q_out.put(ids)
 
     def getEstimates(self):
         ''' ests contains C or dF_f; just neural data
@@ -335,6 +310,7 @@ class CaimanProcessor(Processor):
 
     def _checkFrames(self):
         ''' Check to see if we have frames for processing
+            TODO: rework logic since not accessing store directly here anymore
         '''
         try:
             res = self.q_in.get()
@@ -343,6 +319,7 @@ class CaimanProcessor(Processor):
         except CannotGetObjectError:
             logger.error('No frames')
             self.done = True
+        #TODO: add'l error handling
 
 
     def _processFrame(self, frame, frame_number):

@@ -16,24 +16,22 @@ import asyncio
 import concurrent
 import functools
 import signal
+from nexus.module import Spike
 
 import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-logging.basicConfig(filename='logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()), 
-                    filemode='w', 
-                    format='%(asctime)s | %(levelname)-8s | %(name)s | %(lineno)04d | %(message)s')
+#logging.basicConfig(filename='logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()), 
+#                    filemode='w', 
+#                   format='%(asctime)s | %(levelname)-8s | %(name)s | %(lineno)04d | %(message)s')
 
-#fh = logging.FileHandler('logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()))
-#formatter = logging.Formatter('%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s')
-#fh.setFormatter(formatter)
-#logger.addHandler(fh)
+        #fh = logging.FileHandler('logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()))
+        #formatter = logging.Formatter('%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s')
+        #fh.setFormatter(formatter)
+        #logger.addHandler(fh)
 
-# TODO: Provide function in abstract classes (?) where Nexus can give/set Links
-# This would be for dynamically adding new Links for user-defined modules beyond
-# the q_in/q_out and q_comm queues. [Future feature]
 
 # TODO: Set up limbo.notify in async function (?)
 
@@ -89,7 +87,8 @@ class Nexus():
     
         self.visName = self.tweak.visName
         self.visLimbo = store.Limbo(self.visName)
-        self.Visual = CaimanVisual(self.visName, self.visLimbo)
+        self.Visual = CaimanVisual(self.visName)
+        self.Visual.setStore(self.visLimbo)
         self.modules.update({self.visName:self.Visual}) # needed? TODO
 
         self.guiName = 'GUI'
@@ -105,35 +104,48 @@ class Nexus():
         self.procLimbo = store.Limbo(self.procName)
 
         from process.process import CaimanProcessor
-        self.Processor = CaimanProcessor(self.procName, self.procLimbo)
+        self.Processor = CaimanProcessor(self.procName)
+        self.Processor.setStore(self.procLimbo)
 
         self.acqName = self.tweak.acqName
         self.acqLimbo = store.Limbo(self.acqName)
-        self.Acquirer = FileAcquirer(self.acqName, self.acqLimbo)
+        self.Acquirer = FileAcquirer(self.acqName)
+        self.Acquirer.setStore(self.acqLimbo)
 
         self.flags.update({'quit':False, 'run':False, 'load':False})
 
     def setupProcessor(self):
-        '''Setup process parameters
+        '''Setup pre-processor
         '''
         self.queues.update({'acq_proc':Link('acq_proc', self.acqName, self.procName), 
                             'proc_comm':Link('proc_comm', self.procName, self.name),
-                            'proc_signal':Link('proc_signal', self.name, self.procName)})
-        self.Processor = self.Processor.setupProcess(self.queues['acq_proc'], self.queues['proc_vis'], self.queues['proc_signal'], self.queues['proc_comm'])
+                            'proc_sig':Link('proc_sig', self.name, self.procName)})
+        self.Processor.setLinks(self.queues['proc_comm'], self.queues['proc_sig'], q_in=self.queues['acq_proc'], q_out=self.queues['proc_vis'])
+        self.Processor = self.Processor.setup()
 
     def setupAcquirer(self, filename):
-        ''' Load data from file
+        ''' Setup acquisition
         '''
-        self.queues.update({'acq_comm':Link('acq_comm', self.acqName, self.name)})
+        # Update queues for communication and signaling
+        # Already have data queue q_out = acq_proc
+        # Data queue q_in is None 
+        self.queues.update({'acq_comm':Link('acq_comm', self.acqName, self.name),
+                            'acq_sig':Link('acq_sig', self.name, self.acqName)})
+        self.Acquirer.setLinks(self.queues['acq_comm'], self.queues['acq_sig'], q_out=self.queues['acq_proc'])
         try:
-            self.Acquirer.setupAcquirer(filename, self.queues['acq_proc'], self.queues['acq_comm'])
+            self.Acquirer.setup(filename)
         except FileNotFoundError:
             logger.error('Dataset not found at {}'.format(filename))
 
     def setupVisual(self):
+        ''' Setup visual 
+        '''
+        # Data q_out is None
         self.queues.update({'vis_comm':Link('vis_comm', self.visName, self.name),
-                            'proc_vis':Link('proc_vis', self.procName, self.visName)})
-        self.GUI.visual.setupVisual(self.queues['proc_vis'], self.queues['vis_comm'])
+                            'proc_vis':Link('proc_vis', self.procName, self.visName),
+                            'vis_sig':Link('vis_sig', self.name, self.visName)})
+        self.GUI.visual.setLinks(self.queues['vis_comm'], self.queues['vis_sig'], q_in=self.queues['proc_vis'])
+        self.GUI.visual.setup() #Currently does nothing
 
     def runProcessor(self):
         '''Run the processor continually on input frames
@@ -169,11 +181,18 @@ class Nexus():
         for t in self.processes:
             t.start()
 
-        self.queues['proc_signal'].put('run')
+        self.queues['acq_sig'].put(Spike.run())
+        self.queues['proc_sig'].put(Spike.run())
 
     def quit(self):
         logger.warning('Killing child processes')
         
+        #TODO: make signals, etc
+        #Consider making queues nested dict to access all sig, comm, etc TODO
+        self.queues['proc_sig'].put(Spike.quit())
+        self.queues['vis_sig'].put(Spike.quit())
+        self.queues['acq_sig'].put(Spike.quit())
+
         self.processes.append(self.t3)
         for t in self.processes:
             if t.is_alive():

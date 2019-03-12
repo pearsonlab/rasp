@@ -3,28 +3,22 @@ import os
 import h5py
 import numpy as np
 import asyncio
+from nexus.module import Module, Spike
+from queue import Empty
+
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class Acquirer():
+class Acquirer(Module):
     '''Abstract class for the image acquirer component
        Needs to obtain an image from some input (eg, microscope, file)
        Needs to output frames standardized for processor. Can do some normalization
        Also saves direct to disk in parallel (?)
        Will likely change specifications in the future
     '''
-    def __init__(self, name, client):
-        self.name = name
-        self.client = client
-
-    def setupAcquirer(self, q_out, q_comm):
-        # Essenitally the registration process
-        self.q_out = q_out
-        self.comm = q_comm
-
-    def run(self):
-        # Get images continuously
+    def getFrame(self):
+        # provide function for grabbing the next single frame
         raise NotImplementedError
 
 
@@ -37,13 +31,14 @@ class FileAcquirer(Acquirer):
         self.frame_num = 0
         self.data = None
         self.done = False
+        self.flag = False
 
-    def setupAcquirer(self, filename, *args, **kwargs):
+    def setup(self, filename, *args, **kwargs):
         '''Get file names from config or user input
            Open file stream
            #TODO: implement more than h5 files
         '''
-        super().setupAcquirer(*args, **kwargs)
+        #super().setup(*args, **kwargs)
         
         if os.path.exists(filename):
             print('Looking for ', filename)
@@ -63,17 +58,28 @@ class FileAcquirer(Acquirer):
         return self.data[num,:,:]
 
     def run(self):
-        ''' Run indefinitely
+        ''' Run indefinitely. Calls runAcquirer after checking for singals
         '''
-        while True: #TODO: get signal from Link is run vs pause vs stop
-            try:
-                self.runAcquirer()
-                if self.done:
-                    logger.info('Acquirer is exiting')
-                    return
-            except Exception as e:
-                logger.error('Acquirer exception during run: {}'.format(e))
-                break 
+        while True:
+            if self.flag:
+                try:
+                    self.runAcquirer()
+                    if self.done:
+                        logger.info('Acquirer is done, exiting')
+                        return
+                except Exception as e:
+                    logger.error('Acquirer exception during run: {}'.format(e))
+                    break 
+            try: 
+                signal = self.q_sig.get(timeout=1)
+                if signal == Spike.run(): 
+                    self.flag = True
+                    logger.warning('Received run signal, begin running acquirer')
+                elif signal == Spike.quit():
+                    logger.warning('Received quit signal, aborting')
+                    break
+            except Empty as e:
+                pass #no signal from Nexus
 
     def runAcquirer(self):
         '''While frames exist in location specified during setup,
@@ -83,7 +89,7 @@ class FileAcquirer(Acquirer):
             id = self.client.put(self.getFrame(self.frame_num), str(self.frame_num))
             try:
                 self.q_out.put([{str(self.frame_num):id}])
-                self.comm.put([self.frame_num])
+                self.q_comm.put([self.frame_num])
                 self.frame_num += 1
             except Exception as e:
                 logger.error('Acquirer general exception: {}'.format(e))
@@ -94,6 +100,6 @@ class FileAcquirer(Acquirer):
             logger.error('Done with all available frames: {0}'.format(self.frame_num))
             self.data = None
             self.q_out.put(None)
-            self.comm.put(None)
+            self.q_comm.put(None)
             self.done = True
 

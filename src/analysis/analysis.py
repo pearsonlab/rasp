@@ -6,11 +6,11 @@ class Analysis():
     Performs additional computations on the extracted
     neural activity from the processor module
     '''
-    def setupAnalysis(self):
+    def setup(self):
         # Essenitally the registration process
         raise NotImplementedError
 
-    def runAnalysis(self):
+    def run(self):
         # Get activity and then do additional computations on estimates
         raise NotImplementedError
     
@@ -25,11 +25,12 @@ class MeanAnalysis(Analysis):
         self.client = client
         self.ests = None
 
-    def setupAnalysis(self):
+    def setup(self):
         pass
 
-    def runAnalysis(self, ests):
-        # ests structure: npa.array([components, frames])
+    def run(self, ests):
+        # ests structure: np.array([components, frames])
+        pass
 
     def runAvg(self, ests):
         estsAvg = []

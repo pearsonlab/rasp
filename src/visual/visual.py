@@ -11,6 +11,7 @@ import pyqtgraph as pg
 from visual.front_end import FrontEnd
 import sys
 from scipy.sparse import csc_matrix
+from nexus.module import Module
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -23,8 +24,7 @@ class DisplayVisual():
     def runGUI(self):
         logger.info('Loading FrontEnd')
         self.app = QtWidgets.QApplication([])
-        screen_resolution = self.app.desktop().screenGeometry()
-        print('---------- Screen resolution: ', screen_resolution)
+#        screen_resolution = self.app.desktop().screenGeometry()
         self.rasp = FrontEnd(self.visual, self.link)
         self.rasp.show()
         logger.info('GUI ready')
@@ -40,7 +40,7 @@ class DisplayVisual():
         self.link = link
 
 
-class Visual():
+class Visual(Module):
     '''Abstract lass for displaying data
     '''
     def plotEstimates(self):
@@ -48,13 +48,18 @@ class Visual():
         '''
         raise NotImplementedError
 
+    def run(self):
+        ''' Currently not running independently
+        TODO: FIXME: implement this
+        '''
+        pass
+
 class CaimanVisual(Visual):
     ''' Class for displaying data from caiman processor
     '''
 
-    def __init__(self, name, client):
-        self.name = name
-        self.client = client
+    def __init__(self, *args):
+        super().__init__(*args)
 
         self.plots = [0,1,2]
         self.com1 = np.zeros(2)
@@ -72,11 +77,10 @@ class CaimanVisual(Visual):
         self.dims = None
         self.flip = False
 
-    def setupVisual(self, q_in, q_comm):
-        ''' Setup Links
+    def setup(self):
+        ''' Setup 
         '''
-        self.q_in = q_in
-        self.q_comm = q_comm
+        pass
 
     def plotEstimates(self):
         ''' Take numpy estimates and t=frame_number
