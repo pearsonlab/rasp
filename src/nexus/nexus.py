@@ -17,6 +17,9 @@ import concurrent
 import functools
 import signal
 from nexus.module import Spike
+from queue import Empty, Full
+
+#TODO TODO TODO Nexus put no wait for signals!!!!
 
 import logging
 from datetime import datetime
@@ -96,7 +99,7 @@ class Nexus():
         self.GUI.setVisual(self.Visual)
         self.setupVisual()
         self.queues.update({'gui_comm':Link('gui_comm', self.guiName, self.name)})
-        self.GUI.setLink(self.queues['gui_comm'])
+        self.GUI.setLink(self.queues['gui_comm']) #TODO: update this to Module.setLinks
 
         self.runInit() #must be run before import caiman
         self.t = time.time()
@@ -181,8 +184,15 @@ class Nexus():
         for t in self.processes:
             t.start()
 
-        self.queues['acq_sig'].put(Spike.run())
-        self.queues['proc_sig'].put(Spike.run())
+        for q in self.sig_queues:
+            try:
+                q.put_nowait(Spike.run())
+            except Full as f:
+                logger.warning('Signal queue'+q.name+'is full')
+                #queue full, keep going anyway TODO: add repeat trying as async task
+        
+#        self.queues['acq_sig'].put(Spike.run())
+#        self.queues['proc_sig'].put(Spike.run())
 
     def quit(self):
         logger.warning('Killing child processes')

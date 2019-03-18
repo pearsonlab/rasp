@@ -24,7 +24,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def __init__(self, visual, comm, parent=None):
         ''' Setup GUI
-            Setup and start Nexus
+            Setup and start Nexus controls
         '''
         self.visual = visual #Visual class that provides plots and images
         self.comm = comm #Link back to Nexus for transmitting signals
@@ -153,7 +153,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         '''
         image = None
         try:
-            raw, color, image = self.visual.plotCompFrame(self.thresh_r)
+            raw, color = self.visual.getFrames()
+            image = self.visual.plotCompFrame(self.thresh_r)
             if raw is not None and np.unique(raw).size > 1:
                 self.rawplot.setImage(raw.T, autoHistogramRange=False)
                 self.rawplot.ui.histogram.vb.setLimits(yMin=0.02, yMax=0.55)

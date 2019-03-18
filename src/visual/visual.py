@@ -33,12 +33,10 @@ class DisplayVisual():
 
     def setVisual(self, Visual):
         self.visual = Visual
-        print('inside display, visual name is ', self.visual.name)
 
     def setLink(self, link):
         print('setting link ', link)
         self.link = link
-
 
 class Visual(Module):
     '''Abstract lass for displaying data
@@ -61,16 +59,14 @@ class CaimanVisual(Visual):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.plots = [0,1,2]
+        # self.plots = [0,1,2]
         self.com1 = np.zeros(2)
-        self.com2 = np.zeros(2)
-        self.com3 = np.zeros(2)
+        # self.com2 = np.zeros(2)
+        # self.com3 = np.zeros(2)
         self.neurons = []
         self.estsAvg = []
         self.coords = None
         self.frame = 0
-        self.q_in = None
-        self.q_comm = None
         self.image = None
         self.raw = None
         self.A = None
@@ -100,7 +96,7 @@ class CaimanVisual(Visual):
             self.frame += 1
 
             stim = self.stimAvg(ests)
-            avg = stim[self.plots[0]]
+            avg = stim[0]
             avgAvg = np.array(np.mean(stim, axis=0))
 
             if self.frame >= 200:
@@ -112,28 +108,13 @@ class CaimanVisual(Visual):
             if ests.shape[1]>0:
                 Yavg = np.mean(ests[:,self.frame-window:self.frame], axis=0) 
                 #Y0 = ests[self.plots[0],frame_number-window:frame_number]
-                Y1 = ests[self.plots[0],self.frame-window:self.frame]
+                Y1 = ests[0,self.frame-window:self.frame]
                 X = np.arange(0,Y1.size)+(self.frame-window)
                 return X,[Y1,Yavg],avg,avgAvg
         
         except Exception as e:
             print('probably timeout ', e)
             return None
-
-    def stimAvg(self, ests):
-        ''' For now, avergae over every 100 frames
-        where each 100 frames presents a new stimulus
-        '''
-        estsAvg = []
-        # TODO: this goes in another class
-        for i in range(ests.shape[0]): #for each component
-            tmpList = []
-            for j in range(int(np.floor(ests.shape[1]/100))+1): #average over stim window
-                tmp = np.mean(ests[int(i)][int(j)*100:int(j)*100+100])
-                tmpList.append(tmp)
-            estsAvg.append(tmpList)
-        self.estsAvg = np.array(estsAvg)        
-        return self.estsAvg
 
     def selectNeurons(self, x, y):
         ''' x and y are coordinates
@@ -147,12 +128,12 @@ class CaimanVisual(Visual):
         dist = cdist(com, [np.array([y, x])])
         if np.min(dist) < 50:
             selected = neurons[np.argmin(dist)]
-            self.plots[0] = selected
+            self.selectedNeuron = selected
             self.com1 = com[selected]
         else:
             logger.error('No neurons nearby where you clicked')
             self.com1 = com[0]
-        return [self.com1, self.com2, self.com3]
+        return self.com1
 
     def getFirstSelect(self):
         first = None
@@ -161,35 +142,25 @@ class CaimanVisual(Visual):
         return first
 
     def plotCompFrame(self, thresh_r):
-        ''' Computes colored frame and nicer background+components frame
+        ''' Computes shaded frame
+            based on threshold value of sliders (user-selected)
         '''
         image = self.image
-        raw = self.raw
-        color = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
-        #color = np.stack([image, image, image, image], axis=-1)
         image2 = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
         image2[...,3] = 100
-        color[...,3] = 255
         if self.coords is not None:
             coords = [o['coordinates'] for o in self.coords]
             for i,c in enumerate(coords):
                 c = np.array(c)
                 ind = c[~np.isnan(c).any(axis=1)].astype(int)
-                cv2.fillConvexPoly(color, ind, self._tuningColor(i, color[ind[:,1], ind[:,0]])) #(255,0,0,255))
-                #color[ind[:,1], ind[:,0], :] = self._tuningColor(i, color[ind[:,1], ind[:,0]])
-                #image2[ind[:,1], ind[:,0], :] = self._threshNeuron(i, thresh) #(255,255,255,255)
                 cv2.fillConvexPoly(image2, ind, self._threshNeuron(i, thresh_r))
-        #color = np.concatenate((color, image), axis=3)
-        #color[...,3] = 255
 
         if self.image.shape[0] < self.image.shape[1]:
                 self.flip = True
-                raw = raw.T
         else:
-            np.swapaxes(color,0,1)
             np.swapaxes(image2,0,1)
 
-        return np.flipud(raw), np.rot90(color,2), np.rot90(image2, 2)
+        return np.rot90(image2, 2)
 
     def _threshNeuron(self, ind, thresh_r):
         thresh = np.max(thresh_r)
@@ -198,13 +169,9 @@ class CaimanVisual(Visual):
         if self.estsAvg[ind] is not None:
             intensity = np.max(self.estsAvg[ind])
             act[:len(self.estsAvg[ind])] = self.estsAvg[ind]
-            #d = thresh_r - act
             if thresh > intensity: 
-                #print('thresh ', thresh, ' and int ', intensity)
                 display = (255,255,255,0)
             elif np.any(act[np.where(thresh_r==0)[0]]>0.5):
-                # print('thresh_r', thresh_r)
-                # print('activity ', act)
                 display = (255,255,255,0)
         return display
 
@@ -219,22 +186,21 @@ class CaimanVisual(Visual):
         else:
             return (255,255,255,0)
 
-    
-    def _updateCoords(self, A, dims):
-        '''See if we need to recalculate the coords
-           Also see if we need to add components
-        '''
-        if self.A is None: #initial calculation
-            self.A = A
-            self.dims = dims
-            self.coords = self.get_contours(self.A, self.dims)
+    # def _updateCoords(self, A, dims):
+    #     '''See if we need to recalculate the coords
+    #        Also see if we need to add components
+    #     '''
+    #     if self.A is None: #initial calculation
+    #         self.A = A
+    #         self.dims = dims
+    #         self.coords = self.get_contours(self.A, self.dims)
 
-        elif np.shape(A)[1] > np.shape(self.A)[1]: #Only recalc if we have new components
-            self.A = A
-            self.dims = dims
-            self.coords = self.get_contours(self.A, self.dims)
+    #     elif np.shape(A)[1] > np.shape(self.A)[1]: #Only recalc if we have new components
+    #         self.A = A
+    #         self.dims = dims
+    #         self.coords = self.get_contours(self.A, self.dims)
 
-        return self.coords  #Not really necessary
+    #     return self.coords  #Not really necessary
         
     # def plotContours(self, A, dims):
     #     ''' Provide contours to plot atop raw image
@@ -253,89 +219,89 @@ class CaimanVisual(Visual):
     #         self.neurons.extend(newNeur)
     #     return newNeur
 
-    def get_contours(self, A, dims, thr=0.9, thr_method='nrg', swap_dim=False):
-        ''' Stripped-down version of visualization get_contours function from caiman'''
+    # def get_contours(self, A, dims, thr=0.9, thr_method='nrg', swap_dim=False):
+    #     ''' Stripped-down version of visualization get_contours function from caiman'''
 
-        """Gets contour of spatial components and returns their coordinates
+    #     """Gets contour of spatial components and returns their coordinates
 
-        Args:
-            A:   np.ndarray or sparse matrix
-                    Matrix of Spatial components (d x K)
+    #     Args:
+    #         A:   np.ndarray or sparse matrix
+    #                 Matrix of Spatial components (d x K)
 
-                dims: tuple of ints
-                    Spatial dimensions of movie (x, y[, z])
+    #             dims: tuple of ints
+    #                 Spatial dimensions of movie (x, y[, z])
 
-                thr: scalar between 0 and 1
-                    Energy threshold for computing contours (default 0.9)
+    #             thr: scalar between 0 and 1
+    #                 Energy threshold for computing contours (default 0.9)
 
-                thr_method: [optional] string
-                    Method of thresholding:
-                        'max' sets to zero pixels that have value less than a fraction of the max value
-                        'nrg' keeps the pixels that contribute up to a specified fraction of the energy
+    #             thr_method: [optional] string
+    #                 Method of thresholding:
+    #                     'max' sets to zero pixels that have value less than a fraction of the max value
+    #                     'nrg' keeps the pixels that contribute up to a specified fraction of the energy
 
-        Returns:
-            Coor: list of coordinates with center of mass and
-                    contour plot coordinates (per layer) for each component
-        """
+    #     Returns:
+    #         Coor: list of coordinates with center of mass and
+    #                 contour plot coordinates (per layer) for each component
+    #     """
 
-        if 'csc_matrix' not in str(type(A)):
-            A = csc_matrix(A)
-        d, nr = np.shape(A)
+    #     if 'csc_matrix' not in str(type(A)):
+    #         A = csc_matrix(A)
+    #     d, nr = np.shape(A)
         
-        d1, d2 = dims
-        x, y = np.mgrid[0:d1:1, 0:d2:1]
+    #     d1, d2 = dims
+    #     x, y = np.mgrid[0:d1:1, 0:d2:1]
 
-        coordinates = []
+    #     coordinates = []
 
-        # get the center of mass of neurons( patches )
-        cm = self.com(A, *dims)
+    #     # get the center of mass of neurons( patches )
+    #     cm = self.com(A, *dims)
 
-        # for each patches
-        #TODO: this does NOT need to be recomputed except when update_shapes has changes...
-        for i in range(nr):
-            pars = dict()
-            # we compute the cumulative sum of the energy of the Ath component that has been ordered from least to highest
-            patch_data = A.data[A.indptr[i]:A.indptr[i + 1]]
-            indx = np.argsort(patch_data)[::-1]
-            cumEn = np.cumsum(patch_data[indx]**2)
-            # we work with normalized values
-            cumEn /= cumEn[-1]
-            Bvec = np.ones(d)
-            # we put it in a similar matrix
-            Bvec[A.indices[A.indptr[i]:A.indptr[i + 1]][indx]] = cumEn
-            Bmat = np.reshape(Bvec, dims, order='F')
-            pars['coordinates'] = []
-            # for each dimensions we draw the contour
-            for B in (Bmat if len(dims) == 3 else [Bmat]):
-                vertices = find_contours(B.T, thr)
-                # this fix is necessary for having disjoint figures and borders plotted correctly
-                v = np.atleast_2d([np.nan, np.nan])
-                for _, vtx in enumerate(vertices):
-                    num_close_coords = np.sum(np.isclose(vtx[0, :], vtx[-1, :]))
-                    if num_close_coords < 2:
-                        if num_close_coords == 0:
-                            # case angle
-                            newpt = np.round(vtx[-1, :] / [d2, d1]) * [d2, d1]
-                            vtx = np.concatenate((vtx, newpt[np.newaxis, :]), axis=0)
-                        else:
-                            # case one is border
-                            vtx = np.concatenate((vtx, vtx[0, np.newaxis]), axis=0)
-                    v = np.concatenate(
-                        (v, vtx, np.atleast_2d([np.nan, np.nan])), axis=0)
+    #     # for each patches
+    #     #TODO: this does NOT need to be recomputed except when update_shapes has changes...
+    #     for i in range(nr):
+    #         pars = dict()
+    #         # we compute the cumulative sum of the energy of the Ath component that has been ordered from least to highest
+    #         patch_data = A.data[A.indptr[i]:A.indptr[i + 1]]
+    #         indx = np.argsort(patch_data)[::-1]
+    #         cumEn = np.cumsum(patch_data[indx]**2)
+    #         # we work with normalized values
+    #         cumEn /= cumEn[-1]
+    #         Bvec = np.ones(d)
+    #         # we put it in a similar matrix
+    #         Bvec[A.indices[A.indptr[i]:A.indptr[i + 1]][indx]] = cumEn
+    #         Bmat = np.reshape(Bvec, dims, order='F')
+    #         pars['coordinates'] = []
+    #         # for each dimensions we draw the contour
+    #         for B in (Bmat if len(dims) == 3 else [Bmat]):
+    #             vertices = find_contours(B.T, thr)
+    #             # this fix is necessary for having disjoint figures and borders plotted correctly
+    #             v = np.atleast_2d([np.nan, np.nan])
+    #             for _, vtx in enumerate(vertices):
+    #                 num_close_coords = np.sum(np.isclose(vtx[0, :], vtx[-1, :]))
+    #                 if num_close_coords < 2:
+    #                     if num_close_coords == 0:
+    #                         # case angle
+    #                         newpt = np.round(vtx[-1, :] / [d2, d1]) * [d2, d1]
+    #                         vtx = np.concatenate((vtx, newpt[np.newaxis, :]), axis=0)
+    #                     else:
+    #                         # case one is border
+    #                         vtx = np.concatenate((vtx, vtx[0, np.newaxis]), axis=0)
+    #                 v = np.concatenate(
+    #                     (v, vtx, np.atleast_2d([np.nan, np.nan])), axis=0)
 
-                pars['coordinates'] = v if len(
-                    dims) == 2 else (pars['coordinates'] + [v])
-            pars['CoM'] = np.squeeze(cm[i, :])
-            pars['neuron_id'] = i + 1
-            coordinates.append(pars)
-        return coordinates
+    #             pars['coordinates'] = v if len(
+    #                 dims) == 2 else (pars['coordinates'] + [v])
+    #         pars['CoM'] = np.squeeze(cm[i, :])
+    #         pars['neuron_id'] = i + 1
+    #         coordinates.append(pars)
+    #     return coordinates
 
-    def com(self, A, d1, d2):
+    # def com(self, A, d1, d2):
         
-        Coor = np.matrix([np.outer(np.ones(d2), np.arange(d1)).ravel(),
-                            np.outer(np.arange(d2), np.ones(d1)).ravel()], dtype=A.dtype)
-        cm = (Coor * A / A.sum(axis=0)).T
-        return np.array(cm)
+    #     Coor = np.matrix([np.outer(np.ones(d2), np.arange(d1)).ravel(),
+    #                         np.outer(np.arange(d2), np.ones(d1)).ravel()], dtype=A.dtype)
+    #     cm = (Coor * A / A.sum(axis=0)).T
+    #     return np.array(cm)
 
 def runVis():
     logger.error('trying to run')
@@ -344,9 +310,7 @@ def runVis():
     logger.error('trying to run after app')
     rasp = FrontEnd()
     rasp.show()
-    #logger.error('before exec')
     app.exec_()
-    #logger.error('after exec')
 
 if __name__=="__main__":
     vis = CaimanVisual('name', 'client')

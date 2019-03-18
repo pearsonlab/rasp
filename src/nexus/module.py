@@ -46,6 +46,7 @@ class Module():
         ''' Essenitally the registration process
             Can also be an initialization for the module
         '''
+        #TODO: require param_file arg here?
         raise NotImplementedError
 
     def run(self):
@@ -55,11 +56,40 @@ class Module():
         '''
         raise NotImplementedError
 
+        ''' Suggested implementation for synchronous running
+        TODO: define async example that checks for signals _while_ running
+        while True:
+            if self.flag:
+                try:
+                    self.runModule() #subfunction for running singly
+                    if self.done:
+                        logger.info('Module is done, exiting')
+                        return
+                except Exception as e:
+                    logger.error('Module exception during run: {}'.format(e))
+                    break 
+            try: 
+                signal = self.q_sig.get(timeout=1)
+                if signal == Spike.run(): 
+                    self.flag = True
+                    logger.warning('Received run signal, begin running')
+                elif signal == Spike.quit():
+                    logger.warning('Received quit signal, aborting')
+                    break
+                elif signal == Spike.pause():
+                    logger.warning('Received pause signal, pending...')
+                    self.flag = False
+                elif signal == Spike.resume(): #currently treat as same as run
+                    logger.warning('Received resume signal, resuming')
+                    self.flag = True
+            except Empty as e:
+                pass #no signal from Nexus
+        '''
+
 class Spike():
     ''' Class containing definition of signals Nexus uses
         to communicate with its modules
         TODO: doc each of these with expected handling behavior
-        TODO: rename Radar?
     '''
     def run():
         return 'run'
@@ -73,5 +103,5 @@ class Spike():
     def resume():
         return 'resume'
 
-    def reset():
+    def reset(): #TODO
         return 'reset'

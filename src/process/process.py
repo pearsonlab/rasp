@@ -150,6 +150,12 @@ class CaimanProcessor(Processor):
                 elif signal == Spike.quit():
                     logger.warning('Received quit signal, aborting')
                     break
+                elif signal == Spike.pause():
+                    logger.warning('Received pause signal, pending...')
+                    self.flag = False
+                elif signal == Spike.resume(): #currently treat as same as run
+                    logger.warning('Received resume signal, resuming')
+                    self.flag = True
             except Empty as e:
                 pass #no signal from Nexus
 
@@ -238,38 +244,22 @@ class CaimanProcessor(Processor):
         self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
         t=time.time()
-        #self.coords = get_contours(A, self.onAc.dims)
         self.putAnalysis_time.append([time.time()-t])
 
         image, cor_frame = self.makeImage()
-        dims = self.onAc.dims
-        #self.q_out.put([self.ests, A, self.onAc.dims, self.image, self.cor_frame])
         ids = []
         ids.append(self.client.put(np.array(C), str(self.frame_number)))
         ids.append(self.client.put(A.toarray(), 'A'+str(self.frame_number)))
-        ids.append(self.client.put(dims, 'dims'+str(self.frame_number)))
         ids.append(self.client.put(image, 'image'+str(self.frame_number)))
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
         self.q_out.put(ids)
 
-    def getEstimates(self):
-        ''' ests contains C or dF_f; just neural data
-        '''
-        return self.ests
-
-    def getCoords(self):
-        return self.coords
-    
-    def getTime(self):
-        ''' returns what frame we have/are processing
-        '''
-        return self.frame_number
-
     def makeImage(self):
         '''Create image data for visualiation
             Using caiman code here
-            #TODO: move to CaimanVisual class
+            #TODO: move to MeanAnalysis class ?? Check timing if we move it!
+                Other idea -- easier way to compute this?
         '''
         mn = self.onAc.M - self.onAc.N
         image = None
@@ -283,8 +273,6 @@ class CaimanProcessor(Processor):
 
         cor_frame = (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
         return image, cor_frame
-        #return image
-
 
     def _finalAnalysis(self, t):
         ''' Some kind of final steps for estimates

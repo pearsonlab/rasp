@@ -2,7 +2,7 @@ import time
 import os
 import h5py
 import numpy as np
-import asyncio
+import random
 from nexus.module import Module, Spike
 from queue import Empty
 
@@ -78,6 +78,12 @@ class FileAcquirer(Acquirer):
                 elif signal == Spike.quit():
                     logger.warning('Received quit signal, aborting')
                     break
+                elif signal == Spike.pause():
+                    logger.warning('Received pause signal, pending...')
+                    self.flag = False
+                elif signal == Spike.resume(): #currently treat as same as run
+                    logger.warning('Received resume signal, resuming')
+                    self.flag = True
             except Empty as e:
                 pass #no signal from Nexus
 
@@ -94,7 +100,7 @@ class FileAcquirer(Acquirer):
             except Exception as e:
                 logger.error('Acquirer general exception: {}'.format(e))
 
-            time.sleep(0.1)
+            time.sleep(0.1) #pretend framerate
 
         else: # essentially a done signal from the source (eg, camera)
             logger.error('Done with all available frames: {0}'.format(self.frame_num))
@@ -102,4 +108,73 @@ class FileAcquirer(Acquirer):
             self.q_out.put(None)
             self.q_comm.put(None)
             self.done = True
+
+
+class BehaviorAcquirer(Module):
+    ''' Module that acquires information of behavioral stimulus
+        during the experiment
+
+        Current assumption is that stimulus is off or on, on has many types,
+        and any change in stimulus is _un_associated with a frame number.
+        TODO: needs to be associated with time, then frame number
+    '''
+
+    def setup(self, param_file=None):
+        ''' Pre-define set of input stimuli
+        '''
+        self.flag = False
+        self.n = 0 #our fake frame number here
+        #TODO: Consider global frame_number in store...or signal from Nexus
+
+        #TODO: Convert this to Tweak and load from there
+        if param_file is not None:
+            try:
+                params_dict = None #self._load_params_from_file(param_file)
+            except Exception as e:
+                logger.exception('File cannot be loaded. {0}'.format(e))
+        else:
+            self.behaviors = ['0', '1', '2', '3', '4', 
+                                '5', '6', '7', '8', '9'] #10 sets of input stimuli
+
+    def run(self):
+        ''' Run continuously, waiting for input
+        '''
+        while True:
+            if self.flag:
+                try:
+                    self.getInput()
+                    if self.done:
+                        logger.info('BehaviorAcquirer is done, exiting')
+                        return
+                except Exception as e:
+                    logger.error('BehaviorAcquirer exception during run: {}'.format(e))
+                    break 
+            try: 
+                signal = self.q_sig.get(timeout=1)
+                if signal == Spike.run(): 
+                    self.flag = True
+                    logger.warning('Received run signal, begin running')
+                elif signal == Spike.quit():
+                    logger.warning('Received quit signal, aborting')
+                    break
+                elif signal == Spike.pause():
+                    logger.warning('Received pause signal, pending...')
+                    self.flag = False
+                elif signal == Spike.resume(): #currently treat as same as run
+                    logger.warning('Received resume signal, resuming')
+                    self.flag = True
+            except Empty as e:
+                pass #no signal from Nexus
+
+    def getInput(self):
+        ''' Check for input from behavioral control
+        '''
+        #Faking it for now. TODO: Talk to Max about his format
+        if self.n % 100 == 0:
+            self.curr_stim = random.choice(self.behaviors)
+            self.q_out.put({self.n:self.curr_stim})
+            logger.warning('Changed stimulus! :{}'.format(self.curr_stim))
+            #self.q_comm.put()
+
+        self.n += 1
 
