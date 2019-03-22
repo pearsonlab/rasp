@@ -61,8 +61,6 @@ class CaimanVisual(Visual):
 
         # self.plots = [0,1,2]
         self.com1 = np.zeros(2)
-        # self.com2 = np.zeros(2)
-        # self.com3 = np.zeros(2)
         self.neurons = []
         self.estsAvg = []
         self.coords = None
@@ -78,50 +76,51 @@ class CaimanVisual(Visual):
         '''
         pass
 
-    def plotEstimates(self):
-        ''' Take numpy estimates and t=frame_number
-            Create X and Y for plotting, return
-        '''
-        try:
-            #(ests, A, dims, self.image, self.raw) = self.q_in.get(timeout=1)
-            ids = self.q_in.get(timeout=1)
-            res = []
-            for id in ids:
-                res.append(self.client.getID(id))
-            (ests, A, dims, self.image, self.raw) = res
+    # def plotEstimates(self):
+    #     ''' Take numpy estimates and t=frame_number
+    #         Create X and Y for plotting, return
+    #     '''
+    #     try:
+    #         #(ests, A, dims, self.image, self.raw) = self.q_in.get(timeout=1)
+    #         ids = self.q_in.get(timeout=1)
+    #         res = []
+    #         for id in ids:
+    #             res.append(self.client.getID(id))
+    #         (ests, A, dims, self.image, self.raw) = res
             
-            self.coords = self._updateCoords(A, dims)
-            #self.coords = self.get_contours(self.A, self.dims)
+    #         self.coords = self._updateCoords(A, dims)
+    #         #self.coords = self.get_contours(self.A, self.dims)
             
-            self.frame += 1
+    #         self.frame += 1
 
-            stim = self.stimAvg(ests)
-            avg = stim[0]
-            avgAvg = np.array(np.mean(stim, axis=0))
+    #         stim = self.stimAvg(ests)
+    #         avg = stim[0]
+    #         avgAvg = np.array(np.mean(stim, axis=0))
 
-            if self.frame >= 200:
-                # TODO: change to init batch here
-                window = 200
-            else:
-                window = self.frame
+    #         if self.frame >= 200:
+    #             # TODO: change to init batch here
+    #             window = 200
+    #         else:
+    #             window = self.frame
 
-            if ests.shape[1]>0:
-                Yavg = np.mean(ests[:,self.frame-window:self.frame], axis=0) 
-                #Y0 = ests[self.plots[0],frame_number-window:frame_number]
-                Y1 = ests[0,self.frame-window:self.frame]
-                X = np.arange(0,Y1.size)+(self.frame-window)
-                return X,[Y1,Yavg],avg,avgAvg
+    #         if ests.shape[1]>0:
+    #             Yavg = np.mean(ests[:,self.frame-window:self.frame], axis=0) 
+    #             #Y0 = ests[self.plots[0],frame_number-window:frame_number]
+    #             Y1 = ests[0,self.frame-window:self.frame]
+    #             X = np.arange(0,Y1.size)+(self.frame-window)
+    #             return X,[Y1,Yavg],avg,avgAvg
         
-        except Exception as e:
-            print('probably timeout ', e)
-            return None
+    #     except Exception as e:
+    #         print('probably timeout ', e)
+    #         return None
 
     def selectNeurons(self, x, y):
         ''' x and y are coordinates
             identifies which neuron is closest to this point
             and updates plotEstimates to use that neuron
         '''
-        #TODO: flip x and y if self.flip = True
+        #TODO: flip x and y if self.flip = True 
+
         coords = self.coords
         neurons = [o['neuron_id']-1 for o in coords]
         com = np.array([o['CoM'] for o in coords])
@@ -141,8 +140,8 @@ class CaimanVisual(Visual):
             first = [np.array(self.neurons[0])]
         return first
 
-    def plotCompFrame(self, thresh_r):
-        ''' Computes shaded frame
+    def plotThreshFrame(self, thresh_r):
+        ''' Computes shaded frame for targeting panel
             based on threshold value of sliders (user-selected)
         '''
         image = self.image
@@ -159,8 +158,9 @@ class CaimanVisual(Visual):
                 self.flip = True
         else:
             np.swapaxes(image2,0,1)
+        #TODO: add rotation to user preferences and/or user clickable input
 
-        return np.rot90(image2, 2)
+        return image2
 
     def _threshNeuron(self, ind, thresh_r):
         thresh = np.max(thresh_r)
@@ -175,16 +175,16 @@ class CaimanVisual(Visual):
                 display = (255,255,255,0)
         return display
 
-    def _tuningColor(self, ind, inten):
-        if self.estsAvg[ind] is not None:
-            ests = np.array(self.estsAvg[ind])
-            h = np.argmax(ests)*36/360
-            intensity = 1- np.mean(inten[0][0])/255.0
-            r, g, b, = colorsys.hls_to_rgb(h, intensity, 0.8)
-            r, g, b = [x*255.0 for x in (r, g, b)]
-            return (r, g, b)+ (intensity*150,)
-        else:
-            return (255,255,255,0)
+    # def _tuningColor(self, ind, inten):
+    #     if self.estsAvg[ind] is not None:
+    #         ests = np.array(self.estsAvg[ind])
+    #         h = np.argmax(ests)*36/360
+    #         intensity = 1- np.mean(inten[0][0])/255.0
+    #         r, g, b, = colorsys.hls_to_rgb(h, intensity, 0.8)
+    #         r, g, b = [x*255.0 for x in (r, g, b)]
+    #         return (r, g, b)+ (intensity*150,)
+    #     else:
+    #         return (255,255,255,0)
 
     # def _updateCoords(self, A, dims):
     #     '''See if we need to recalculate the coords

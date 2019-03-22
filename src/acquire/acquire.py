@@ -17,9 +17,10 @@ class Acquirer(Module):
        Also saves direct to disk in parallel (?)
        Will likely change specifications in the future
     '''
-    def getFrame(self):
-        # provide function for grabbing the next single frame
-        raise NotImplementedError
+    #def getFrame(self):
+    #    # provide function for grabbing the next single frame
+    #    raise NotImplementedError
+    # TODO: require module-specific functions or no?
 
 
 class FileAcquirer(Acquirer):

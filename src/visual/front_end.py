@@ -154,7 +154,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         image = None
         try:
             raw, color = self.visual.getFrames()
-            image = self.visual.plotCompFrame(self.thresh_r)
+            image = self.visual.plotThreshFrame(self.thresh_r)
             if raw is not None and np.unique(raw).size > 1:
                 self.rawplot.setImage(raw.T, autoHistogramRange=False)
                 self.rawplot.ui.histogram.vb.setLimits(yMin=0.02, yMax=0.55)

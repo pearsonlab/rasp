@@ -7,9 +7,9 @@ class Analysis(Module):
     Performs additional computations on the extracted
     neural activity from the processor module
     '''
-    def putAnalysis(self):
-        # Update the DS with analysis
-        raise NotImplementedError
+    #def putAnalysis(self):
+    #    # Update the DS with analysis
+    #    raise NotImplementedError
 
 
 class MeanAnalysis(Analysis):
@@ -79,7 +79,7 @@ class MeanAnalysis(Analysis):
             dims = self.image.shape
             self.coords = self._updateCoords(A, dims)
 
-            self.plotColorFrame()
+            self.raw, self.color = self.plotColorFrame()
             
             self.stimAvg(ests)
             self.globalAvg = np.array(np.mean(self.stimAvg, axis=0))
@@ -115,15 +115,14 @@ class MeanAnalysis(Analysis):
         ids.append(self.client.put(self.X, 'X'+str(self.frame)))
         ids.append(self.client.put(self.Yavg, 'Yavg'+str(self.frame)))
         ids.append(self.client.put(self.globalAvg, 'globalAvg'+str(self.frame)))
-        ids.append(self # raw
-        ids.append(self #color
+        ids.append(self.client.put(self.raw, 'raw'+str(self.frame)))
+        ids.append(self.client.put(self.color, 'color'+str(self.frame)))
 
         self.q_out.put(ids)
 
     def stimAvg(self, ests):
         ''' Using stimInd as mask, average ests across each input stimulus
         '''
-
         estsAvg = []
         for i in range(ests.shape[0]): #for each component
             tmpList = []
@@ -154,8 +153,20 @@ class MeanAnalysis(Analysis):
         else:
             np.swapaxes(color,0,1)
             np.swapaxes(image2,0,1)
+        #TODO: user input for rotating frame? See Visual class
 
         return np.flipud(raw), np.rot90(color,2)
+
+    def _tuningColor(self, ind, inten):
+        if self.estsAvg[ind] is not None:
+            ests = np.array(self.estsAvg[ind])
+            h = np.argmax(ests)*36/360
+            intensity = 1- np.mean(inten[0][0])/255.0
+            r, g, b, = colorsys.hls_to_rgb(h, intensity, 0.8)
+            r, g, b = [x*255.0 for x in (r, g, b)]
+            return (r, g, b)+ (intensity*150,)
+        else:
+            return (255,255,255,0)
 
     def _updateCoords(self, A, dims):
         '''See if we need to recalculate the coords
@@ -170,8 +181,7 @@ class MeanAnalysis(Analysis):
             self.A = A
             self.dims = dims
             self.coords = self.get_contours(self.A, self.dims)
-
-        return self.coords  #Not really necessary
+        #return self.coords  #Not really necessary
     
 
     def get_contours(self, A, dims, thr=0.9, thr_method='nrg', swap_dim=False):
