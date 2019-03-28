@@ -10,6 +10,7 @@ class Module():
         '''
         self.name = name
         self.links = {}
+        self.done = False #Needed?
 
     def __str__(self):
         ''' Return this instance name
@@ -46,7 +47,6 @@ class Module():
         ''' Essenitally the registration process
             Can also be an initialization for the module
         '''
-        #TODO: require param_file arg here?
         raise NotImplementedError
 
     def run(self):
@@ -58,6 +58,7 @@ class Module():
 
         ''' Suggested implementation for synchronous running
         TODO: define async example that checks for signals _while_ running
+        TODO: Make this a context manager
         while True:
             if self.flag:
                 try:
@@ -105,3 +106,38 @@ class Spike():
 
     def reset(): #TODO
         return 'reset'
+
+
+class RunManager():
+    def __init__(self):
+        self.flag = False
+
+    def __enter__(self):
+        if self.flag:
+            try:
+                self.runModule() #subfunction for running singly
+                if self.done: #TODO: require this in module?
+                    logger.info('Module is done, exiting')
+                    return
+            except Exception as e:
+                logger.error('Module exception during run: {}'.format(e))
+                break 
+        try: 
+            signal = self.q_sig.get(timeout=1)
+            if signal == Spike.run(): 
+                self.flag = True
+                logger.warning('Received run signal, begin running')
+            elif signal == Spike.quit():
+                logger.warning('Received quit signal, aborting')
+                break
+            elif signal == Spike.pause():
+                logger.warning('Received pause signal, pending...')
+                self.flag = False
+            elif signal == Spike.resume(): #currently treat as same as run
+                logger.warning('Received resume signal, resuming')
+                self.flag = True
+        except Empty as e:
+            pass #no signal from Nexus
+
+    def __exit__(self):
+        pass

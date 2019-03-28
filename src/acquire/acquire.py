@@ -34,13 +34,14 @@ class FileAcquirer(Acquirer):
         self.done = False
         self.flag = False
 
-    def setup(self, filename, *args, **kwargs):
+    def setup(self, filename, framerate=10):
         '''Get file names from config or user input
+            Also get specified framerate, or default is 10 Hz
            Open file stream
            #TODO: implement more than h5 files
-        '''
-        #super().setup(*args, **kwargs)
-        
+        '''        
+        self.framerate = 1/framerate 
+
         if os.path.exists(filename):
             print('Looking for ', filename)
             n, ext = os.path.splitext(filename)[:2]
@@ -101,7 +102,7 @@ class FileAcquirer(Acquirer):
             except Exception as e:
                 logger.error('Acquirer general exception: {}'.format(e))
 
-            time.sleep(0.1) #pretend framerate
+            time.sleep(self.framerate) #pretend framerate
 
         else: # essentially a done signal from the source (eg, camera)
             logger.error('Done with all available frames: {0}'.format(self.frame_num))

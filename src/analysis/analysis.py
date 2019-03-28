@@ -81,8 +81,8 @@ class MeanAnalysis(Analysis):
 
             self.raw, self.color = self.plotColorFrame()
             
-            self.stimAvg(ests)
-            self.globalAvg = np.array(np.mean(self.stimAvg, axis=0))
+            stim = self.stimAvg(ests)
+            self.globalAvg = np.array(np.mean(stim, axis=0))
 
             if self.frame >= 200:
                 # TODO: change to init batch here
