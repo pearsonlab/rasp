@@ -17,11 +17,9 @@ import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class DisplayVisual():
-    def __init__(self, name):
-        self.name = name
+class DisplayVisual(Module):
 
-    def runGUI(self):
+    def run(self):
         logger.info('Loading FrontEnd')
         self.app = QtWidgets.QApplication([])
 #        screen_resolution = self.app.desktop().screenGeometry()
@@ -31,12 +29,9 @@ class DisplayVisual():
         self.app.exec_()
         logger.info('Done running GUI')
 
-    def setVisual(self, Visual):
+    def setup(self, Visual):
         self.visual = Visual
 
-    def setLink(self, link):
-        print('setting link ', link)
-        self.link = link
 
 class Visual(Module):
     '''Abstract lass for displaying data

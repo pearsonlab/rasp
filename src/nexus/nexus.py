@@ -6,6 +6,7 @@ from multiprocessing import Process, Queue, Manager, cpu_count
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import numpy as np
 import pyarrow.plasma as plasma
+from importlib import import_module
 from nexus import store
 from nexus.tweak import Tweak
 from acquire.acquire import FileAcquirer
@@ -48,13 +49,6 @@ class Nexus():
         return self.name
     
     def loadTweak(self, file=None):
-        #TODO load from file or user input
-        tweak = Tweak()
-
-        # for connection in tweak.getConnections():
-        #     q = Queue()
-        #     self.connections.update({connection:q})
-        #     self.queues.append(q)
         ''' For each connection:
             create a Link with a name (purpose), start, and end
             Start links to one module's name, end to the other. 
@@ -66,8 +60,51 @@ class Nexus():
             OR
             For each connection, create 2 Links. Nexus acts as intermediary. 
         '''
+        #TODO load from file or user input, as in dialogue through FrontEnd?
 
-        return tweak
+        self.tweak = Tweak(file)
+        self.tweak.createConfig()
+
+        # First set up each class/module
+        for name,module in self.tweak.modules.items():
+            # Instantiate selected class
+            mod = import_module(module.packagename)
+            clss = getattr(mod, module.classname)
+            instance = clss(module.name)
+
+            # Add link to Limbo store
+            instance.setStore(store.Limbo(module.name))
+
+            # Add signal and communication links
+            q_comm = Link(module.name+'_comm', module.name, self.name)
+            q_sig = Link(module.name+'_sig', self.name, module.name)
+            self.queues.update({q_comm.name:q_comm, q_sig.name:q_sig})
+            instance.setLinks(q_comm, q_sig)
+
+            # Update information
+            self.modules.update({name:instance})
+
+        # Second set up each connection b/t modules
+        for source,drain in self.tweak.connections.items():
+            name = source.split('.')[0]
+            #current assumption is connection goes from q_out to something(s) else
+            for d in drain:
+                d_name = d.split('.')
+                link = Link(name+'_'+d_name[0], source, d)
+                self.queues.update({d:link}) #input queues are unique, output are not
+                self.modules[name].setLinkOut(link)
+                if d_name[1] == 'q_in':
+                    self.modules[d_name[0]].setLinkIn(link)
+                else:
+                    link.name = d_name[1] #special queue
+                    self.modules[d_name[0]].addLink(link)
+        
+        print('Nexus modules: ', self.modules)
+        print('Nexus queues: ', self.queues)
+
+        #TODO: error handling for is a user tries to use q_in without defining it
+        #TODO: if user wants multiple output queues this no longer works
+
 
     def createNexus(self):
         self._startStore(2000000000) #default size should be system-dependent
@@ -77,43 +114,44 @@ class Nexus():
         self.limbo.subscribe()
 
         self.queues = {}
-        self.modules = {} # needed?
+        self.modules = {}
         self.flags = {}
         self.processes = []
         
         # Create connections to the store based on module name
         # Instatiate modules and give them Limbo client connections
-        self.tweakLimbo = store.Limbo('tweak')
-        self.tweak = self.loadTweak() #self.tweakLimbo)
+        #self.tweakLimbo = store.Limbo('tweak')
 
-        self.procName = self.tweak.procName
+        # self.procName = self.tweak.procName
     
-        self.visName = self.tweak.visName
-        self.visLimbo = store.Limbo(self.visName)
-        self.Visual = CaimanVisual(self.visName)
-        self.Visual.setStore(self.visLimbo)
-        self.modules.update({self.visName:self.Visual}) # needed? TODO
+        # self.visName = self.tweak.visName
+        # self.visLimbo = store.Limbo(self.visName)
+        # self.Visual = CaimanVisual(self.visName)
+        # self.Visual.setStore(self.visLimbo)
+        # self.modules.update({self.visName:self.Visual})
 
-        self.guiName = 'GUI'
-        self.GUI = DisplayVisual(self.guiName)
-        self.GUI.setVisual(self.Visual)
-        self.setupVisual()
-        self.queues.update({'gui_comm':Link('gui_comm', self.guiName, self.name)})
-        self.GUI.setLink(self.queues['gui_comm']) #TODO: update this to Module.setLinks
+        #TODO: move GUI spec to Visual module so it can be generic?
+        # self.GUI = DisplayVisual('GUI')
+        # self.GUI.setup(self.Visual)
+        # self.setupVisual()
+        # self.queues.update({'gui_comm':Link('gui_comm', 'GUI', self.name)})
+        # self.GUI.setLink(self.queues['gui_comm']) #TODO: update this to Module.setLinks?
 
-        self.runInit() #must be run before import caiman
-        self.t = time.time()
+        # self.runInit() #must be run before import caiman
+        # self.t = time.time()
 
-        self.procLimbo = store.Limbo(self.procName)
+        self.loadTweak() #TODO: filename?
 
-        from process.process import CaimanProcessor
-        self.Processor = CaimanProcessor(self.procName)
-        self.Processor.setStore(self.procLimbo)
+        # self.procLimbo = store.Limbo(self.procName)
 
-        self.acqName = self.tweak.acqName
-        self.acqLimbo = store.Limbo(self.acqName)
-        self.Acquirer = FileAcquirer(self.acqName)
-        self.Acquirer.setStore(self.acqLimbo)
+        # from process.process import CaimanProcessor
+        # self.Processor = CaimanProcessor(self.procName)
+        # self.Processor.setStore(self.procLimbo)
+
+        # self.acqName = self.tweak.acqName
+        # self.acqLimbo = store.Limbo(self.acqName)
+        # self.Acquirer = FileAcquirer(self.acqName)
+        # self.Acquirer.setStore(self.acqLimbo)
 
         self.flags.update({'quit':False, 'run':False, 'load':False})
 
@@ -385,6 +423,10 @@ class AsyncQueue(object):
             raise AttributeError("'%s' object has no attribute '%s'" % 
                                     (self.__class__.__name__, name))
 
+    def __repr__(self):
+        #return str(self.__class__) + ": " + str(self.__dict__)
+        return 'Link '+self.name #+' From: '+self.start+' To: '+self.end
+
     async def put_async(self, item):
         loop = asyncio.get_event_loop()
         res = await loop.run_in_executor(self._executor, self.put, item)
@@ -413,7 +455,7 @@ class AsyncQueue(object):
 
 
 if __name__ == '__main__':
-    nexus = Nexus('test')
+    nexus = Nexus('Nexus')
     nexus.createNexus()
     nexus.setupProcessor()
     cwd = os.getcwd()
