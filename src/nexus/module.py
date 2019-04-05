@@ -20,7 +20,7 @@ class Module():
     def __repr__(self):
         ''' Return this instance name and links dict
         '''
-        return self.name+': '+str(self.links)
+        return self.name+': '+str(self.links.keys())
 
     def setStore(self, client):
         '''Set client interface to the store
@@ -58,9 +58,10 @@ class Module():
         # User can then use: self.my_queue = self.links['my_queue'] in a setup fcn,
         # or continue to reference it using self.links['my_queue']
 
-    def setup(self):
+    def setup(self, **kwargs):
         ''' Essenitally the registration process
             Can also be an initialization for the module
+            options is a list of options, can be empty
         '''
         raise NotImplementedError
 

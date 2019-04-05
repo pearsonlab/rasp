@@ -87,8 +87,23 @@ class Nexus():
         # Second set up each connection b/t modules
         for source,drain in self.tweak.connections.items():
             name = source.split('.')[0]
+            
             #current assumption is connection goes from q_out to something(s) else
-            for d in drain:
+            if len(drain) > 1: #we need multiasyncqueue 
+                link, endLinks = MultiLink(name+'_multi', source, drain)
+                self.queues.update({name+'_multi':link})
+                self.modules[name].setLinkOut(link)
+                for i,e in enumerate(endLinks):
+                    self.queues.update({drain[i]:e})
+                    d_name = drain[i].split('.')
+                    if d_name[1] == 'q_in':
+                        self.modules[d_name[0]].setLinkIn(e)
+                    else:
+                        e.name = d_name[1]
+                        self.modules[d_name[0]].addLink(e)
+
+            else: #single input, single output
+                d = drain[0] #FIXME
                 d_name = d.split('.')
                 link = Link(name+'_'+d_name[0], source, d)
                 self.queues.update({d:link}) #input queues are unique, output are not
@@ -117,18 +132,6 @@ class Nexus():
         self.modules = {}
         self.flags = {}
         self.processes = []
-        
-        # Create connections to the store based on module name
-        # Instatiate modules and give them Limbo client connections
-        #self.tweakLimbo = store.Limbo('tweak')
-
-        # self.procName = self.tweak.procName
-    
-        # self.visName = self.tweak.visName
-        # self.visLimbo = store.Limbo(self.visName)
-        # self.Visual = CaimanVisual(self.visName)
-        # self.Visual.setStore(self.visLimbo)
-        # self.modules.update({self.visName:self.Visual})
 
         #TODO: move GUI spec to Visual module so it can be generic?
         # self.GUI = DisplayVisual('GUI')
@@ -142,67 +145,37 @@ class Nexus():
 
         self.loadTweak() #TODO: filename?
 
-        # self.procLimbo = store.Limbo(self.procName)
-
-        # from process.process import CaimanProcessor
-        # self.Processor = CaimanProcessor(self.procName)
-        # self.Processor.setStore(self.procLimbo)
-
-        # self.acqName = self.tweak.acqName
-        # self.acqLimbo = store.Limbo(self.acqName)
-        # self.Acquirer = FileAcquirer(self.acqName)
-        # self.Acquirer.setStore(self.acqLimbo)
-
         self.flags.update({'quit':False, 'run':False, 'load':False})
 
-    def setupProcessor(self):
-        '''Setup pre-processor
+    def setupAll(self):
+        '''Setup all modules
         '''
-        self.queues.update({'acq_proc':Link('acq_proc', self.acqName, self.procName), 
-                            'proc_comm':Link('proc_comm', self.procName, self.name),
-                            'proc_sig':Link('proc_sig', self.name, self.procName)})
-        self.Processor.setLinks(self.queues['proc_comm'], self.queues['proc_sig'], q_in=self.queues['acq_proc'], q_out=self.queues['proc_vis'])
-        self.Processor = self.Processor.setup()
-
-    def setupAcquirer(self, filename):
-        ''' Setup acquisition
-        '''
-        # Update queues for communication and signaling
-        # Already have data queue q_out = acq_proc
-        # Data queue q_in is None 
-        self.queues.update({'acq_comm':Link('acq_comm', self.acqName, self.name),
-                            'acq_sig':Link('acq_sig', self.name, self.acqName)})
-        self.Acquirer.setLinks(self.queues['acq_comm'], self.queues['acq_sig'], q_out=self.queues['acq_proc'])
-        try:
-            self.Acquirer.setup(filename)
-        except FileNotFoundError:
-            logger.error('Dataset not found at {}'.format(filename))
+        for name,m in self.tweak.modules.items(): # m is TweakModule 
+            try: #self.modules[name] is the module instance
+                self.modules[name].setup(**m.options)
+            except Exception as e:
+                logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
 
     def setupVisual(self):
         ''' Setup visual 
         '''
         # Data q_out is None
-        self.queues.update({'vis_comm':Link('vis_comm', self.visName, self.name),
-                            'proc_vis':Link('proc_vis', self.procName, self.visName),
-                            'vis_sig':Link('vis_sig', self.name, self.visName)})
-        self.GUI.visual.setLinks(self.queues['vis_comm'], self.queues['vis_sig'], q_in=self.queues['proc_vis'])
+        #self.queues.update({'vis_comm':Link('vis_comm', self.visName, self.name),
+        #                    'proc_vis':Link('proc_vis', self.procName, self.visName),
+        #                    'vis_sig':Link('vis_sig', self.name, self.visName)})
+        #self.GUI.visual.setLinks(self.queues['vis_comm'], self.queues['vis_sig'], q_in=self.queues['proc_vis'])
         self.GUI.visual.setup() #Currently does nothing
 
-    def runProcessor(self):
-        '''Run the processor continually on input frames
+    def runModule(self, module):
+        '''Run the module continually; for in separate process
         '''
-        self.Processor.run()
-
-    def runAcquirer(self):
-        ''' Run the acquirer continually 
-        '''
-        self.Acquirer.run()
+        module.run()
 
     def startNexus(self):
-        self.t1 = Process(target=self.runAcquirer)
-        self.t1.daemon = True
-        self.t2 = Process(target=self.runProcessor)
-        self.t2.daemon = True
+        for name,m in self.modules.items(): #m accesses the specific module instance
+            p = Process(target=self.runModule, args=(m,))
+            p.daemon = True
+            self.processes.append(p)
 
         loop = asyncio.get_event_loop()
 
@@ -216,11 +189,9 @@ class Nexus():
     def run(self):
         logger.info('Starting processes')
         self.t = time.time()
-
-        self.processes.extend([self.t1, self.t2])
         
-        for t in self.processes:
-            t.start()
+        for p in self.processes:
+            p.start()
 
         for q in self.sig_queues:
             try:
@@ -241,11 +212,11 @@ class Nexus():
         self.queues['vis_sig'].put(Spike.quit())
         self.queues['acq_sig'].put(Spike.quit())
 
-        self.processes.append(self.t3)
-        for t in self.processes:
-            if t.is_alive():
-                t.terminate()
-            t.join()
+        self.processes.append(self.p_GUI)
+        for p in self.processes:
+            if p.is_alive():
+                p.terminate()
+            p.join()
 
         logger.warning('Done with available frames')
         print('total time ', time.time()-self.t)
@@ -253,9 +224,9 @@ class Nexus():
         self.destroyNexus()
 
     def runInit(self):
-        self.t3 = Process(target=self.GUI.runGUI)
-        self.t3.daemon = True
-        self.t3.start()
+        self.p_GUI = Process(target=self.GUI.runGUI)
+        self.p_GUI.daemon = True
+        self.p_GUI.start()
         logger.info('Started Front End')
 
     async def pollQueues(self):
@@ -328,13 +299,12 @@ class Nexus():
         self._closeStore()
         logger.warning('Killed the central store')
 
-
     def _closeStore(self):
         ''' Internal method to kill the subprocess
             running the store (plasma sever)
         '''
         try:
-            self.p.kill()
+            self.p_Limbo.kill()
             logger.info('Store closed successfully')
         except Exception as e:
             logger.exception('Cannot close store {0}'.format(e))
@@ -347,7 +317,7 @@ class Nexus():
         if size is None:
             raise RuntimeError('Server size needs to be specified')
         try:
-            self.p = subprocess.Popen(['plasma_store',
+            self.p_Limbo = subprocess.Popen(['plasma_store',
                               '-s', '/tmp/store',
                               '-m', str(size)],
                               stdout=subprocess.DEVNULL,
@@ -382,7 +352,6 @@ def Link(name, start, end):
     m = Manager()
     q = AsyncQueue(m.Queue(maxsize=0), name, start, end)
     return q
-
 
 class AsyncQueue(object):
     def __init__(self,q, name, start, end):
@@ -454,12 +423,68 @@ class AsyncQueue(object):
             self._real_executor.shutdown()
 
 
+def MultiLink(name, start, end):
+    ''' End is a list
+
+        Return a MultiAsyncQueue as q (for producer) and list of AsyncQueues as q_out (for consumers)
+    '''
+    m = Manager()
+
+    q_out = []
+    for endpoint in end:
+        q = AsyncQueue(m.Queue(maxsize=0), name, start, endpoint)
+        q_out.append(q)
+
+    q = MultiAsyncQueue(m.Queue(maxsize=0), q_out, name, start, end)
+
+    return q, q_out
+
+class MultiAsyncQueue(AsyncQueue):
+    ''' Extension of AsyncQueue created by Link to have multiple endpoints.
+        A single producer queue's 'put' is copied to multiple consumer's queues
+        q_in is the producer queue, q_out are the consumer queues
+
+        #TODO: test the async nature of this group of queues
+    '''
+    def __init__(self, q_in, q_out, name, start, end):
+        self.queue = q_in
+        self.output = q_out
+
+        self.real_executor = None
+        self.cancelled_join = False
+
+        self.name = name
+        self.start = start
+        self.end = end[0] #somewhat arbitrary endpoint naming
+        self.status = 'pending'
+        self.result = None
+    
+    def __getattr__(self, name):
+        # Remove put and put_nowait and define behavior specifically
+        #TODO: remove get capability
+        if name in ['qsize', 'empty', 'full',
+                    'get', 'get_nowait', 'close']:
+            return getattr(self.queue, name)
+        else:
+            raise AttributeError("'%s' object has no attribute '%s'" % 
+                                    (self.__class__.__name__, name))
+
+    def put(self, item):
+        for q in self.output:
+            q.put(item)
+
+    def put_nowait(self, item):
+        for q in self.output:
+            q.put_nowait(item)
+
+
+
 if __name__ == '__main__':
     nexus = Nexus('Nexus')
     nexus.createNexus()
-    nexus.setupProcessor()
+    nexus.setupAll()
     cwd = os.getcwd()
-    nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
+    #nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
     nexus.startNexus() #start polling, create processes
 #    nexus.run()
 #    nexus.destroyNexus()

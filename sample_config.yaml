@@ -1,0 +1,45 @@
+modules:
+  Acquirer:
+    class: acquire.FileAcquirer
+    #framerate: 30
+    #camera: /dev/USB0
+    #other pre-defined things here for class constructor (?) 
+
+  Processor:
+    class: process.CaimanProcessor
+
+  Visual:
+    class: visual.CaimanVisual
+  
+  Analysis:
+    class: analysis.MeanAnalysis
+
+  InputStim:
+    class: acquire.BehaviorAcquirer
+
+
+connections:
+  Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue] #second is user-defined, added as extra Link
+  Processor.q_out: [Analysis.q_in]
+  Analysis.q_out: [Visual.q_in]
+  InputStim.q_out: [Analysis.input_stim_queue]
+
+  #rules: q_out can be tied to more than one queue, 
+  #but q_in has single dedicated input, all others
+  #must be in different named queues
+
+
+
+# TODO: future version of connections? 
+connections:
+  - from: ImageAcquisition.q_out
+    to: ImageProcessor.q_in
+    buffer: 5 # only keep 5 frames in the data store before throwing away
+    overrun_policy: discard, pause
+
+
+# example user module inheriting from Acquirer abstract class
+class MyImageAcquisition(Acquirer):
+    def __init__(self, *args, **kwargs):
+        self.framerate = kwargs.pop('framerate', 20)
+        super(self).__init__(*args, **kwargs)

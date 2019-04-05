@@ -94,11 +94,10 @@ class CaimanProcessor(Processor):
         '''
         return {}
 
-    def setup(self):
+    def setup(self, config_file = None):
         ''' Create OnACID object and initialize it
                 (runs initialize online)
             limboClient is a client to the data store server
-            TODO: put configParams in store and load here
         '''
         self.done = False
         self.dropped_frames = []

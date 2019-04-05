@@ -53,6 +53,9 @@ class FileAcquirer(Acquirer):
                     print('data is ', len(self.data))
         else: raise FileNotFoundError
 
+        self.save_file = filename.split('.')[0]+'_backup'+'.h5' #TODO: make parameter in setup ?
+        
+
     def getFrame(self, num):
         ''' Can be live acquistion from disk (?) #TODO
             Here just return frame from loaded data
@@ -94,11 +97,14 @@ class FileAcquirer(Acquirer):
            grab frame, save, put in store
         '''
         if(self.frame_num < len(self.data)):
-            id = self.client.put(self.getFrame(self.frame_num), str(self.frame_num))
+            frame = self.getFrame(self.frame_num)
+            id = self.client.put(frame, str(self.frame_num))
             try:
                 self.q_out.put([{str(self.frame_num):id}])
                 self.q_comm.put([self.frame_num])
                 self.frame_num += 1
+
+                self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?               
             except Exception as e:
                 logger.error('Acquirer general exception: {}'.format(e))
 
@@ -110,6 +116,9 @@ class FileAcquirer(Acquirer):
             self.q_out.put(None)
             self.q_comm.put(None)
             self.done = True
+
+    def saveFrame(self, frame):
+
 
 
 class BehaviorAcquirer(Module):
