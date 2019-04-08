@@ -26,7 +26,7 @@ import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 #logging.basicConfig(filename='logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()), 
 #                    filemode='w', 
 #                   format='%(asctime)s | %(levelname)-8s | %(name)s | %(lineno)04d | %(message)s')
@@ -78,7 +78,8 @@ class Nexus():
             # Add signal and communication links
             q_comm = Link(module.name+'_comm', module.name, self.name)
             q_sig = Link(module.name+'_sig', self.name, module.name)
-            self.queues.update({q_comm.name:q_comm, q_sig.name:q_sig})
+            self.comm_queues.update({q_comm.name:q_comm})
+            self.sig_queues.update({q_sig.name:q_sig})
             instance.setLinks(q_comm, q_sig)
 
             # Update information
@@ -91,10 +92,10 @@ class Nexus():
             #current assumption is connection goes from q_out to something(s) else
             if len(drain) > 1: #we need multiasyncqueue 
                 link, endLinks = MultiLink(name+'_multi', source, drain)
-                self.queues.update({name+'_multi':link})
+                self.data_queues.update({name+'_multi':link})
                 self.modules[name].setLinkOut(link)
                 for i,e in enumerate(endLinks):
-                    self.queues.update({drain[i]:e})
+                    self.data_queues.update({drain[i]:e})
                     d_name = drain[i].split('.')
                     if d_name[1] == 'q_in':
                         self.modules[d_name[0]].setLinkIn(e)
@@ -106,16 +107,13 @@ class Nexus():
                 d = drain[0] #FIXME
                 d_name = d.split('.')
                 link = Link(name+'_'+d_name[0], source, d)
-                self.queues.update({d:link}) #input queues are unique, output are not
+                self.data_queues.update({d:link}) #input queues are unique, output are not
                 self.modules[name].setLinkOut(link)
                 if d_name[1] == 'q_in':
                     self.modules[d_name[0]].setLinkIn(link)
                 else:
                     link.name = d_name[1] #special queue
                     self.modules[d_name[0]].addLink(link)
-        
-        print('Nexus modules: ', self.modules)
-        print('Nexus queues: ', self.queues)
 
         #TODO: error handling for is a user tries to use q_in without defining it
         #TODO: if user wants multiple output queues this no longer works
@@ -128,7 +126,9 @@ class Nexus():
         self.limbo = store.Limbo()
         self.limbo.subscribe()
 
-        self.queues = {}
+        self.comm_queues = {}
+        self.sig_queues = {}
+        self.data_queues = {}
         self.modules = {}
         self.flags = {}
         self.processes = []
@@ -153,18 +153,9 @@ class Nexus():
         for name,m in self.tweak.modules.items(): # m is TweakModule 
             try: #self.modules[name] is the module instance
                 self.modules[name].setup(**m.options)
+                print('set up '+name)
             except Exception as e:
                 logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
-
-    def setupVisual(self):
-        ''' Setup visual 
-        '''
-        # Data q_out is None
-        #self.queues.update({'vis_comm':Link('vis_comm', self.visName, self.name),
-        #                    'proc_vis':Link('proc_vis', self.procName, self.visName),
-        #                    'vis_sig':Link('vis_sig', self.name, self.visName)})
-        #self.GUI.visual.setLinks(self.queues['vis_comm'], self.queues['vis_sig'], q_in=self.queues['proc_vis'])
-        self.GUI.visual.setup() #Currently does nothing
 
     def runModule(self, module):
         '''Run the module continually; for in separate process
@@ -199,18 +190,15 @@ class Nexus():
             except Full as f:
                 logger.warning('Signal queue'+q.name+'is full')
                 #queue full, keep going anyway TODO: add repeat trying as async task
-        
-#        self.queues['acq_sig'].put(Spike.run())
-#        self.queues['proc_sig'].put(Spike.run())
 
     def quit(self):
         logger.warning('Killing child processes')
         
-        #TODO: make signals, etc
-        #Consider making queues nested dict to access all sig, comm, etc TODO
-        self.queues['proc_sig'].put(Spike.quit())
-        self.queues['vis_sig'].put(Spike.quit())
-        self.queues['acq_sig'].put(Spike.quit())
+        for q in self.sig_queues:
+            try:
+                q.put_nowait(Spike.quit())
+            except Full as e:
+                logger.warning('Signal queue '+q.name+' full, cannot tell it to quit')
 
         self.processes.append(self.p_GUI)
         for p in self.processes:
@@ -233,7 +221,8 @@ class Nexus():
         gui_fut = None
         acq_fut = None
         proc_fut = None
-        polling = [self.queues['gui_comm'], self.queues['acq_comm'], self.queues['proc_comm']]
+        #polling = [self.queues['gui_comm'], self.queues['acq_comm'], self.queues['proc_comm']]
+        polling = list(self.comm_queues.values()) #TODO: FIXME
         tasks = []
         for q in polling:
             tasks.append(asyncio.ensure_future(q.get_async()))
@@ -274,6 +263,8 @@ class Nexus():
     def processGuiSignal(self, flag):
         '''Receive flags from the Front End as user input
             List of flags: 0 = run(), 1 = quit, 2 = load tweak
+
+            #TODO: Use Spike signals here as well
         '''
         logger.info('Received signal from GUI: '+flag[0])
         if flag[0] in self.flags.keys():
@@ -483,7 +474,7 @@ if __name__ == '__main__':
     nexus = Nexus('Nexus')
     nexus.createNexus()
     nexus.setupAll()
-    cwd = os.getcwd()
+    #cwd = os.getcwd()
     #nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
     nexus.startNexus() #start polling, create processes
 #    nexus.run()

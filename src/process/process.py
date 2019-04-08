@@ -99,6 +99,7 @@ class CaimanProcessor(Processor):
                 (runs initialize online)
             limboClient is a client to the data store server
         '''
+        logger.info('Running setup for '+self.name)
         self.done = False
         self.dropped_frames = []
         self.coords = None

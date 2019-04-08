@@ -19,6 +19,7 @@ class MeanAnalysis(Analysis):
     def setup(self, param_file=None):
         '''
         '''
+        logger.info('Running setup for '+self.name)
         # TODO: same as behaviorAcquisition, need number of stimuli here. TODO: make adaptive later
         self.num_stim = 10 
         self.frame = 0

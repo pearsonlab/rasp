@@ -40,6 +40,7 @@ class FileAcquirer(Acquirer):
            Open file stream
            #TODO: implement more than h5 files
         '''        
+        logger.info('Running setup for '+self.name)
         self.framerate = 1/framerate 
 
         if os.path.exists(filename):
@@ -53,8 +54,9 @@ class FileAcquirer(Acquirer):
                     print('data is ', len(self.data))
         else: raise FileNotFoundError
 
-        self.save_file = filename.split('.')[0]+'_backup'+'.h5' #TODO: make parameter in setup ?
-        
+        save_file = filename.split('.')[0]+'_backup'+'.h5' #TODO: make parameter in setup ?
+        self.f = h5py.File(save_file, 'w', libver='latest')
+        self.dset = self.f.create_dataset("default", (len(self.data),))
 
     def getFrame(self, num):
         ''' Can be live acquistion from disk (?) #TODO
@@ -116,9 +118,11 @@ class FileAcquirer(Acquirer):
             self.q_out.put(None)
             self.q_comm.put(None)
             self.done = True
+            self.f.close()
 
     def saveFrame(self, frame):
-
+        self.dset[self.frame_num-1] = frame
+        self.f.flush()
 
 
 class BehaviorAcquirer(Module):

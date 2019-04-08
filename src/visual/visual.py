@@ -29,8 +29,9 @@ class DisplayVisual(Module):
         self.app.exec_()
         logger.info('Done running GUI')
 
-    def setup(self, Visual):
-        self.visual = Visual
+    def setup(self, visual=None):
+        logger.info('Running setup for '+self.name)
+        self.visual = visual
 
 
 class Visual(Module):
