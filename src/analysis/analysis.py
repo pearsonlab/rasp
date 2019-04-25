@@ -23,10 +23,10 @@ class MeanAnalysis(Analysis):
         # TODO: same as behaviorAcquisition, need number of stimuli here. TODO: make adaptive later
         self.num_stim = 10 
         self.frame = 0
-        self.ests = None
         self.flag = False
         self.curr_stim = 0 #start with zeroth stim unless signaled otherwise
         self.stimInd = []
+        self.window = 200 #TODO: make user input, choose scrolling window for Visual
 
     def run(self, ests):
         # ests structure: np.array([components, frames])
@@ -67,35 +67,40 @@ class MeanAnalysis(Analysis):
         ''' Take numpy estimates and frame_number
             Create X and Y for plotting
         '''
+        # Keep internal running count 
         self.frame += 1
+        # From the input_stim_queue update the current stimulus (once per frame)
         self.stimInd.append(self.curr_stim)
+
         try:
+            #TODO: add error handling for if we received some but not all of these
             ids = self.q_in.get(timeout=1)
             res = []
             for id in ids:
                 res.append(self.client.getID(id))
-            (ests, A, self.image, self.raw) = res
-            #TODO: add error handling for if we received some but not all of these
+            (C, A, self.image, self.raw) = res
             
+            # Update coordinates (if necessary)
             dims = self.image.shape
             self.coords = self._updateCoords(A, dims)
 
+            # Compute coloring of neurons for processed frame
+            # Also rotate and stack as needed for plotting
             self.raw, self.color = self.plotColorFrame()
             
-            stim = self.stimAvg(ests)
+            # Compute tuning curves based on input stimulus
+            # Just do overall average activity for now
+            self.tuning_all = self.stimAvg(C)
             self.globalAvg = np.array(np.mean(stim, axis=0))
 
-            if self.frame >= 200:
-                # TODO: change to init batch here
-                window = 200
+            if self.frame >= self.window:
+                window = self.window
             else:
                 window = self.frame
 
-            if ests.shape[1]>0:
-                self.Yavg = np.mean(ests[:,self.frame-window:self.frame], axis=0) 
-                #self.Y1 = ests[0,self.frame-window:self.frame]
+            if C.shape[1]>0:
+                self.Yavg = np.mean(C[:,self.frame-window:self.frame], axis=0) 
                 self.X = np.arange(0,Yavg.size)+(self.frame-window)
-                #return X,[Y1,Yavg],avg,allAvg
             
             self.putAnalysis()
         
@@ -104,9 +109,9 @@ class MeanAnalysis(Analysis):
 
     def updateStim(self, stim):
         ''' Recevied new signal from Behavior Acquirer to change input stimulus
+            [possibly other action items here...? Validation?]
         '''
         self.curr_stim = stim
-        # possibly other action items here...? Validation?
 
     def putAnalysis(self):
         ''' Throw things to DS and put IDs in queue for Visual
@@ -118,6 +123,7 @@ class MeanAnalysis(Analysis):
         ids.append(self.client.put(self.globalAvg, 'globalAvg'+str(self.frame)))
         ids.append(self.client.put(self.raw, 'raw'+str(self.frame)))
         ids.append(self.client.put(self.color, 'color'+str(self.frame)))
+        ids.append(self.client.put(self.coords, 'coords'+str(self.frame)))
 
         self.q_out.put(ids)
 

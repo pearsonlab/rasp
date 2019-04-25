@@ -12,6 +12,8 @@ from multiprocessing import Pool
 import logging; logger=logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+#TODO: Use Apache Arrow for better memory usage with the Plasma store
+
 class StoreInterface():
     '''General interface for a store
     '''

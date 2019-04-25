@@ -23,7 +23,7 @@ class DisplayVisual(Module):
         logger.info('Loading FrontEnd')
         self.app = QtWidgets.QApplication([])
 #        screen_resolution = self.app.desktop().screenGeometry()
-        self.rasp = FrontEnd(self.visual, self.link)
+        self.rasp = FrontEnd(self.visual, self.q_comm)
         self.rasp.show()
         logger.info('GUI ready')
         self.app.exec_()
@@ -109,6 +109,9 @@ class CaimanVisual(Visual):
     #     except Exception as e:
     #         print('probably timeout ', e)
     #         return None
+
+    def getFrames(self):
+        
 
     def selectNeurons(self, x, y):
         ''' x and y are coordinates

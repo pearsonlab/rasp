@@ -65,59 +65,95 @@ class Nexus():
         self.tweak = Tweak(file)
         self.tweak.createConfig()
 
+        if self.tweak.hasGUI:
+            # Have to load GUI first (at least with Caiman) #TODO: Fix Caiman instead?
+            name = self.tweak.gui.name
+            m = self.tweak.gui # m is TweakModule 
+            # treat GUI uniquely since user communication comes from here
+            try:
+                visualClass = m.options['visual']
+                # need to instantiate this module 
+                visualModule = self.tweak.modules[visualClass]
+                self.createModule(visualClass, visualModule)
+
+                #then give it to our GUI
+                self.createModule(name, m)
+                self.modules[name].setup(visual=self.modules[visualClass])
+                print('(GUI) set up '+name)
+
+                self.p_GUI = Process(target=self.modules[name].run)
+                self.p_GUI.daemon = True
+                self.p_GUI.start()
+
+            except Exception as e:
+                logger.error('Exception in setting up GUI {}'.format(name)+': {}'.format(e))
+
         # First set up each class/module
         for name,module in self.tweak.modules.items():
-            # Instantiate selected class
-            mod = import_module(module.packagename)
-            clss = getattr(mod, module.classname)
-            instance = clss(module.name)
-
-            # Add link to Limbo store
-            instance.setStore(store.Limbo(module.name))
-
-            # Add signal and communication links
-            q_comm = Link(module.name+'_comm', module.name, self.name)
-            q_sig = Link(module.name+'_sig', self.name, module.name)
-            self.comm_queues.update({q_comm.name:q_comm})
-            self.sig_queues.update({q_sig.name:q_sig})
-            instance.setLinks(q_comm, q_sig)
-
-            # Update information
-            self.modules.update({name:instance})
+            if name not in self.modules.keys(): 
+                #Check for modules being instantiated twice
+                self.createModule(name, module)
 
         # Second set up each connection b/t modules
         for source,drain in self.tweak.connections.items():
-            name = source.split('.')[0]
-            
-            #current assumption is connection goes from q_out to something(s) else
-            if len(drain) > 1: #we need multiasyncqueue 
-                link, endLinks = MultiLink(name+'_multi', source, drain)
-                self.data_queues.update({name+'_multi':link})
-                self.modules[name].setLinkOut(link)
-                for i,e in enumerate(endLinks):
-                    self.data_queues.update({drain[i]:e})
-                    d_name = drain[i].split('.')
-                    if d_name[1] == 'q_in':
-                        self.modules[d_name[0]].setLinkIn(e)
-                    else:
-                        e.name = d_name[1]
-                        self.modules[d_name[0]].addLink(e)
-
-            else: #single input, single output
-                d = drain[0] #FIXME
-                d_name = d.split('.')
-                link = Link(name+'_'+d_name[0], source, d)
-                self.data_queues.update({d:link}) #input queues are unique, output are not
-                self.modules[name].setLinkOut(link)
-                if d_name[1] == 'q_in':
-                    self.modules[d_name[0]].setLinkIn(link)
-                else:
-                    link.name = d_name[1] #special queue
-                    self.modules[d_name[0]].addLink(link)
+            self.createConnection(source, drain)
 
         #TODO: error handling for is a user tries to use q_in without defining it
         #TODO: if user wants multiple output queues this no longer works
 
+    def createModule(self, name, module):
+        ''' Function to instantiate module, add signal and comm Links,
+            and update self.modules dictionary
+        '''
+        # Instantiate selected class
+        mod = import_module(module.packagename)
+        clss = getattr(mod, module.classname)
+        instance = clss(module.name)
+
+        # Add link to Limbo store
+        instance.setStore(store.Limbo(module.name))
+
+        # Add signal and communication links
+        q_comm = Link(module.name+'_comm', module.name, self.name)
+        q_sig = Link(module.name+'_sig', self.name, module.name)
+        self.comm_queues.update({q_comm.name:q_comm})
+        self.sig_queues.update({q_sig.name:q_sig})
+        instance.setLinks(q_comm, q_sig)
+
+        # Update information
+        self.modules.update({name:instance})
+
+    def createConnection(self, source, drain):
+        ''' Function to set up Links between modules
+            for data location passing
+        '''
+        name = source.split('.')[0]
+        
+        #current assumption is connection goes from q_out to something(s) else
+        if len(drain) > 1: #we need multiasyncqueue 
+            link, endLinks = MultiLink(name+'_multi', source, drain)
+            self.data_queues.update({name+'_multi':link})
+            self.modules[name].setLinkOut(link)
+            for i,e in enumerate(endLinks):
+                self.data_queues.update({drain[i]:e})
+                d_name = drain[i].split('.')
+                if d_name[1] == 'q_in':
+                    self.modules[d_name[0]].setLinkIn(e)
+                else:
+                    e.name = d_name[1]
+                    self.modules[d_name[0]].addLink(e)
+
+        else: #single input, single output
+            d = drain[0] #FIXME
+            d_name = d.split('.')
+            link = Link(name+'_'+d_name[0], source, d)
+            self.data_queues.update({d:link}) #input queues are unique, output are not
+            self.modules[name].setLinkOut(link)
+            if d_name[1] == 'q_in':
+                self.modules[d_name[0]].setLinkIn(link)
+            else:
+                link.name = d_name[1] #special queue
+                self.modules[d_name[0]].addLink(link)
 
     def createNexus(self):
         self._startStore(2000000000) #default size should be system-dependent
@@ -151,11 +187,26 @@ class Nexus():
         '''Setup all modules
         '''
         for name,m in self.tweak.modules.items(): # m is TweakModule 
-            try: #self.modules[name] is the module instance
-                self.modules[name].setup(**m.options)
-                print('set up '+name)
-            except Exception as e:
-                logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
+            print('name: ', name, '    module: ', m)
+            if "GUI" in name:
+                # treat GUI uniquely since user communication comes from here
+                try:
+                    visualClass = self.tweak.modules[name].options['visual']
+                    self.modules[name].setup(visual=self.modules[visualClass])
+                    print('(GUI) set up '+name)
+
+                    self.p_GUI = Process(target=self.modules[name].run)
+                    self.p_GUI.daemon = True
+                    self.p_GUI.start()
+
+                except Exception as e:
+                    logger.error('Exception in setting up GUI {}'.format(name)+': {}'.format(e))
+            else:
+                try: #self.modules[name] is the module instance
+                    self.modules[name].setup(**m.options)
+                    print('set up '+name)
+                except Exception as e:
+                    logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
 
     def runModule(self, module):
         '''Run the module continually; for in separate process

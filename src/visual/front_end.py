@@ -19,6 +19,7 @@ import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 #TODO: Behavioral stimuli/timing as input, dynamic calculation of tuning curves != 11 
+#NOTE: GUI only gives comm signals to Nexus, does not receive any. Visual serves that role (?)
 
 class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 

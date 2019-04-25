@@ -4,6 +4,8 @@ import io
 
 import logging; logger = logging.getLogger(__name__)
 
+#TODO: Write a save function for Tweak objects output as YAML configFile but using TweakModule objects
+
 class Tweak():
     ''' Handles configuration and logs of configs for
         the entire server/processing pipeline.
@@ -28,7 +30,7 @@ class Tweak():
         with open(self.configFile, 'r') as ymlfile:
             cfg = yaml.safe_load(ymlfile)
 
-        for name,module in cfg['modules'].items():
+        for name,module in cfg['modules'].items(): 
             # put import/name info in TweakModule object TODO: make ordered?
             packagename = module.pop('package')
             classname = module.pop('class')
@@ -36,7 +38,12 @@ class Tweak():
                 options = module
             tweakModule = TweakModule(name, packagename, classname, options=module)
 
-            self.modules.update({name:tweakModule})
+            if "GUI" in name:
+                self.hasGUI = True
+                self.gui = tweakModule
+            
+            else:
+                self.modules.update({name:tweakModule})
         
         print('self.modules:  ', self.modules)
 

@@ -63,7 +63,6 @@ class Module():
             Can also be an initialization for the module
             options is a list of options, can be empty
         '''
-        logger.info('Running setup for '+self.name)
         raise NotImplementedError
 
     def run(self):
