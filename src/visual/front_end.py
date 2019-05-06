@@ -172,38 +172,37 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             of the activity of the selected neurons.
             TODO: separate updates for each plot?
         '''
-        pen=pyqtgraph.mkPen(width=2, color='w')
-        pen2=pyqtgraph.mkPen(width=2, color='r')
-        Y = None
-        avg = None
-        avgAvg = None
+        penW=pyqtgraph.mkPen(width=2, color='w')
+        penR=pyqtgraph.mkPen(width=2, color='r')
+        C = None
         try:
-            (X, Y, avg, avgAvg) = self.visual.plotEstimates()
+            (Cx, C, tune) = self.visual.getCurves()
         except Exception as e:
             logger.error('output does not yet exist. error: {}'.format(e))
 
-        if(Y is not None):
-            self.c1.setData(X, Y[1], pen=pen)
-            self.c2.setData(X, Y[0], pen=pen2)
+        if(C is not None):
+            self.c1.setData(Cx, C[1], pen=pen)
+            self.c2.setData(Cx, C[0], pen=pen2)
             
             if(self.flag):
                 self.selected = self.visual.getFirstSelect()
                 if self.selected is not None:
                     self._updateRedCirc()
 
-        if(avg is not None):
+        #TODO: rewrite as set of polar[] and set of tune[]
+        if(tune[0] is not None):
             self.radius = np.zeros(11)
-            self.radius[:len(avg)] = avg
+            self.radius[:len(tune[0])] = tune[0]
             self.x = self.radius * np.cos(self.theta)
             self.y = self.radius * np.sin(self.theta)
-            self.polar2.setData(self.x, self.y, pen=pyqtgraph.mkPen(width=2, color='r'))
+            self.polar2.setData(self.x, self.y, pen=penR)
 
-        if(avgAvg is not None):
+        if(tune[1] is not None):
             self.radius2 = np.zeros(11)
-            self.radius2[:len(avgAvg)] = avgAvg
+            self.radius2[:len(tune[1])] = tune[1]
             self.x2 = self.radius2 * np.cos(self.theta)
             self.y2 = self.radius2 * np.sin(self.theta)
-            self.polar1.setData(self.x2, self.y2, pen=pyqtgraph.mkPen(width=2, color='w'))
+            self.polar1.setData(self.x2, self.y2, pen=penW)
 
     def mouseClick(self, event):
         '''Clicked on raw image to select neurons

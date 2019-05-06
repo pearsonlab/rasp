@@ -56,7 +56,7 @@ class FileAcquirer(Acquirer):
 
         save_file = filename.split('.')[0]+'_backup'+'.h5' #TODO: make parameter in setup ?
         self.f = h5py.File(save_file, 'w', libver='latest')
-        self.dset = self.f.create_dataset("default", (len(self.data),))
+        self.dset = self.f.create_dataset("default", (len(self.data),)) #TODO: need to set maxsize to none?
 
     def getFrame(self, num):
         ''' Can be live acquistion from disk (?) #TODO

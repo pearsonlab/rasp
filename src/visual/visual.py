@@ -44,7 +44,7 @@ class Visual(Module):
 
     def run(self):
         ''' Currently not running independently
-        TODO: FIXME: implement this
+        TODO: FIXME: implement this? Or leave tied to GUI?
         '''
         pass
 
@@ -63,7 +63,7 @@ class CaimanVisual(Visual):
         self.frame = 0
         self.image = None
         self.raw = None
-        self.A = None
+        self.C = None
         self.dims = None
         self.flip = False
 
@@ -71,6 +71,25 @@ class CaimanVisual(Visual):
         ''' Setup 
         '''
         pass
+
+    def getCurves(self):
+        ''' Return the fluorescence traces and calculated tuning curves
+            for the selected neuron as well as the population average
+            Cx is the time (overall or window) as x axis
+            C is a list; currently C[0] is selected neuron and C[1] is pop avg
+            tune is a similar list to C
+
+            #TODO: Put get in run() function and do return from here
+        '''
+        try: 
+            ids = self.q_in(timeout=1)
+            res = []
+            for id in ids:
+                res.append(self.client.getID(id))
+            # expect Cx, C, tune from Analysis module
+            (self.Cx, self.C, self.tune) = res
+
+        return self.Cx, self.C, self.tune
 
     # def plotEstimates(self):
     #     ''' Take numpy estimates and t=frame_number
@@ -111,7 +130,7 @@ class CaimanVisual(Visual):
     #         return None
 
     def getFrames(self):
-        
+
 
     def selectNeurons(self, x, y):
         ''' x and y are coordinates
