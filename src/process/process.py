@@ -306,7 +306,7 @@ class CaimanProcessor(Processor):
             #return self.client.get('frame')
         except CannotGetObjectError:
             logger.error('No frames')
-            self.done = True
+            self.done = True  #TODO: remove this, let Nexus send end signal
         #TODO: add'l error handling
 
 
