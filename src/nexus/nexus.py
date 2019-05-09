@@ -525,12 +525,11 @@ if __name__ == '__main__':
     nexus = Nexus('Nexus')
     nexus.createNexus()
     nexus.setupAll()
+    
     #cwd = os.getcwd()
-    #nexus.setupAcquirer(cwd+'/data/Tolias_mesoscope_1.hdf5')
+    #nexus.setupAcquirer(cwd+'/../data/Eva/zf1.h5')
+    
     nexus.startNexus() #start polling, create processes
-#    nexus.run()
-#    nexus.destroyNexus()
-    #os._exit(0)
     
     
     
