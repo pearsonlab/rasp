@@ -14,12 +14,13 @@ from threading import Thread
 from multiprocessing import Process
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from matplotlib import cm
+from queue import Empty
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-#TODO: Behavioral stimuli/timing as input, dynamic calculation of tuning curves != 11 
-#NOTE: GUI only gives comm signals to Nexus, does not receive any. Visual serves that role (?)
+#TODO: Behavioral stimuli/timing as input, dynamic calculation of tuning curves
+#NOTE: GUI only gives comm signals to Nexus, does not receive any. Visual serves that role
 
 class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
@@ -46,7 +47,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
         self.slider.valueChanged.connect(_call(self.sliderMoved)) #Threshold for magnitude selection
-       
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
@@ -111,8 +111,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.slider.setMaximum(12)
 
         #videos
-#        self.rawplot.ui.histogram.vb.disableAutoRange()
-        self.rawplot.ui.histogram.vb.setLimits(yMin=-0.1, yMax=200)
+        #self.rawplot.ui.histogram.vb.disableAutoRange()
+        self.rawplot.ui.histogram.vb.setLimits(yMin=-0.1, yMax=200) #0-255 needed, saturated here for easy viewing
 
     def _loadParams(self):
         ''' Button event to load parameters from file
@@ -130,6 +130,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def _runProcess(self):
         '''Run ImageProcessor in separate thread
         '''
+        self.flag = True
         self.comm.put(['run'])
         #TODO: grey out button until self.t is done, but allow other buttons to be active
 
@@ -139,6 +140,10 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def update(self):
         ''' Update visualization while running
         '''
+        #start looking for data to display
+        if self.flag:
+           self.visual.getData()
+
         #plot lines
         self.updateLines()
 
@@ -175,6 +180,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         penW=pyqtgraph.mkPen(width=2, color='w')
         penR=pyqtgraph.mkPen(width=2, color='r')
         C = None
+        tune = None
         try:
             (Cx, C, tune) = self.visual.getCurves()
         except Exception as e:
@@ -190,19 +196,20 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     self._updateRedCirc()
 
         #TODO: rewrite as set of polar[] and set of tune[]
-        if(tune[0] is not None):
-            self.radius = np.zeros(11)
-            self.radius[:len(tune[0])] = tune[0]
-            self.x = self.radius * np.cos(self.theta)
-            self.y = self.radius * np.sin(self.theta)
-            self.polar2.setData(self.x, self.y, pen=penR)
+        if tune is not None:
+            if(tune[0] is not None):
+                self.radius = np.zeros(11)
+                self.radius[:len(tune[0])] = tune[0]
+                self.x = self.radius * np.cos(self.theta)
+                self.y = self.radius * np.sin(self.theta)
+                self.polar2.setData(self.x, self.y, pen=penR)
 
-        if(tune[1] is not None):
-            self.radius2 = np.zeros(11)
-            self.radius2[:len(tune[1])] = tune[1]
-            self.x2 = self.radius2 * np.cos(self.theta)
-            self.y2 = self.radius2 * np.sin(self.theta)
-            self.polar1.setData(self.x2, self.y2, pen=penW)
+            if(tune[1] is not None):
+                self.radius2 = np.zeros(11)
+                self.radius2[:len(tune[1])] = tune[1]
+                self.x2 = self.radius2 * np.cos(self.theta)
+                self.y2 = self.radius2 * np.sin(self.theta)
+                self.polar1.setData(self.x2, self.y2, pen=penW)
 
     def mouseClick(self, event):
         '''Clicked on raw image to select neurons
