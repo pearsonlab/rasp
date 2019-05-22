@@ -20,8 +20,6 @@ import signal
 from nexus.module import Spike
 from queue import Empty, Full
 
-#TODO TODO TODO Nexus put no wait for signals!!!!
-
 import logging
 from datetime import datetime
 
@@ -65,6 +63,10 @@ class Nexus():
         self.tweak = Tweak(file)
         self.tweak.createConfig()
 
+        # create all data links requested from Tweak config
+        self.createConnections()
+        print('Data queues: ', self.data_queues)
+
         if self.tweak.hasGUI:
             # Have to load GUI first (at least with Caiman) #TODO: Fix Caiman instead?
             name = self.tweak.gui.name
@@ -75,6 +77,9 @@ class Nexus():
                 # need to instantiate this module 
                 visualModule = self.tweak.modules[visualClass]
                 self.createModule(visualClass, visualModule)
+                # then add links for visual
+                for k,l in {key:self.data_queues[key] for key in self.data_queues.keys() if visualClass in key}.items():
+                    self.assignLink(k, l)
 
                 #then give it to our GUI
                 self.createModule(name, m)
@@ -95,9 +100,11 @@ class Nexus():
                 self.createModule(name, module)
 
         # Second set up each connection b/t modules
-        for source,drain in self.tweak.connections.items():
-            self.createConnection(source, drain)
+        for name,link in self.data_queues.items():
+            self.assignLink(name, link)
+        print('modules now: ', self.modules)
 
+        #TODO: links multi created for visual after visual in separate process?
         #TODO: error handling for is a user tries to use q_in without defining it
         #TODO: if user wants multiple output queues this no longer works
 
@@ -123,37 +130,38 @@ class Nexus():
         # Update information
         self.modules.update({name:instance})
 
-    def createConnection(self, source, drain):
+    def createConnections(self):
+        ''' Assemble links (multi or other)
+            for later assignment
+        '''
+        for source,drain in self.tweak.connections.items():
+            name = source.split('.')[0]
+            #current assumption is connection goes from q_out to something(s) else
+            if len(drain) > 1: #we need multiasyncqueue 
+                link, endLinks = MultiLink(name+'_multi', source, drain)
+                self.data_queues.update({source:link})
+                for i,e in enumerate(endLinks):
+                    self.data_queues.update({drain[i]:e})
+            else: #single input, single output
+                d = drain[0]
+                d_name = d.split('.')
+                link = Link(name+'_'+d_name[0], source, d)
+                self.data_queues.update({source:link})
+                self.data_queues.update({d:link})
+
+    def assignLink(self, name, link):
         ''' Function to set up Links between modules
             for data location passing
+            Module must already be instantiated
         '''
-        name = source.split('.')[0]
-        
-        #current assumption is connection goes from q_out to something(s) else
-        if len(drain) > 1: #we need multiasyncqueue 
-            link, endLinks = MultiLink(name+'_multi', source, drain)
-            self.data_queues.update({name+'_multi':link})
-            self.modules[name].setLinkOut(link)
-            for i,e in enumerate(endLinks):
-                self.data_queues.update({drain[i]:e})
-                d_name = drain[i].split('.')
-                if d_name[1] == 'q_in':
-                    self.modules[d_name[0]].setLinkIn(e)
-                else:
-                    e.name = d_name[1]
-                    self.modules[d_name[0]].addLink(e)
-
-        else: #single input, single output
-            d = drain[0] #FIXME
-            d_name = d.split('.')
-            link = Link(name+'_'+d_name[0], source, d)
-            self.data_queues.update({d:link}) #input queues are unique, output are not
-            self.modules[name].setLinkOut(link)
-            if d_name[1] == 'q_in':
-                self.modules[d_name[0]].setLinkIn(link)
-            else:
-                link.name = d_name[1] #special queue
-                self.modules[d_name[0]].addLink(link)
+        classname = name.split('.')[0]
+        linktype = name.split('.')[1]
+        if linktype == 'q_out':
+            self.modules[classname].setLinkOut(link)
+        elif linktype == 'q_in':
+            self.modules[classname].setLinkIn(link)
+        else:
+            self.modules[classname].addLink(linktype, link)
 
     def createNexus(self):
         self._startStore(2000000000) #default size should be system-dependent
@@ -168,16 +176,6 @@ class Nexus():
         self.modules = {}
         self.flags = {}
         self.processes = []
-
-        #TODO: move GUI spec to Visual module so it can be generic?
-        # self.GUI = DisplayVisual('GUI')
-        # self.GUI.setup(self.Visual)
-        # self.setupVisual()
-        # self.queues.update({'gui_comm':Link('gui_comm', 'GUI', self.name)})
-        # self.GUI.setLink(self.queues['gui_comm']) #TODO: update this to Module.setLinks?
-
-        # self.runInit() #must be run before import caiman
-        # self.t = time.time()
 
         self.loadTweak() #TODO: filename?
 
@@ -500,6 +498,10 @@ class MultiAsyncQueue(AsyncQueue):
         self.end = end[0] #somewhat arbitrary endpoint naming
         self.status = 'pending'
         self.result = None
+
+    def __repr__(self):
+        #return str(self.__class__) + ": " + str(self.__dict__)
+        return 'MultiLink '+self.name 
     
     def __getattr__(self, name):
         # Remove put and put_nowait and define behavior specifically

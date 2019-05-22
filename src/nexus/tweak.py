@@ -45,13 +45,13 @@ class Tweak():
             else:
                 self.modules.update({name:tweakModule})
         
-        print('self.modules:  ', self.modules)
+        #print('self.modules:  ', self.modules)
 
         for name,conn in cfg['connections'].items():
             #TODO check for correctness  TODO: make more generic (not just q_out)
             self.connections.update({name:conn}) #conn should be a list
         
-        print('self.connections: ', self.connections)
+        #print('self.connections: ', self.connections)
 
     def addParams(self, type, param):
         ''' Function to add paramter param of type type

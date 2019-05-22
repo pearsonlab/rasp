@@ -1,4 +1,6 @@
 from nexus.module import Module, Spike
+from queue import Empty
+
 import logging; logger = logging.getLogger(__name__)
 
 

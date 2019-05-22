@@ -73,6 +73,8 @@ class BatchProcessor(Processor):
         ''' Process the set of frames
         '''
         pass
+        # once done, 
+        # self.frames = []
 
     def putEstimates(self):
         ''' Put output of processing into DS

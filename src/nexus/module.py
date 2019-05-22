@@ -48,13 +48,12 @@ class Module():
         self.q_out = q_out
         self.links.update({'q_out':self.q_out})
 
-    def addLink(self, link):
+    def addLink(self, name, link):
         ''' Function provided to add additional data links 
             using same form as q_in or q_out
             Must be done during registration and not during run
-            TODO: Test this function
         '''
-        self.links.update({link.name:link})
+        self.links.update({name:link})
         # User can then use: self.my_queue = self.links['my_queue'] in a setup fcn,
         # or continue to reference it using self.links['my_queue']
 
