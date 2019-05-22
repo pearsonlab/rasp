@@ -58,7 +58,6 @@ class Limbo(StoreInterface):
             Returns the plamaclient if successful
             Updates the client internal
         '''
-        
         try:
             self.client = plasma.connect(store_loc, '', 0)
             logger.info('Successfully connected to store')
@@ -104,7 +103,7 @@ class Limbo(StoreInterface):
             logger.error('Object already exists. Meant to call replace?')
             #raise PlasmaObjectExists
         except Exception as e:
-            logger.error('could not store object: {0}'.format(e))
+            logger.error('Could not store object '+object_name+': {0}'.format(e))
             #print('size ', sys.getsizeof(object), 'object_name ', object_name)
         return object_id
     

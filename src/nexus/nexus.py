@@ -25,15 +25,18 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+logging.basicConfig(level=logging.INFO,
+                    format='%(name)s %(message)s',
+                    handlers=[logging.FileHandler("example2.log"),
+                              logging.StreamHandler()])
 #logging.basicConfig(filename='logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()), 
-#                    filemode='w', 
-#                   format='%(asctime)s | %(levelname)-8s | %(name)s | %(lineno)04d | %(message)s')
+                   #filemode='w', 
+                  #format='%(asctime)s | %(levelname)-8s | %(name)s | %(lineno)04d | %(message)s')
 
         #fh = logging.FileHandler('logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()))
         #formatter = logging.Formatter('%(asctime)s | %(levelname)-8s | %(lineno)04d | %(message)s')
         #fh.setFormatter(formatter)
         #logger.addHandler(fh)
-
 
 # TODO: Set up limbo.notify in async function (?)
 
@@ -106,7 +109,6 @@ class Nexus():
 
         #TODO: links multi created for visual after visual in separate process?
         #TODO: error handling for is a user tries to use q_in without defining it
-        #TODO: if user wants multiple output queues this no longer works
 
     def createModule(self, name, module):
         ''' Function to instantiate module, add signal and comm Links,
@@ -153,7 +155,10 @@ class Nexus():
         ''' Function to set up Links between modules
             for data location passing
             Module must already be instantiated
+
+            #NOTE: Could use this for reassigning links if modules crash?
         '''
+        logger.info('Assigning link {}'.format(name))
         classname = name.split('.')[0]
         linktype = name.split('.')[1]
         if linktype == 'q_out':
@@ -185,26 +190,12 @@ class Nexus():
         '''Setup all modules
         '''
         for name,m in self.tweak.modules.items(): # m is TweakModule 
-            print('name: ', name, '    module: ', m)
-            if "GUI" in name:
-                # treat GUI uniquely since user communication comes from here
-                try:
-                    visualClass = self.tweak.modules[name].options['visual']
-                    self.modules[name].setup(visual=self.modules[visualClass])
-                    print('(GUI) set up '+name)
+            try: #self.modules[name] is the module instance
+                self.modules[name].setup(**m.options)
+            except Exception as e:
+                logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
 
-                    self.p_GUI = Process(target=self.modules[name].run)
-                    self.p_GUI.daemon = True
-                    self.p_GUI.start()
-
-                except Exception as e:
-                    logger.error('Exception in setting up GUI {}'.format(name)+': {}'.format(e))
-            else:
-                try: #self.modules[name] is the module instance
-                    self.modules[name].setup(**m.options)
-                    print('set up '+name)
-                except Exception as e:
-                    logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
+        logger.info('Finished setup for all modules')
 
     def runModule(self, module):
         '''Run the module continually; for in separate process
@@ -212,10 +203,15 @@ class Nexus():
         module.run()
 
     def startNexus(self):
+        ''' Puts all modules in separate processes and begins polling
+            to listen to comm queues
+        '''
         for name,m in self.modules.items(): #m accesses the specific module instance
-            p = Process(target=self.runModule, args=(m,))
-            p.daemon = True
-            self.processes.append(p)
+            if 'GUI' not in name: #GUI already started
+                p = Process(target=self.runModule, args=(m,))
+                p.daemon = True
+                self.processes.append(p)
+                #TODO: os.nice() for priority?
 
         loop = asyncio.get_event_loop()
 
@@ -231,9 +227,10 @@ class Nexus():
         self.t = time.time()
         
         for p in self.processes:
+            print(p)
             p.start()
 
-        for q in self.sig_queues:
+        for q in self.sig_queues.values():
             try:
                 q.put_nowait(Spike.run())
             except Full as f:
@@ -243,7 +240,7 @@ class Nexus():
     def quit(self):
         logger.warning('Killing child processes')
         
-        for q in self.sig_queues:
+        for q in self.sig_queues.values():
             try:
                 q.put_nowait(Spike.quit())
             except Full as e:
@@ -260,76 +257,57 @@ class Nexus():
 
         self.destroyNexus()
 
-    def runInit(self):
-        self.p_GUI = Process(target=self.GUI.runGUI)
-        self.p_GUI.daemon = True
-        self.p_GUI.start()
-        logger.info('Started Front End')
-
     async def pollQueues(self):
         gui_fut = None
         acq_fut = None
         proc_fut = None
-        #polling = [self.queues['gui_comm'], self.queues['acq_comm'], self.queues['proc_comm']]
-        polling = list(self.comm_queues.values()) #TODO: FIXME
+        polling = list(self.comm_queues.values())
+        pollingNames = list(self.comm_queues.keys())
         tasks = []
         for q in polling:
             tasks.append(asyncio.ensure_future(q.get_async()))
 
         while not self.flags['quit']:   
-
-            #print('pending tasks: ',len(tasks))
-
             done, pending = await asyncio.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)
             #TODO: actually kill pending tasks
-            #TODO: tasks as dict vs list indexing so we can associate a task with the module/Link
-
-            if tasks[0] in done or polling[0].status == 'done':
-                #r = gui_fut.result()
-                r = polling[0].result
-                self.processGuiSignal(r)
-
-                tasks[0] = (asyncio.ensure_future(polling[0].get_async()))
-
-            if tasks[1] in done or polling[1].status == 'done': #catch tasks that complete await wait/gather
-                r = polling[1].result
-                if r is None:
-                    logger.info('Acquirer is finished')
-                else:
-                    tasks[1] = (asyncio.ensure_future(polling[1].get_async()))
-
-            if tasks[2] in done or polling[2].status == 'done':
-                r = polling[2].result
-                if r is None:
-                    logger.info('Processor is finished')
-                    self.quit()
-                    break
-                else:
-                    tasks[2] = (asyncio.ensure_future(polling[0].get_async()))
+            
+            for i,t in enumerate(tasks):
+                if t in done or polling[i].status == 'done': #catch tasks that complete await wait/gather
+                    r = polling[i].result
+                    if 'GUI' in pollingNames[i]:
+                        self.processGuiSignal(r)
+                    else:
+                        self.processModuleSignal(r, pollingNames[i])
+                    tasks[i] = (asyncio.ensure_future(polling[i].get_async()))
 
         logger.warning('Shutting down polling')
 
     def processGuiSignal(self, flag):
         '''Receive flags from the Front End as user input
             List of flags: 0 = run(), 1 = quit, 2 = load tweak
-
-            #TODO: Use Spike signals here as well
         '''
         logger.info('Received signal from GUI: '+flag[0])
         if flag[0] in self.flags.keys():
-            if flag[0] == 'run':
+            if flag[0] == Spike.run():
                 logger.info('Begin run!')
                 self.flags['run'] = True
                 self.run()
-            elif flag[0] == 'quit':
+            elif flag[0] == Spike.quit():
                 logger.warning('Quitting the program!')
                 self.flags['quit'] = True
                 self.quit()
-            elif flag[0] == 'load':
+            elif flag[0] == Spike.load():
                 logger.info('Loading Tweak config from file '+flag[1])
                 self.loadTweak(flag[1])
+            elif flag[0] == Spike.stop():
+                logger.info('Stopping processes')
+                # TODO. Also pause, resume, reset
         else:
             logger.error('Signal received from Nexus but cannot identify {}'.format(flag))
+
+    def processModuleSignal(self, sig, name):
+        pass #logger.info('Received signal '+str(sig[0])+' from '+name)
+        #TODO
 
     def destroyNexus(self):
         ''' Method that calls the internal method

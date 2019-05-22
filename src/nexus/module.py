@@ -121,6 +121,9 @@ class Spike():
 
     def reset(): #TODO
         return 'reset'
+    
+    def load():
+        return 'load'
 
 
 class RunManager():

@@ -61,7 +61,7 @@ class CaimanProcessor(Processor):
 
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'], #cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -129,7 +129,11 @@ class CaimanProcessor(Processor):
         self.detect_time = []
         self.shape_time = []
         self.flag = False
+
+        total_times = []
+
         while True:
+            t = time.time()
             if self.flag: #if we have received run signal
                 try: 
                     self.runProcess()
@@ -143,7 +147,7 @@ class CaimanProcessor(Processor):
                     logger.exception('What happened: {0}'.format(e))
                     break  
             try: 
-                signal = self.q_sig.get(timeout=1)
+                signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
                     self.flag = True
                     logger.warning('Received run signal, begin running process')
@@ -158,6 +162,10 @@ class CaimanProcessor(Processor):
                     self.flag = True
             except Empty as e:
                 pass #no signal from Nexus
+            
+            total_times.append(time.time()-t)
+        print('Processor broke, avg time per frame: ', np.mean(total_times))
+        print('Processor got through ', self.frame_number, ' frames')
 
     def runProcess(self):
         ''' Run process. Runs once per frame.
@@ -234,17 +242,15 @@ class CaimanProcessor(Processor):
             TODO rewrite output input
         '''
         #t = time.time()
-        # Just store C traces for now
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
         #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
         #f = self.onAc.estimates.C_on[:nb, :self.frame_number]
-        
-        self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
-        t=time.time()
-        self.putAnalysis_time.append([time.time()-t])
+        print('frame ', self.frame_number, ', C ', C[0,:])
+        
+        #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
         image, cor_frame = self.makeImage()
         ids = []
@@ -254,6 +260,7 @@ class CaimanProcessor(Processor):
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
         self.q_out.put(ids)
+        self.q_comm.put([self.frame_number])
 
     def makeImage(self):
         '''Create image data for visualiation
@@ -336,7 +343,7 @@ class CaimanProcessor(Processor):
             if self.onAc.params.get('motion', 'pw_rigid'):
                 frame_cor1, shift = motion_correct_iteration_fast(
                             frame, templ, self.max_shifts_online, self.max_shifts_online)
-                frame_cor, shift = tile_and_correct(frame, templ, self.onAc.params.motion['strides'], self.onAc.params.motion['overlaps'], onAc.params.motion['max_shifts'], newoverlaps=None, newstrides=None, upsample_factor_grid=4, upsample_factor_fft=10, show_movie=False, max_deviation_rigid=onAc.params.motion['max_deviation_rigid'],add_to_movie=0, shifts_opencv=True, gSig_filt=None, use_cuda=False, border_nan='copy')[:2]
+                frame_cor, shift = tile_and_correct(frame, templ, self.onAc.params.motion['strides'], self.onAc.params.motion['overlaps'], self.onAc.params.motion['max_shifts'], newoverlaps=None, newstrides=None, upsample_factor_grid=4, upsample_factor_fft=10, show_movie=False, max_deviation_rigid=self.onAc.params.motion['max_deviation_rigid'],add_to_movie=0, shifts_opencv=True, gSig_filt=None, use_cuda=False, border_nan='copy')[:2]
             else:
                 frame_cor, shift = motion_correct_iteration_fast(frame, templ, self.max_shifts_online, self.max_shifts_online)
             self.onAc.estimates.shifts.append(shift)
