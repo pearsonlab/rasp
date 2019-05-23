@@ -1,8 +1,12 @@
 from nexus.module import Module, Spike
 from queue import Empty
+from scipy.sparse import csc_matrix
+from skimage.measure import find_contours
+import numpy as np
+import time
 
 import logging; logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.INFO)
 
 class Analysis(Module):
     '''Abstract class for the analysis module
@@ -21,7 +25,6 @@ class MeanAnalysis(Analysis):
     def setup(self, param_file=None):
         '''
         '''
-        logger.info('Running setup for '+self.name)
         # TODO: same as behaviorAcquisition, need number of stimuli here. TODO: make adaptive later
         self.num_stim = 10 
         self.frame = 0
@@ -29,10 +32,17 @@ class MeanAnalysis(Analysis):
         self.curr_stim = 0 #start with zeroth stim unless signaled otherwise
         self.stimInd = []
         self.window = 200 #TODO: make user input, choose scrolling window for Visual
+        self.A = None
+        self.C = None
+        self.Call = None
+        self.Cx = None
+        self.Cpop = None
 
-    def run(self, ests):
+    def run(self):
         # ests structure: np.array([components, frames])
+        total_times = []
         while True:
+            t = time.time()
             if self.flag:
                 try:
                     self.runAvg()
@@ -43,7 +53,7 @@ class MeanAnalysis(Analysis):
                     logger.error('Analysis exception during run: {}'.format(e))
                     break 
             try: 
-                signal = self.q_sig.get(timeout=1)
+                signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
                     self.flag = True
                     logger.warning('Received run signal, begin running')
@@ -59,28 +69,33 @@ class MeanAnalysis(Analysis):
             except Empty as e:
                 pass #no signal from Nexus
             try: 
-                sig = self.input_stim_queue(timeout=1)
+                sig = self.links['input_stim_queue'].get(timeout=0.005)
                 self.updateStim(sig)
             except Empty as e:
                 pass #no change in input stimulus
                 #TODO: other errors
+                    
+            total_times.append(time.time()-t)
+        print('Analysis broke, avg time per frame: ', np.mean(total_times))
+        print('Analysis got through ', self.frame, ' frames')
+
 
     def runAvg(self):
         ''' Take numpy estimates and frame_number
             Create X and Y for plotting
         '''
-        # Keep internal running count 
-        self.frame += 1
-        # From the input_stim_queue update the current stimulus (once per frame)
-        self.stimInd.append(self.curr_stim)
-
         try:
             #TODO: add error handling for if we received some but not all of these
-            ids = self.q_in.get(timeout=1)
+            ids = self.q_in.get(timeout=0.005)
             res = []
             for id in ids:
                 res.append(self.client.getID(id))
-            (C, A, self.image, self.raw) = res
+            (self.C, A, self.image, self.raw) = res
+
+            # Keep internal running count 
+            self.frame += 1
+            # From the input_stim_queue update the current stimulus (once per frame)
+            self.stimInd.append(self.curr_stim)
             
             # Update coordinates (if necessary)
             dims = self.image.shape
@@ -92,22 +107,26 @@ class MeanAnalysis(Analysis):
             
             # Compute tuning curves based on input stimulus
             # Just do overall average activity for now
-            self.tuning_all = self.stimAvg(C)
-            self.globalAvg = np.array(np.mean(stim, axis=0))
+            self.tuning_all = self.stimAvg(self.C)
+            self.globalAvg = np.array(np.mean(self.tuning_all, axis=0))
+            self.tune = [self.tuning_all, self.globalAvg]
 
             if self.frame >= self.window:
                 window = self.window
             else:
                 window = self.frame
 
-            if C.shape[1]>0:
-                self.Yavg = np.mean(C[:,self.frame-window:self.frame], axis=0) 
-                self.X = np.arange(0,Yavg.size)+(self.frame-window)
+            if self.C.shape[1]>0:
+                self.Cpop = np.nanmean(self.C[:,self.frame-window:self.frame], axis=0)
+                self.Cx = np.arange(0,self.Cpop.size)+(self.frame-window)
+                self.Call = self.C[:,self.frame-window:self.frame]
             
             self.putAnalysis()
         
+        except Empty as e:
+            pass
         except Exception as e:
-            print('probably timeout ', e)
+            logger.exception('probably timeout {}'.format(e))
 
     def updateStim(self, stim):
         ''' Recevied new signal from Behavior Acquirer to change input stimulus
@@ -118,16 +137,18 @@ class MeanAnalysis(Analysis):
     def putAnalysis(self):
         ''' Throw things to DS and put IDs in queue for Visual
         '''
+        t = time.time()
         ids = []
-        ids.append(self.client.put(self.estsAvg, 'estsAvg'+str(self.frame)))
-        ids.append(self.client.put(self.X, 'X'+str(self.frame)))
-        ids.append(self.client.put(self.Yavg, 'Yavg'+str(self.frame)))
-        ids.append(self.client.put(self.globalAvg, 'globalAvg'+str(self.frame)))
-        ids.append(self.client.put(self.raw, 'raw'+str(self.frame)))
-        ids.append(self.client.put(self.color, 'color'+str(self.frame)))
+        ids.append(self.client.put(self.Cx, 'Cx'+str(self.frame)))
+        ids.append(self.client.put(self.Call, 'Call'+str(self.frame)))
+        ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
+        ids.append(self.client.put(self.tune, 'tune'+str(self.frame)))
+        ids.append(self.client.put(np.array(self.raw), 'raw'+str(self.frame)))
+        ids.append(self.client.put(np.array(self.color), 'color'+str(self.frame)))
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame)))
 
         self.q_out.put(ids)
+        self.q_comm.put([self.frame])
 
     def stimAvg(self, ests):
         ''' Using stimInd as mask, average ests across each input stimulus
@@ -139,7 +160,7 @@ class MeanAnalysis(Analysis):
                 tmp = np.mean(ests[int(i)][int(j)*100:int(j)*100+100])
                 tmpList.append(tmp)
             estsAvg.append(tmpList)
-        self.estsAvg = np.array(estsAvg)        
+        self.estsAvg = np.array(estsAvg)             
         return self.estsAvg
 
     def plotColorFrame(self):
@@ -159,12 +180,11 @@ class MeanAnalysis(Analysis):
         if self.image.shape[0] < self.image.shape[1]:
                 self.flip = True
                 raw = raw.T
-        else:
-            np.swapaxes(color,0,1)
-            np.swapaxes(image2,0,1)
+        # else:
+        #     np.swapaxes(color,0,1)
         #TODO: user input for rotating frame? See Visual class
 
-        return np.flipud(raw), np.rot90(color,2)
+        return raw, np.rot90(color,1)
 
     def _tuningColor(self, ind, inten):
         if self.estsAvg[ind] is not None:
@@ -187,6 +207,7 @@ class MeanAnalysis(Analysis):
             self.coords = self.get_contours(self.A, self.dims)
 
         elif np.shape(A)[1] > np.shape(self.A)[1]: #Only recalc if we have new components
+            logger.info('Analysis: recomputing contours')
             self.A = A
             self.dims = dims
             self.coords = self.get_contours(self.A, self.dims)

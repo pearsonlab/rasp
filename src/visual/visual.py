@@ -1,22 +1,23 @@
 import time
 import numpy as np
 import cv2
-from nexus.store import Limbo
+from nexus.store import Limbo, ObjectNotFoundError
 from scipy.spatial.distance import cdist
-from skimage.measure import find_contours
 from math import floor
 import colorsys
 from PyQt5 import QtGui, QtWidgets
 import pyqtgraph as pg
 from visual.front_end import FrontEnd
 import sys
-from scipy.sparse import csc_matrix
 from nexus.module import Module
 from queue import Empty
 
 import logging; logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(message)s',
+                    handlers=[logging.FileHandler("example1.log"),
+                              logging.StreamHandler()])
 
 class DisplayVisual(Module):
 
@@ -62,6 +63,9 @@ class CaimanVisual(Visual):
         self.neurons = []
         self.estsAvg = []
         self.frame = 0
+        self.selectedNeuron = 0
+        self.selectedTune = None
+        self.frame_num = 0
 
         self.flip = False
         self.flag = False
@@ -76,27 +80,39 @@ class CaimanVisual(Visual):
         self.color = None
         self.coords = None
 
+        self.total_times = []
+
     def getData(self):
+        t = time.time()
         try: 
-            ids = self.q_in.get(timeout=1)
+            ids = self.q_in.get(timeout=0.005)
             res = []
             for id in ids:
                 res.append(self.client.getID(id))
             # expect Cx, C, tune, raw, color, coords from Analysis module
-            (self.Cx, self.C, self.tune, self.raw, self.color, self.coords) = res
+            (self.Cx, self.C, self.Cpop, self.tune, self.raw, self.color, self.coords) = res
+            ##############FIXME frame number!
+            self.frame_num += 1
         except Empty as e:
-            pass #no data
+            pass #logger.info('Visual: No data from queue') #no data
+        except ObjectNotFoundError as e:
+            logger.error('Object not found, continuing...')
         except Exception as e:
-            logger.error('Exception in get data {}'.format(e))
+            logger.error('Visual: Exception in get data: {}'.format(e))
+
+        self.total_times.append(time.time()-t)  
 
     def getCurves(self):
         ''' Return the fluorescence traces and calculated tuning curves
             for the selected neuron as well as the population average
             Cx is the time (overall or window) as x axis
-            C is a list; currently C[0] is selected neuron and C[1] is pop avg
+            C is indexed for selected neuron and Cpop is the population avg
             tune is a similar list to C
         '''
-        return self.Cx, self.C, self.tune
+        if self.tune is not None:
+            self.selectedTune = self.tune[0][self.selectedNeuron,:]
+
+        return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, [self.selectedTune, self.tune[1]]
 
     def getFrames(self):
         ''' Return the raw and colored frames for display
@@ -132,7 +148,7 @@ class CaimanVisual(Visual):
         ''' Computes shaded frame for targeting panel
             based on threshold value of sliders (user-selected)
         '''
-        image = self.color
+        image = self.raw
         image2 = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
         image2[...,3] = 100
         if self.coords is not None:
@@ -143,11 +159,11 @@ class CaimanVisual(Visual):
                 cv2.fillConvexPoly(image2, ind, self._threshNeuron(i, thresh_r))
 
         if self.color.shape[0] < self.color.shape[1]:
-                self.flip = True
+            self.flip = True
         else:
             np.swapaxes(image2,0,1)
         #TODO: add rotation to user preferences and/or user clickable input
-        return image2
+        return np.rot90(image2,1)
 
     def _threshNeuron(self, ind, thresh_r):
         thresh = np.max(thresh_r)

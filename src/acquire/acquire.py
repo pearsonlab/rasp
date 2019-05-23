@@ -34,13 +34,12 @@ class FileAcquirer(Acquirer):
         self.done = False
         self.flag = False
 
-    def setup(self, filename, framerate=10):
+    def setup(self, filename, framerate=30):
         '''Get file names from config or user input
             Also get specified framerate, or default is 10 Hz
            Open file stream
            #TODO: implement more than h5 files
         '''        
-        logger.info('Running setup for '+self.name)
         self.framerate = 1/framerate 
 
         if os.path.exists(filename):
@@ -62,12 +61,15 @@ class FileAcquirer(Acquirer):
         ''' Can be live acquistion from disk (?) #TODO
             Here just return frame from loaded data
         '''
-        return self.data[num,:,:]
+        #return self.data[num,:,:]
+        return self.data[10,:,:]
 
     def run(self):
         ''' Run indefinitely. Calls runAcquirer after checking for singals
         '''
+        total_times = []
         while True:
+            t = time.time()
             if self.flag:
                 try:
                     self.runAcquirer()
@@ -78,7 +80,7 @@ class FileAcquirer(Acquirer):
                     logger.error('Acquirer exception during run: {}'.format(e))
                     break 
             try: 
-                signal = self.q_sig.get(timeout=1)
+                signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
                     self.flag = True
                     logger.warning('Received run signal, begin running acquirer')
@@ -93,6 +95,10 @@ class FileAcquirer(Acquirer):
                     self.flag = True
             except Empty as e:
                 pass #no signal from Nexus
+            
+            total_times.append(time.time()-t)
+        print('Acquire broke, avg time per frame: ', np.mean(total_times))
+        print('Acquire got through ', self.frame_num, ' frames')
 
     def runAcquirer(self):
         '''While frames exist in location specified during setup,
@@ -103,7 +109,7 @@ class FileAcquirer(Acquirer):
             id = self.client.put(frame, str(self.frame_num))
             try:
                 self.q_out.put([{str(self.frame_num):id}])
-                self.q_comm.put([self.frame_num])
+                self.q_comm.put([self.frame_num]) #TODO: needed?
                 self.frame_num += 1
 
                 self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?               
@@ -120,9 +126,13 @@ class FileAcquirer(Acquirer):
             self.done = True
             self.f.close()
 
+
     def saveFrame(self, frame):
-        self.dset[self.frame_num-1] = frame
-        self.f.flush()
+        ''' TODO: this
+        '''
+        pass
+        # self.dset[self.frame_num-1] = frame
+        # self.f.flush()
 
 
 class BehaviorAcquirer(Module):
@@ -165,7 +175,7 @@ class BehaviorAcquirer(Module):
                     logger.error('BehaviorAcquirer exception during run: {}'.format(e))
                     break 
             try: 
-                signal = self.q_sig.get(timeout=1)
+                signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
                     self.flag = True
                     logger.warning('Received run signal, begin running')
@@ -188,7 +198,7 @@ class BehaviorAcquirer(Module):
         if self.n % 100 == 0:
             self.curr_stim = random.choice(self.behaviors)
             self.q_out.put({self.n:self.curr_stim})
-            logger.warning('Changed stimulus! :{}'.format(self.curr_stim))
+            logger.warning('Changed stimulus! {}'.format(self.curr_stim))
             #self.q_comm.put()
 
         self.n += 1

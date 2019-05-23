@@ -21,6 +21,7 @@ logger.setLevel(logging.INFO)
 
 #TODO: Behavioral stimuli/timing as input, dynamic calculation of tuning curves
 #NOTE: GUI only gives comm signals to Nexus, does not receive any. Visual serves that role
+#TODO: Add ability to receive signals like pause updating ...?
 
 class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
@@ -30,6 +31,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         '''
         self.visual = visual #Visual class that provides plots and images
         self.comm = comm #Link back to Nexus for transmitting signals
+
+        self.total_times = []
 
         pyqtgraph.setConfigOption('background', QColor(100, 100, 100))
         super(FrontEnd, self).__init__(parent)
@@ -132,6 +135,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         '''
         self.flag = True
         self.comm.put(['run'])
+        logger.info('-------------------------   put run in comm')
         #TODO: grey out button until self.t is done, but allow other buttons to be active
 
     def _loadTweak(self, file):
@@ -140,9 +144,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def update(self):
         ''' Update visualization while running
         '''
+        t = time.time()
         #start looking for data to display
         if self.flag:
            self.visual.getData()
+           #logger.info('Did I get something:', self.visual.Cx)
 
         #plot lines
         self.updateLines()
@@ -152,43 +158,51 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #re-update
         if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(50, self.update)
+            QtCore.QTimer.singleShot(5, self.update)
+        
+        self.total_times.append(time.time()-t)
     
     def updateVideo(self):
         ''' TODO: Bug on clicking ROI --> trace and report to pyqtgraph
         '''
+        #t = time.time()
         image = None
         try:
             raw, color = self.visual.getFrames()
+            #logger.info('Got frames: ', raw)
             image = self.visual.plotThreshFrame(self.thresh_r)
-            if raw is not None and np.unique(raw).size > 1:
-                self.rawplot.setImage(raw.T, autoHistogramRange=False)
-                self.rawplot.ui.histogram.vb.setLimits(yMin=0.02, yMax=0.55)
-                self.rawplot_2.setImage(color)
-                self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
-                self.rawplot_3.setImage(image)
-                self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
+            if raw is not None:
+                if np.unique(raw).size > 1:
+                    self.rawplot.setImage(raw.T, autoHistogramRange=False)
+                    self.rawplot.ui.histogram.vb.setLimits(yMin=0.02, yMax=0.55)
+                    self.rawplot_2.setImage(color)
+                    self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
+                    self.rawplot_3.setImage(image)
+                    self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
             logger.error('Oh no {0}'.format(e))
+
+        #print('update Video time ', time.time()-t)
 
     def updateLines(self):
         ''' Helper function to plot the line traces
             of the activity of the selected neurons.
             TODO: separate updates for each plot?
         '''
+        #t = time.time()
         penW=pyqtgraph.mkPen(width=2, color='w')
         penR=pyqtgraph.mkPen(width=2, color='r')
         C = None
         tune = None
         try:
-            (Cx, C, tune) = self.visual.getCurves()
+            (Cx, C, Cpop, tune) = self.visual.getCurves()
         except Exception as e:
             logger.error('output does not yet exist. error: {}'.format(e))
 
-        if(C is not None):
-            self.c1.setData(Cx, C[1], pen=pen)
-            self.c2.setData(Cx, C[0], pen=pen2)
+        if(C is not None and Cx is not None):
+            self.c1.setData(Cx, Cpop, pen=penW)
+            self.c2.setData(Cx, C, pen=penR)
             
             if(self.flag):
                 self.selected = self.visual.getFirstSelect()
@@ -196,7 +210,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     self._updateRedCirc()
 
         #TODO: rewrite as set of polar[] and set of tune[]
-        if tune is not None:
+        if tune:
             if(tune[0] is not None):
                 self.radius = np.zeros(11)
                 self.radius[:len(tune[0])] = tune[0]
@@ -210,6 +224,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 self.x2 = self.radius2 * np.cos(self.theta)
                 self.y2 = self.radius2 * np.sin(self.theta)
                 self.polar1.setData(self.x2, self.y2, pen=penW)
+        
+        #print('Full update Lines time ', time.time()-t)
 
     def mouseClick(self, event):
         '''Clicked on raw image to select neurons
@@ -275,6 +291,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if confirm == QMessageBox.Yes:
             self.comm.put(['quit'])
+            print('Visual broke, avg time per frame: ', np.mean(self.visual.total_times))
+            print('Visual got through ', self.visual.frame_num, ' frames')
+            print('GUI avg time ', np.mean(self.total_times))
             event.accept()
         else: event.ignore()
             
