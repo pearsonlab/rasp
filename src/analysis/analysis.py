@@ -5,6 +5,8 @@ from scipy.sparse import csc_matrix
 from skimage.measure import find_contours
 import numpy as np
 import time
+import cv2
+import colorsys
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -93,7 +95,7 @@ class MeanAnalysis(Analysis):
             res = []
             for id in ids:
                 res.append(self.client.getID(id))
-            (self.C, A, self.image, self.raw) = res
+            (self.C, self.coords, self.image, self.raw) = res
 
             # Keep internal running count 
             self.frame += 1
@@ -101,18 +103,18 @@ class MeanAnalysis(Analysis):
             self.stimInd.append(self.curr_stim)
             
             # Update coordinates (if necessary)
-            dims = self.image.shape
-            self.coords = self._updateCoords(A, dims)
-
-            # Compute coloring of neurons for processed frame
-            # Also rotate and stack as needed for plotting
-            self.raw, self.color = self.plotColorFrame()
+            # dims = self.image.shape
+            # self.coords = self._updateCoords(A, dims)
             
             # Compute tuning curves based on input stimulus
             # Just do overall average activity for now
             self.tuning_all = self.stimAvg(self.C)
             self.globalAvg = np.array(np.mean(self.tuning_all, axis=0))
             self.tune = [self.tuning_all, self.globalAvg]
+
+            # Compute coloring of neurons for processed frame
+            # Also rotate and stack as needed for plotting
+            self.raw, self.color = self.plotColorFrame()
 
             if self.frame >= self.window:
                 window = self.window
@@ -130,7 +132,7 @@ class MeanAnalysis(Analysis):
         except Empty as e:
             pass
         except Exception as e:
-            logger.exception('probably timeout {}'.format(e))
+            logger.exception('Error in analysis: {}'.format(e))
 
     def updateStim(self, stim):
         ''' Recevied new signal from Behavior Acquirer to change input stimulus

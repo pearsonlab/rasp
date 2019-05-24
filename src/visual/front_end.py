@@ -181,7 +181,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
-            logger.error('Oh no {0}'.format(e))
+            logger.error('Error in {}'.format(e))
 
         #print('update Video time ', time.time()-t)
 

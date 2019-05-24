@@ -104,6 +104,7 @@ class CaimanProcessor(Processor):
         self.dropped_frames = []
         self.coords = None
         self.ests = None
+        self.A = None
 
         self.loadParams()
         self.params = self.client.get('params_dict')
@@ -203,9 +204,10 @@ class CaimanProcessor(Processor):
             except KeyError as e:
                 logger.error('Key error... {0}'.format(e))
         else:
-            logger.error('Done with all available frames: {0}'.format(self.frame_number))
-            self.q_comm.put(None)
-            self.done = True
+            pass
+            # logger.error('Done with all available frames: {0}'.format(self.frame_number))
+            # self.q_comm.put(None)
+            # self.done = True
 
     def finalProcess(self, output):    
         if self.onAc.params.get('online', 'normalize'):
@@ -246,7 +248,6 @@ class CaimanProcessor(Processor):
        
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
-        print('size A', A.toarray().nbytes)
         #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
         #f = self.onAc.estimates.C_on[:nb, :self.frame_number]
@@ -254,6 +255,8 @@ class CaimanProcessor(Processor):
         #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
         image, cor_frame = self.makeImage()
+        dims = image.shape
+        self._updateCoords(A,dims)
 
         # ids = self.client.random_ObjectID(4)
         # objs = [np.array(C), A.toarray(), image, np.array(cor_frame)]
@@ -267,15 +270,24 @@ class CaimanProcessor(Processor):
 
         ids = []
         ids.append(self.client.put(np.array(C), str(self.frame_number)))
-        t = time.time()
-        ids.append(self.client.put(A.toarray(), 'A'+str(self.frame_number)))
-        t2 = time.time()
+        ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'image'+str(self.frame_number)))
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
-        print('put time: ', t2-t)
 
         self.q_out.put(ids)
         self.q_comm.put([self.frame_number])
+    
+    def _updateCoords(self, A, dims):
+        '''See if we need to recalculate the coords
+           Also see if we need to add components
+        '''
+        if self.coords is None: #initial calculation
+            self.A = A
+            self.coords = get_contours(A, dims)
+
+        elif np.shape(A)[1] > np.shape(self.A)[1]: #Only recalc if we have new components
+            self.A = A
+            self.coords = get_contours(A, dims)
 
     def makeImage(self):
         '''Create image data for visualiation
@@ -323,12 +335,15 @@ class CaimanProcessor(Processor):
             TODO: rework logic since not accessing store directly here anymore
         '''
         try:
-            res = self.q_in.get()
+            res = self.q_in.get(timeout=0.005)
             return res
             #return self.client.get('frame')
-        except CannotGetObjectError:
-            logger.error('No frames')
+        # except CannotGetObjectError:
+        #     logger.error('No frames')
         #TODO: add'l error handling
+        except Empty:
+            #logger.info('no frames for processing')
+            return None
 
 
     def _processFrame(self, frame, frame_number):
