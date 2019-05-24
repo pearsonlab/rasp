@@ -137,15 +137,15 @@ class CaimanProcessor(Processor):
             if self.flag: #if we have received run signal
                 try: 
                     self.runProcess()
-                    if self.done:
-                        logger.info('Done running Process')
-                        print('Dropped frames: ', self.dropped_frames)
-                        print('Total number of dropped frames ', len(self.dropped_frames))
-                        print('mean time per fit frame ', np.mean(self.process_time))
-                        return
+                    # if self.done:
+                    #     logger.info('Done running Process')
+                    #     print('Dropped frames: ', self.dropped_frames)
+                    #     print('Total number of dropped frames ', len(self.dropped_frames))
+                    #     print('mean time per fit frame ', np.mean(self.process_time))
+                    #     #return
                 except Exception as e:
                     logger.exception('What happened: {0}'.format(e))
-                    break  
+                    #break  
             try: 
                 signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
@@ -154,6 +154,7 @@ class CaimanProcessor(Processor):
                 elif signal == Spike.quit():
                     print('Total number of dropped frames ', len(self.dropped_frames))
                     print('mean time per fit frame ', np.mean(self.process_time))
+                    print('mean time per process frame ', np.mean(self.procFrame_time))
                     logger.warning('Received quit signal, aborting')
                     break
                 elif signal == Spike.pause():
@@ -186,12 +187,11 @@ class CaimanProcessor(Processor):
         if frame is not None:
             self.done = False
             try:
-                frame = self.client.getID(frame[0][str(self.frame_number)])
-                #t = time.time()
-                frame = self._processFrame(frame, self.frame_number+init)
-                self.frame = frame.copy()
+                self.frame = self.client.getID(frame[0][str(self.frame_number)])
+                self.frame = self._processFrame(self.frame, self.frame_number+init)
+                #self.frame = frame.copy()
                 t = time.time()
-                self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
+                self._fitFrame(self.frame_number+init, self.frame.reshape(-1, order='F'))
                 self.process_time.append([time.time()-t])
                 #if frame_count % 5 == 0: 
                 self.putEstimates(self.onAc.estimates, output) # currently every frame. User-specified?
@@ -235,7 +235,7 @@ class CaimanProcessor(Processor):
         # np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
         # np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
 
-        print('mean time per frame ', np.mean(self.process_time))
+        #print('mean time per frame ', np.mean(self.process_time))
 
 
     def putEstimates(self, estimates, output):
@@ -243,9 +243,10 @@ class CaimanProcessor(Processor):
             into the output location specified
             TODO rewrite output input
         '''
-        #t = time.time()
+       
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
+        print('size A', A.toarray().nbytes)
         #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
         #f = self.onAc.estimates.C_on[:nb, :self.frame_number]
@@ -253,11 +254,25 @@ class CaimanProcessor(Processor):
         #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
         image, cor_frame = self.makeImage()
+
+        # ids = self.client.random_ObjectID(4)
+        # objs = [np.array(C), A.toarray(), image, np.array(cor_frame)]
+        # for i,obj in enumerate(objs):
+        #     try:
+        #         self.client._put(obj, ids[i])
+        #         print('put time: ', time.time()-t)
+        #     except Exception as e:
+        #         logger.error('_put exception {}'.format(e))    
+        # print('total put time: ', time.time()-t)
+
         ids = []
         ids.append(self.client.put(np.array(C), str(self.frame_number)))
+        t = time.time()
         ids.append(self.client.put(A.toarray(), 'A'+str(self.frame_number)))
+        t2 = time.time()
         ids.append(self.client.put(image, 'image'+str(self.frame_number)))
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
+        print('put time: ', t2-t)
 
         self.q_out.put(ids)
         self.q_comm.put([self.frame_number])
@@ -313,7 +328,6 @@ class CaimanProcessor(Processor):
             #return self.client.get('frame')
         except CannotGetObjectError:
             logger.error('No frames')
-            self.done = True  #TODO: remove this, let Nexus send end signal
         #TODO: add'l error handling
 
 

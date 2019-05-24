@@ -72,12 +72,9 @@ class FileAcquirer(Acquirer):
             if self.flag:
                 try:
                     self.runAcquirer()
-                    if self.done:
-                        logger.info('Acquirer is done, exiting')
-                        return
                 except Exception as e:
                     logger.error('Acquirer exception during run: {}'.format(e))
-                    break 
+                    #break 
             try: 
                 signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
@@ -103,7 +100,10 @@ class FileAcquirer(Acquirer):
         '''While frames exist in location specified during setup,
            grab frame, save, put in store
         '''
-        if(self.frame_num < len(self.data)):
+        if self.done:
+            pass #logger.info('Acquirer is done, exiting')
+            #return
+        elif(self.frame_num < len(self.data)):
             frame = self.getFrame(self.frame_num)
             id = self.client.put(frame, str(self.frame_num))
             try:
