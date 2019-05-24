@@ -85,6 +85,8 @@ class Limbo(StoreInterface):
             logger.exception('Notification error: {}'.format(e))
             raise Exception
 
+        return notification_info
+
 
     def put(self, object, object_name):
         ''' Put a single object referenced by its string name 
@@ -95,16 +97,24 @@ class Limbo(StoreInterface):
         object_id = None
         try:
             object_id = self.client.put(object)
-            #print('we did a plasma put: ', object_name)
+
+            ##############
+            if not self.client.contains(object_id):
+                logger.error('The put did not take!!------------')
+            
+            try:
+                self.client.get(object_id)
+            except ObjectNotAvailable:
+                logger.error('--------- Did a put and tried a get but that failed')
+            ###############
+            
             self.updateStored(object_name, object_id)
             logger.debug('object successfully stored: '+object_name)
-            #print(object_id)
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
             #raise PlasmaObjectExists
         except Exception as e:
             logger.error('Could not store object '+object_name+': {0}'.format(e))
-            #print('size ', sys.getsizeof(object), 'object_name ', object_name)
         return object_id
     
     

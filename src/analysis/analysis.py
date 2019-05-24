@@ -1,4 +1,5 @@
 from nexus.module import Module, Spike
+from nexus.store import ObjectNotFoundError
 from queue import Empty
 from scipy.sparse import csc_matrix
 from skimage.measure import find_contours
@@ -37,6 +38,7 @@ class MeanAnalysis(Analysis):
         self.Call = None
         self.Cx = None
         self.Cpop = None
+        self.updateCoordsTime = []
 
     def run(self):
         # ests structure: np.array([components, frames])
@@ -77,6 +79,7 @@ class MeanAnalysis(Analysis):
                     
             total_times.append(time.time()-t)
         print('Analysis broke, avg time per frame: ', np.mean(total_times))
+        print('Analysis contouring calc mean time: ', np.mean(self.updateCoordsTime))
         print('Analysis got through ', self.frame, ' frames')
 
 
@@ -122,7 +125,8 @@ class MeanAnalysis(Analysis):
                 self.Call = self.C[:,self.frame-window:self.frame]
             
             self.putAnalysis()
-        
+        except ObjectNotFoundError:
+            logger.error('Estimates unavailable from store, droppping')
         except Empty as e:
             pass
         except Exception as e:
@@ -201,6 +205,7 @@ class MeanAnalysis(Analysis):
         '''See if we need to recalculate the coords
            Also see if we need to add components
         '''
+        t = time.time()
         if self.A is None: #initial calculation
             self.A = A
             self.dims = dims
@@ -211,6 +216,8 @@ class MeanAnalysis(Analysis):
             self.A = A
             self.dims = dims
             self.coords = self.get_contours(self.A, self.dims)
+
+        self.updateCoordsTime.append(time.time() - t)
         #return self.coords  #Not really necessary
     
 

@@ -61,8 +61,7 @@ class FileAcquirer(Acquirer):
         ''' Can be live acquistion from disk (?) #TODO
             Here just return frame from loaded data
         '''
-        #return self.data[num,:,:]
-        return self.data[10,:,:]
+        return self.data[num,:,:]
 
     def run(self):
         ''' Run indefinitely. Calls runAcquirer after checking for singals
@@ -195,7 +194,7 @@ class BehaviorAcquirer(Module):
         ''' Check for input from behavioral control
         '''
         #Faking it for now. TODO: Talk to Max about his format
-        if self.n % 100 == 0:
+        if self.n % 500 == 0:
             self.curr_stim = random.choice(self.behaviors)
             self.q_out.put({self.n:self.curr_stim})
             logger.warning('Changed stimulus! {}'.format(self.curr_stim))

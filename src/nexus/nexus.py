@@ -20,6 +20,9 @@ import signal
 from nexus.module import Spike
 from queue import Empty, Full
 
+#import nest_asyncio
+#nest_asyncio.apply()
+
 import logging
 from datetime import datetime
 
@@ -279,6 +282,8 @@ class Nexus():
                     else:
                         self.processModuleSignal(r, pollingNames[i])
                     tasks[i] = (asyncio.ensure_future(polling[i].get_async()))
+
+            print(self.limbo.notify())
 
         logger.warning('Shutting down polling')
 

@@ -71,7 +71,7 @@ class CaimanProcessor(Processor):
                    'ds_factor': 1,
                    'nb': 2,
                    'motion_correct': True,
-                   'init_batch': 5,
+                   'init_batch': 100,
                    'init_method': 'bare',
                    'normalize': True,
                    'sniper_mode': False,
@@ -83,7 +83,7 @@ class CaimanProcessor(Processor):
                    'min_num_trial': 10,
                    'show_movie': False,
                    'update_freq': 500,
-                   'minibatch_shape': 5,
+                   'minibatch_shape': 100,
                    'output': 'outputEstimates'}
         self.client.put(params_dict, 'params_dict')
         #TODO: return code    
@@ -152,6 +152,8 @@ class CaimanProcessor(Processor):
                     self.flag = True
                     logger.warning('Received run signal, begin running process')
                 elif signal == Spike.quit():
+                    print('Total number of dropped frames ', len(self.dropped_frames))
+                    print('mean time per fit frame ', np.mean(self.process_time))
                     logger.warning('Received quit signal, aborting')
                     break
                 elif signal == Spike.pause():
@@ -247,8 +249,6 @@ class CaimanProcessor(Processor):
         #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
         #f = self.onAc.estimates.C_on[:nb, :self.frame_number]
-
-        print('frame ', self.frame_number, ', C ', C[0,:])
         
         #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
