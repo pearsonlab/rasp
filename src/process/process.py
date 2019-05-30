@@ -61,7 +61,7 @@ class CaimanProcessor(Processor):
 
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'], #cwd+'/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_1.hdf5', cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -71,7 +71,7 @@ class CaimanProcessor(Processor):
                    'ds_factor': 1,
                    'nb': 2,
                    'motion_correct': True,
-                   'init_batch': 5,
+                   'init_batch': 100,
                    'init_method': 'bare',
                    'normalize': True,
                    'sniper_mode': False,
@@ -83,7 +83,7 @@ class CaimanProcessor(Processor):
                    'min_num_trial': 10,
                    'show_movie': False,
                    'update_freq': 500,
-                   'minibatch_shape': 5,
+                   'minibatch_shape': 100,
                    'output': 'outputEstimates'}
         self.client.put(params_dict, 'params_dict')
         #TODO: return code    
@@ -104,6 +104,7 @@ class CaimanProcessor(Processor):
         self.dropped_frames = []
         self.coords = None
         self.ests = None
+        self.A = None
 
         self.loadParams()
         self.params = self.client.get('params_dict')
@@ -137,21 +138,26 @@ class CaimanProcessor(Processor):
             if self.flag: #if we have received run signal
                 try: 
                     self.runProcess()
-                    if self.done:
-                        logger.info('Done running Process')
-                        print('Dropped frames: ', self.dropped_frames)
-                        print('Total number of dropped frames ', len(self.dropped_frames))
-                        print('mean time per fit frame ', np.mean(self.process_time))
-                        return
+                    # if self.done:
+                    #     logger.info('Done running Process')
+                    #     print('Dropped frames: ', self.dropped_frames)
+                    #     print('Total number of dropped frames ', len(self.dropped_frames))
+                    #     print('mean time per fit frame ', np.mean(self.process_time))
+                    #     #return
+                    total_times.append(time.time()-t)
                 except Exception as e:
                     logger.exception('What happened: {0}'.format(e))
-                    break  
+                    #break  
             try: 
                 signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
                     self.flag = True
                     logger.warning('Received run signal, begin running process')
                 elif signal == Spike.quit():
+                    print('Total number of dropped frames ', len(self.dropped_frames))
+                    print('mean time per fit frame ', np.mean(self.process_time))
+                    print('mean time per process frame ', np.mean(self.procFrame_time))
+                    print('mean time per put analysis ', np.mean(self.putAnalysis_time))
                     logger.warning('Received quit signal, aborting')
                     break
                 elif signal == Spike.pause():
@@ -163,7 +169,6 @@ class CaimanProcessor(Processor):
             except Empty as e:
                 pass #no signal from Nexus
             
-            total_times.append(time.time()-t)
         print('Processor broke, avg time per frame: ', np.mean(total_times))
         print('Processor got through ', self.frame_number, ' frames')
 
@@ -184,26 +189,29 @@ class CaimanProcessor(Processor):
         if frame is not None:
             self.done = False
             try:
-                frame = self.client.getID(frame[0][str(self.frame_number)])
-                #t = time.time()
-                frame = self._processFrame(frame, self.frame_number+init)
-                self.frame = frame.copy()
+                self.frame = self.client.getID(frame[0][str(self.frame_number)])
+                self.frame = self._processFrame(self.frame, self.frame_number+init)
+                #self.frame = frame.copy()
                 t = time.time()
-                self._fitFrame(self.frame_number+init, frame.reshape(-1, order='F'))
+                self._fitFrame(self.frame_number+init, self.frame.reshape(-1, order='F'))
                 self.process_time.append([time.time()-t])
                 #if frame_count % 5 == 0: 
+                t = time.time()
                 self.putEstimates(self.onAc.estimates, output) # currently every frame. User-specified?
-                self.frame_number += 1
+                self.putAnalysis_time.append([time.time()-t])
             except ObjectNotFoundError:
-                logger.error('Frame unavailable from store, droppping')
+                logger.error('Processor: Frame unavailable from store, droppping')
                 self.dropped_frames.append(self.frame_number)
-                self.frame_number += 1
             except KeyError as e:
-                logger.error('Key error... {0}'.format(e))
+                logger.error('Processor: Key error... {0}'.format(e))
+                # Proceed at all costs
+                self.dropped_frames.append(self.frame_number)
+            self.frame_number += 1
         else:
-            logger.error('Done with all available frames: {0}'.format(self.frame_number))
-            self.q_comm.put(None)
-            self.done = True
+            pass
+            # logger.error('Done with all available frames: {0}'.format(self.frame_number))
+            # self.q_comm.put(None)
+            # self.done = True
 
     def finalProcess(self, output):    
         if self.onAc.params.get('online', 'normalize'):
@@ -233,7 +241,7 @@ class CaimanProcessor(Processor):
         # np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
         # np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
 
-        print('mean time per frame ', np.mean(self.process_time))
+        #print('mean time per frame ', np.mean(self.process_time))
 
 
     def putEstimates(self, estimates, output):
@@ -241,26 +249,49 @@ class CaimanProcessor(Processor):
             into the output location specified
             TODO rewrite output input
         '''
-        #t = time.time()
+       
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
         #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
         #f = self.onAc.estimates.C_on[:nb, :self.frame_number]
-
-        print('frame ', self.frame_number, ', C ', C[0,:])
         
         #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
         image, cor_frame = self.makeImage()
+        dims = image.shape
+        self._updateCoords(A,dims)
+
+        # ids = self.client.random_ObjectID(4)
+        # objs = [np.array(C), A.toarray(), image, np.array(cor_frame)]
+        # for i,obj in enumerate(objs):
+        #     try:
+        #         self.client._put(obj, ids[i])
+        #         print('put time: ', time.time()-t)
+        #     except Exception as e:
+        #         logger.error('_put exception {}'.format(e))    
+        # print('total put time: ', time.time()-t)
+
         ids = []
         ids.append(self.client.put(np.array(C), str(self.frame_number)))
-        ids.append(self.client.put(A.toarray(), 'A'+str(self.frame_number)))
+        ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'image'+str(self.frame_number)))
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
         self.q_out.put(ids)
         self.q_comm.put([self.frame_number])
+    
+    def _updateCoords(self, A, dims):
+        '''See if we need to recalculate the coords
+           Also see if we need to add components
+        '''
+        if self.coords is None: #initial calculation
+            self.A = A
+            self.coords = get_contours(A, dims)
+
+        elif np.shape(A)[1] > np.shape(self.A)[1]: #Only recalc if we have new components
+            self.A = A
+            self.coords = get_contours(A, dims)
 
     def makeImage(self):
         '''Create image data for visualiation
@@ -308,13 +339,15 @@ class CaimanProcessor(Processor):
             TODO: rework logic since not accessing store directly here anymore
         '''
         try:
-            res = self.q_in.get()
+            res = self.q_in.get(timeout=0.005)
             return res
             #return self.client.get('frame')
-        except CannotGetObjectError:
-            logger.error('No frames')
-            self.done = True  #TODO: remove this, let Nexus send end signal
+        # except CannotGetObjectError:
+        #     logger.error('No frames')
         #TODO: add'l error handling
+        except Empty:
+            #logger.info('no frames for processing')
+            return None
 
 
     def _processFrame(self, frame, frame_number):

@@ -20,6 +20,9 @@ import signal
 from nexus.module import Spike
 from queue import Empty, Full
 
+#import nest_asyncio
+#nest_asyncio.apply()
+
 import logging
 from datetime import datetime
 
@@ -68,7 +71,6 @@ class Nexus():
 
         # create all data links requested from Tweak config
         self.createConnections()
-        print('Data queues: ', self.data_queues)
 
         if self.tweak.hasGUI:
             # Have to load GUI first (at least with Caiman) #TODO: Fix Caiman instead?
@@ -87,7 +89,6 @@ class Nexus():
                 #then give it to our GUI
                 self.createModule(name, m)
                 self.modules[name].setup(visual=self.modules[visualClass])
-                print('(GUI) set up '+name)
 
                 self.p_GUI = Process(target=self.modules[name].run)
                 self.p_GUI.daemon = True
@@ -105,7 +106,6 @@ class Nexus():
         # Second set up each connection b/t modules
         for name,link in self.data_queues.items():
             self.assignLink(name, link)
-        print('modules now: ', self.modules)
 
         #TODO: links multi created for visual after visual in separate process?
         #TODO: error handling for is a user tries to use q_in without defining it
@@ -158,7 +158,7 @@ class Nexus():
 
             #NOTE: Could use this for reassigning links if modules crash?
         '''
-        logger.info('Assigning link {}'.format(name))
+        #logger.info('Assigning link {}'.format(name))
         classname = name.split('.')[0]
         linktype = name.split('.')[1]
         if linktype == 'q_out':
@@ -169,7 +169,7 @@ class Nexus():
             self.modules[classname].addLink(linktype, link)
 
     def createNexus(self):
-        self._startStore(2000000000) #default size should be system-dependent
+        self._startStore(100000000000) #default size should be system-dependent
     
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
@@ -238,6 +238,9 @@ class Nexus():
                 #queue full, keep going anyway TODO: add repeat trying as async task
 
     def quit(self):
+        with open('timing/noticiations.txt', 'w') as output:
+            output.write(str(self.listing))
+        
         logger.warning('Killing child processes')
         
         for q in self.sig_queues.values():
@@ -258,6 +261,7 @@ class Nexus():
         self.destroyNexus()
 
     async def pollQueues(self):
+        self.listing = []
         gui_fut = None
         acq_fut = None
         proc_fut = None
@@ -279,6 +283,12 @@ class Nexus():
                     else:
                         self.processModuleSignal(r, pollingNames[i])
                     tasks[i] = (asyncio.ensure_future(polling[i].get_async()))
+
+            # try:
+            #     print('Store has ', len(self.limbo.get_all()), ' objects')
+            # except:
+            #     pass
+            self.listing.append(self.limbo.notify())
 
         logger.warning('Shutting down polling')
 
@@ -306,7 +316,9 @@ class Nexus():
             logger.error('Signal received from Nexus but cannot identify {}'.format(flag))
 
     def processModuleSignal(self, sig, name):
-        pass #logger.info('Received signal '+str(sig[0])+' from '+name)
+        pass
+        #if sig is not None:
+        #    logger.info('Received signal '+str(sig[0])+' from '+name)
         #TODO
 
     def destroyNexus(self):

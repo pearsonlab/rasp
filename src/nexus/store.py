@@ -8,6 +8,7 @@ import pyarrow.plasma as plasma
 from pyarrow.plasma import ObjectNotAvailable
 import subprocess
 from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
 
 import logging; logger=logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -52,6 +53,9 @@ class Limbo(StoreInterface):
         '''
         self.client = self.connectStore(self.store_loc)
 
+    def release(self):
+        self.client.disconnect()
+
     def connectStore(self, store_loc):
         ''' Connect to the store at store_loc
             Raises exception if can't connect
@@ -59,13 +63,12 @@ class Limbo(StoreInterface):
             Updates the client internal
         '''
         try:
-            self.client = plasma.connect(store_loc, '', 0)
+            self.client = plasma.connect(store_loc)
             logger.info('Successfully connected to store')
         except Exception as e:
             logger.exception('Cannot connect to store: {0}'.format(e))
             raise Exception
         return self.client
-
 
     def subscribe(self):
         ''' Subscribe to a section? of the ds for singals
@@ -85,6 +88,13 @@ class Limbo(StoreInterface):
             logger.exception('Notification error: {}'.format(e))
             raise Exception
 
+        return notification_info
+
+    def random_ObjectID(self, number=1):
+        ids = []
+        for i in range(number):
+            ids.append(plasma.ObjectID(np.random.bytes(20)))
+        return ids
 
     def put(self, object, object_name):
         ''' Put a single object referenced by its string name 
@@ -95,18 +105,17 @@ class Limbo(StoreInterface):
         object_id = None
         try:
             object_id = self.client.put(object)
-            #print('we did a plasma put: ', object_name)
             self.updateStored(object_name, object_id)
             logger.debug('object successfully stored: '+object_name)
-            #print(object_id)
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
             #raise PlasmaObjectExists
         except Exception as e:
             logger.error('Could not store object '+object_name+': {0}'.format(e))
-            #print('size ', sys.getsizeof(object), 'object_name ', object_name)
         return object_id
-    
+
+    def _put(self, obj, id):
+        return self.client.put(obj, id)
     
     def replace(self, object, object_name):
         ''' Explicitly replace an object with new data
@@ -135,34 +144,16 @@ class Limbo(StoreInterface):
         
         return object_id
 
-#    def putArray(self, data, size=1000):
-#        ''' General put for numpy array objects into the store
-#            TODO: use pandas
-#            Unknown errors
-#        '''
-#    
-#        arr = arrow.array(data)
-#        id = plasma.ObjectID(np.random.bytes(20))
-#        buf = memoryview(self.client.create(id, size))
-
-    
-    def putBuffer(self, data, data_name):
-        ''' Try to serialize the data to store as buffer
-            TODO: convert unknown data types to dicts for serializing
-                using SerializationContext
-            TODO: consider to_components for large np arrays
+    def putArray(self, data):
+        ''' General put for numpy array objects into the store
+            TODO: add pandas?
             Unknown errors
-            
-            doc: arrow.apache.org/docs/python/ipc.html Arbitrary Object Serialization
         '''
-    
-        try:
-            buf = arrow.serialize(data).to_buffer()
-        except Exception as e:
-            logger.error('Error: {}'.format(e))
-            raise Exception
+        buf = arrow.serialize(data).to_buffer()
 
-        return self.put(buf, data_name)
+
+    def _getArray(self, buf):
+        return arrow.deserialize(buf)
 
 
     def updateStored(self, object_name, object_id):
@@ -213,6 +204,9 @@ class Limbo(StoreInterface):
             logger.warning('Object {} cannot be found.'.format(object_name))
             #print(self.client.list())
             raise ObjectNotFoundError
+        elif isinstance(res, arrow.lib.Buffer):
+            logger.info('Deserializing first')
+            return self._getArray(res)
         else:
             return res
 
@@ -225,7 +219,7 @@ class Limbo(StoreInterface):
             return res
 
 
-    def delete(self, object_name):
+    def deleteName(self, object_name):
         ''' Deletes an object from the store based on name
             assumes we have id from name
             This prevents us from deleting other portions of 
@@ -242,6 +236,11 @@ class Limbo(StoreInterface):
             #print(self.client.list())
             self.stored.pop(object_name)
             
+    def delete(self, id):
+        try:
+            self.client.delete([id])
+        except Exception as e:
+            logger.error('Couldnt delete: {}'.format(e))
     
     def _delete(self, object_name):
         ''' Deletes object from store
@@ -319,5 +318,3 @@ class ObjectNotFoundError(Exception):
 
 class CannotGetObjectError(Exception):
     pass
-
-

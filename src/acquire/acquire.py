@@ -40,6 +40,8 @@ class FileAcquirer(Acquirer):
            Open file stream
            #TODO: implement more than h5 files
         '''        
+        #self.lower_priority = True
+
         self.framerate = 1/framerate 
 
         if os.path.exists(filename):
@@ -61,24 +63,21 @@ class FileAcquirer(Acquirer):
         ''' Can be live acquistion from disk (?) #TODO
             Here just return frame from loaded data
         '''
-        #return self.data[num,:,:]
-        return self.data[10,:,:]
+        return self.data[num,:,:]
 
     def run(self):
         ''' Run indefinitely. Calls runAcquirer after checking for singals
         '''
         total_times = []
+        #self.changePriority() #run once, at start of process
         while True:
             t = time.time()
             if self.flag:
                 try:
                     self.runAcquirer()
-                    if self.done:
-                        logger.info('Acquirer is done, exiting')
-                        return
                 except Exception as e:
                     logger.error('Acquirer exception during run: {}'.format(e))
-                    break 
+                    #break 
             try: 
                 signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
@@ -104,7 +103,10 @@ class FileAcquirer(Acquirer):
         '''While frames exist in location specified during setup,
            grab frame, save, put in store
         '''
-        if(self.frame_num < len(self.data)):
+        if self.done:
+            pass #logger.info('Acquirer is done, exiting')
+            #return
+        elif(self.frame_num < len(self.data)):
             frame = self.getFrame(self.frame_num)
             id = self.client.put(frame, str(self.frame_num))
             try:
@@ -195,7 +197,7 @@ class BehaviorAcquirer(Module):
         ''' Check for input from behavioral control
         '''
         #Faking it for now. TODO: Talk to Max about his format
-        if self.n % 100 == 0:
+        if self.n % 500 == 0:
             self.curr_stim = random.choice(self.behaviors)
             self.q_out.put({self.n:self.curr_stim})
             logger.warning('Changed stimulus! {}'.format(self.curr_stim))

@@ -1,3 +1,6 @@
+import logging; logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 class Module():
     '''Abstract class for a module that Nexus
        controls and interacts with.
@@ -11,6 +14,8 @@ class Module():
         self.name = name
         self.links = {}
         self.done = False #Needed?
+
+        self.lower_priority = False 
 
         # start with no explicit data queues.             
         # q_in and q_out are for passing ID information to access data in the store
@@ -101,6 +106,19 @@ class Module():
             except Empty as e:
                 pass #no signal from Nexus
         '''
+
+    def changePriority(self):
+        ''' Try to lower this module's priority
+            Only changes priority if lower_priority is set
+            TODO: Only works on unix machines. Add Windows functionality
+        '''
+        if self.lower_priority is True:
+            import os, psutil
+            p = psutil.Process(os.getpid())
+            p.nice(19) #lowest as default
+            logger.info('Lowered priority of this process: {}'.format(self.name))
+            print('Lowered ', os.getpid(), ' for ', self.name)
+
 
 class Spike():
     ''' Class containing definition of signals Nexus uses

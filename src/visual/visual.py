@@ -166,12 +166,13 @@ class CaimanVisual(Visual):
         return np.rot90(image2,1)
 
     def _threshNeuron(self, ind, thresh_r):
+        ests = self.tune[0]
         thresh = np.max(thresh_r)
         display = (255,255,255,150)
         act = np.zeros(11)
-        if self.estsAvg[ind] is not None:
-            intensity = np.max(self.estsAvg[ind])
-            act[:len(self.estsAvg[ind])] = self.estsAvg[ind]
+        if ests[ind] is not None:
+            intensity = np.max(ests[ind])
+            act[:len(ests[ind])] = ests[ind]
             if thresh > intensity: 
                 display = (255,255,255,0)
             elif np.any(act[np.where(thresh_r==0)[0]]>0.5):

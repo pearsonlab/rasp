@@ -1,9 +1,12 @@
 from nexus.module import Module, Spike
+from nexus.store import ObjectNotFoundError
 from queue import Empty
 from scipy.sparse import csc_matrix
 from skimage.measure import find_contours
 import numpy as np
 import time
+import cv2
+import colorsys
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -37,6 +40,7 @@ class MeanAnalysis(Analysis):
         self.Call = None
         self.Cx = None
         self.Cpop = None
+        self.updateCoordsTime = []
 
     def run(self):
         # ests structure: np.array([components, frames])
@@ -90,26 +94,27 @@ class MeanAnalysis(Analysis):
             res = []
             for id in ids:
                 res.append(self.client.getID(id))
-            (self.C, A, self.image, self.raw) = res
+            (self.C, self.coords, self.image, self.raw) = res
 
             # Keep internal running count 
-            self.frame += 1
+            # self.frame += 1 #DANGER
+            self.frame = self.C.shape[1]
             # From the input_stim_queue update the current stimulus (once per frame)
             self.stimInd.append(self.curr_stim)
             
             # Update coordinates (if necessary)
-            dims = self.image.shape
-            self.coords = self._updateCoords(A, dims)
-
-            # Compute coloring of neurons for processed frame
-            # Also rotate and stack as needed for plotting
-            self.raw, self.color = self.plotColorFrame()
+            # dims = self.image.shape
+            # self.coords = self._updateCoords(A, dims)
             
             # Compute tuning curves based on input stimulus
             # Just do overall average activity for now
             self.tuning_all = self.stimAvg(self.C)
             self.globalAvg = np.array(np.mean(self.tuning_all, axis=0))
             self.tune = [self.tuning_all, self.globalAvg]
+
+            # Compute coloring of neurons for processed frame
+            # Also rotate and stack as needed for plotting
+            self.raw, self.color = self.plotColorFrame()
 
             if self.frame >= self.window:
                 window = self.window
@@ -122,11 +127,12 @@ class MeanAnalysis(Analysis):
                 self.Call = self.C[:,self.frame-window:self.frame]
             
             self.putAnalysis()
-        
+        except ObjectNotFoundError:
+            logger.error('Estimates unavailable from store, droppping')
         except Empty as e:
             pass
         except Exception as e:
-            logger.exception('probably timeout {}'.format(e))
+            logger.exception('Error in analysis: {}'.format(e))
 
     def updateStim(self, stim):
         ''' Recevied new signal from Behavior Acquirer to change input stimulus
@@ -201,6 +207,7 @@ class MeanAnalysis(Analysis):
         '''See if we need to recalculate the coords
            Also see if we need to add components
         '''
+        t = time.time()
         if self.A is None: #initial calculation
             self.A = A
             self.dims = dims
@@ -211,6 +218,8 @@ class MeanAnalysis(Analysis):
             self.A = A
             self.dims = dims
             self.coords = self.get_contours(self.A, self.dims)
+
+        self.updateCoordsTime.append(time.time() - t)
         #return self.coords  #Not really necessary
     
 
