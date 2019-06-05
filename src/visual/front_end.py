@@ -410,6 +410,6 @@ class QRangeSlider(QtWidgets.QWidget):
 
 if __name__=="__main__":
     app = QtGui.QApplication(sys.argv)
-    rasp = FrontEnd(None, None )
+    rasp = FrontEnd(None,None)
     rasp.show()
     app.exec_()
