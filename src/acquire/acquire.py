@@ -3,7 +3,7 @@ import os
 import h5py
 import numpy as np
 import random
-from nexus.module import Module, Spike
+from nexus.module import Module, Spike, RunManager
 from queue import Empty
 
 import logging; logger = logging.getLogger(__name__)
@@ -68,41 +68,47 @@ class FileAcquirer(Acquirer):
     def run(self):
         ''' Run indefinitely. Calls runAcquirer after checking for singals
         '''
-        total_times = []
-        #self.changePriority() #run once, at start of process
-        while True:
-            t = time.time()
-            if self.flag:
-                try:
-                    self.runAcquirer()
-                except Exception as e:
-                    logger.error('Acquirer exception during run: {}'.format(e))
-                    #break 
-            try: 
-                signal = self.q_sig.get(timeout=0.005)
-                if signal == Spike.run(): 
-                    self.flag = True
-                    logger.warning('Received run signal, begin running acquirer')
-                elif signal == Spike.quit():
-                    logger.warning('Received quit signal, aborting')
-                    break
-                elif signal == Spike.pause():
-                    logger.warning('Received pause signal, pending...')
-                    self.flag = False
-                elif signal == Spike.resume(): #currently treat as same as run
-                    logger.warning('Received resume signal, resuming')
-                    self.flag = True
-            except Empty as e:
-                pass #no signal from Nexus
+        self.total_times = []
+
+        with RunManager(self.runAcquirer, self.q_sig) as rm:
+            print(rm)
+
+        # #self.changePriority() #run once, at start of process
+        # while True:
+        #     t = time.time()
+        #     if self.flag:
+        #         try:
+        #             self.runAcquirer()
+        #         except Exception as e:
+        #             logger.error('Acquirer exception during run: {}'.format(e))
+        #             #break 
+        #     try: 
+        #         signal = self.q_sig.get(timeout=0.005)
+        #         if signal == Spike.run(): 
+        #             self.flag = True
+        #             logger.warning('Received run signal, begin running acquirer')
+        #         elif signal == Spike.quit():
+        #             logger.warning('Received quit signal, aborting')
+        #             break
+        #         elif signal == Spike.pause():
+        #             logger.warning('Received pause signal, pending...')
+        #             self.flag = False
+        #         elif signal == Spike.resume(): #currently treat as same as run
+        #             logger.warning('Received resume signal, resuming')
+        #             self.flag = True
+        #     except Empty as e:
+        #         pass #no signal from Nexus
             
-            total_times.append(time.time()-t)
-        print('Acquire broke, avg time per frame: ', np.mean(total_times))
+            
+        print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
         print('Acquire got through ', self.frame_num, ' frames')
 
     def runAcquirer(self):
         '''While frames exist in location specified during setup,
            grab frame, save, put in store
         '''
+        t = time.time()
+
         if self.done:
             pass #logger.info('Acquirer is done, exiting')
             #return
@@ -127,6 +133,8 @@ class FileAcquirer(Acquirer):
             self.q_comm.put(None)
             self.done = True
             self.f.close()
+
+        self.total_times.append(time.time()-t)
 
 
     def saveFrame(self, frame):
