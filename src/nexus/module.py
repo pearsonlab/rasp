@@ -1,3 +1,6 @@
+from queue import Empty
+import time
+
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -124,57 +127,68 @@ class Spike():
     ''' Class containing definition of signals Nexus uses
         to communicate with its modules
         TODO: doc each of these with expected handling behavior
+        NOTE: add functionality as class objects..? Any advantage to this?
     '''
+    @staticmethod
     def run():
         return 'run'
 
+    @staticmethod
     def quit():
         return 'quit'
 
+    @staticmethod
     def pause():
         return 'pause'
 
+    @staticmethod
     def resume():
         return 'resume'
 
+    @staticmethod
     def reset(): #TODO
         return 'reset'
     
+    @staticmethod
     def load():
         return 'load'
 
 
 class RunManager():
-    def __init__(self):
+    def __init__(self, runMethod, q_sig):
         self.flag = False
+        self.runMethod = runMethod
+        self.q_sig = q_sig
 
     def __enter__(self):
-        if self.flag:
-            try:
-                self.runModule() #subfunction for running singly
-                if self.done: #TODO: require this in module?
-                    logger.info('Module is done, exiting')
-                    return
-            except Exception as e:
-                logger.error('Module exception during run: {}'.format(e))
-                #break 
-        try: 
-            signal = self.q_sig.get(timeout=1)
-            if signal == Spike.run(): 
-                self.flag = True
-                logger.warning('Received run signal, begin running')
-            elif signal == Spike.quit():
-                logger.warning('Received quit signal, aborting')
-                #self.flag = False  #FIXME
-                self.done = True
-            elif signal == Spike.pause():
-                logger.warning('Received pause signal, pending...')
-                self.flag = False
-            elif signal == Spike.resume(): #currently treat as same as run
-                logger.warning('Received resume signal, resuming')
-                self.flag = True
-        except Empty as e:
-            pass #no signal from Nexus
+        self.start = time.time()
 
-    def __exit__(self):
-        pass
+        while True:
+            if self.flag:
+                try:
+                    self.runMethod() #subfunction for running singly
+                except Exception as e:
+                    logger.error('Module exception during run: {}'.format(e))
+            try: 
+                signal = self.q_sig.get(timeout=0.005)
+                if signal == Spike.run(): 
+                    self.flag = True
+                    logger.warning('Received run signal, begin running')
+                elif signal == Spike.quit():
+                    logger.warning('Received quit signal, aborting')
+                    break
+                elif signal == Spike.pause():
+                    logger.warning('Received pause signal, pending...')
+                    self.flag = False
+                elif signal == Spike.resume(): #currently treat as same as run
+                    logger.warning('Received resume signal, resuming')
+                    self.flag = True
+            except Empty as e:
+                pass #no signal from Nexus
+        return None #Status...?
+
+
+    def __exit__(self, type, value, traceback):
+        logger.info('Ran for '+str(time.time()-self.start)+' seconds')
+        logger.warning('Exiting RunManager')
+        return None
