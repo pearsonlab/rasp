@@ -5,6 +5,7 @@ import subprocess
 from multiprocessing import Process, Queue, Manager, cpu_count
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import numpy as np
+from PyQt5 import QtGui, QtWidgets
 import pyarrow.plasma as plasma
 from importlib import import_module
 from nexus import store
