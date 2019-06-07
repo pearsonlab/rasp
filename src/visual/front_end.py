@@ -15,6 +15,7 @@ from multiprocessing import Process
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from matplotlib import cm
 from queue import Empty
+from nexus.module import Spike
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -44,6 +45,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         self.pushButton_3.clicked.connect(_call(self._runProcess)) #Tell Nexus to start
         self.pushButton_3.clicked.connect(_call(self.update)) #Update front-end graphics
+        self.pushButton_2.clicked.connect(_call(self._setup))
         self.pushButton.clicked.connect(_call(self._loadParams)) #File Dialog, then tell Nexus to load tweak
         self.checkBox.stateChanged.connect(self.update) #Show live front-end updates
         
@@ -134,9 +136,13 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         '''Run ImageProcessor in separate thread
         '''
         self.flag = True
-        self.comm.put(['run'])
+        self.comm.put([Spike.run()])
         logger.info('-------------------------   put run in comm')
         #TODO: grey out button until self.t is done, but allow other buttons to be active
+
+    def _setup(self):
+        self.comm.put([Spike.setup()])
+        self.visual.setup()
 
     def _loadTweak(self, file):
         self.comm.put(['load', file])

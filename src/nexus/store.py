@@ -6,6 +6,7 @@ import pyarrow as arrow
 from pyarrow import PlasmaObjectExists
 import pyarrow.plasma as plasma
 from pyarrow.plasma import ObjectNotAvailable
+from pyarrow.lib import ArrowIOError
 import subprocess
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
@@ -84,6 +85,8 @@ class Limbo(StoreInterface):
         try:
             notification_info = self.client.get_next_notification()
             recv_objid, recv_dsize, recv_msize = notification_info
+        except ArrowIOError as e:
+            notification_info = None
         except Exception as e:
             logger.exception('Notification error: {}'.format(e))
             raise Exception

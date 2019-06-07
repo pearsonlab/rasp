@@ -1,4 +1,4 @@
-from nexus.module import Module, Spike
+from nexus.module import Module, Spike, RunManager
 from nexus.store import ObjectNotFoundError
 from queue import Empty
 from scipy.sparse import csc_matrix
@@ -43,44 +43,46 @@ class MeanAnalysis(Analysis):
         self.updateCoordsTime = []
 
     def run(self):
+        with RunManager(self.runAvg, self.setup, self.q_sig) as rm:
+            logger.info(rm)
         # ests structure: np.array([components, frames])
-        total_times = []
-        while True:
-            t = time.time()
-            if self.flag:
-                try:
-                    self.runAvg()
-                    if self.done:
-                        logger.info('Analysis is done, exiting')
-                        return
-                except Exception as e:
-                    logger.error('Analysis exception during run: {}'.format(e))
-                    break 
-            try: 
-                signal = self.q_sig.get(timeout=0.005)
-                if signal == Spike.run(): 
-                    self.flag = True
-                    logger.warning('Received run signal, begin running')
-                elif signal == Spike.quit():
-                    logger.warning('Received quit signal, aborting')
-                    break    
-                elif signal == Spike.pause():
-                    logger.warning('Received pause signal, pending...')
-                    self.flag = False
-                elif signal == Spike.resume(): #currently treat as same as run
-                    logger.warning('Received resume signal, resuming')
-                    self.flag = True 
-            except Empty as e:
-                pass #no signal from Nexus
-            try: 
-                sig = self.links['input_stim_queue'].get(timeout=0.005)
-                self.updateStim(sig)
-            except Empty as e:
-                pass #no change in input stimulus
-                #TODO: other errors
+        # total_times = []
+        # while True:
+        #     t = time.time()
+        #     if self.flag:
+        #         try:
+        #             self.runAvg()
+        #             if self.done:
+        #                 logger.info('Analysis is done, exiting')
+        #                 return
+        #         except Exception as e:
+        #             logger.error('Analysis exception during run: {}'.format(e))
+        #             break 
+        #     try: 
+        #         signal = self.q_sig.get(timeout=0.005)
+        #         if signal == Spike.run(): 
+        #             self.flag = True
+        #             logger.warning('Received run signal, begin running')
+        #         elif signal == Spike.quit():
+        #             logger.warning('Received quit signal, aborting')
+        #             break    
+        #         elif signal == Spike.pause():
+        #             logger.warning('Received pause signal, pending...')
+        #             self.flag = False
+        #         elif signal == Spike.resume(): #currently treat as same as run
+        #             logger.warning('Received resume signal, resuming')
+        #             self.flag = True 
+        #     except Empty as e:
+        #         pass #no signal from Nexus
+        #     try: 
+        #         sig = self.links['input_stim_queue'].get(timeout=0.005)
+        #         self.updateStim(sig)
+        #     except Empty as e:
+        #         pass #no change in input stimulus
+        #         #TODO: other errors
                     
-            total_times.append(time.time()-t)
-        print('Analysis broke, avg time per frame: ', np.mean(total_times))
+        #     total_times.append(time.time()-t)
+        #print('Analysis broke, avg time per frame: ', np.mean(total_times))
         print('Analysis got through ', self.frame, ' frames')
 
 

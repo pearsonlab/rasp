@@ -2,7 +2,7 @@ import sys
 import os
 import time
 import subprocess
-from multiprocessing import Process, Queue, Manager, cpu_count
+from multiprocessing import Process, Queue, Manager, cpu_count, set_start_method
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import numpy as np
 from PyQt5 import QtGui, QtWidgets
@@ -91,7 +91,7 @@ class Nexus():
                 self.createModule(name, m)
                 self.modules[name].setup(visual=self.modules[visualClass])
 
-                self.p_GUI = Process(target=self.modules[name].run)
+                self.p_GUI = Process(target=self.modules[name].run, name=name)
                 self.p_GUI.daemon = True
                 self.p_GUI.start()
 
@@ -108,8 +108,7 @@ class Nexus():
         for name,link in self.data_queues.items():
             self.assignLink(name, link)
 
-        #TODO: links multi created for visual after visual in separate process?
-        #TODO: error handling for is a user tries to use q_in without defining it
+        #TODO: error handling for if a user tries to use q_in without defining it
 
     def createModule(self, name, module):
         ''' Function to instantiate module, add signal and comm Links,
@@ -118,7 +117,7 @@ class Nexus():
         # Instantiate selected class
         mod = import_module(module.packagename)
         clss = getattr(mod, module.classname)
-        instance = clss(module.name)
+        instance = clss(module.name, **module.options)
 
         # Add link to Limbo store
         instance.setStore(store.Limbo(module.name))
@@ -128,7 +127,7 @@ class Nexus():
         q_sig = Link(module.name+'_sig', self.name, module.name)
         self.comm_queues.update({q_comm.name:q_comm})
         self.sig_queues.update({q_sig.name:q_sig})
-        instance.setLinks(q_comm, q_sig)
+        instance.setCommLinks(q_comm, q_sig)
 
         # Update information
         self.modules.update({name:instance})
@@ -187,16 +186,16 @@ class Nexus():
 
         self.flags.update({'quit':False, 'run':False, 'load':False})
 
-    def setupAll(self):
-        '''Setup all modules
-        '''
-        for name,m in self.tweak.modules.items(): # m is TweakModule 
-            try: #self.modules[name] is the module instance
-                self.modules[name].setup(**m.options)
-            except Exception as e:
-                logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
+    # def setupAll(self):
+    #     '''Setup all modules
+    #     '''
+    #     for name,m in self.tweak.modules.items(): # m is TweakModule 
+    #         try: #self.modules[name] is the module instance
+    #             self.modules[name].setup(**m.options)
+    #         except Exception as e:
+    #             logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
 
-        logger.info('Finished setup for all modules')
+    #     logger.info('Finished setup for all modules')
 
     def runModule(self, module):
         '''Run the module continually; for in separate process
@@ -209,21 +208,23 @@ class Nexus():
         '''
         for name,m in self.modules.items(): #m accesses the specific module instance
             if 'GUI' not in name: #GUI already started
-                p = Process(target=self.runModule, args=(m,))
+                p = Process(target=self.runModule, name=name, args=(m,))
                 p.daemon = True
                 self.processes.append(p)
                 #TODO: os.nice() for priority?
+
+        self.start()
 
         loop = asyncio.get_event_loop()
 
         signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
         for s in signals:
             loop.add_signal_handler(
-                s, lambda s=s: asyncio.create_task(stop_polling(s, loop)))
+                s, lambda s=s: asyncio.ensure_future(self.stop_polling(s, loop))) #TODO
 
         loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
 
-    def run(self):
+    def start(self):
         logger.info('Starting processes')
         self.t = time.time()
         
@@ -231,10 +232,18 @@ class Nexus():
             print(p)
             p.start()
 
+    def setup(self):
+        for q in self.sig_queues.values():
+            try:
+                q.put_nowait(Spike.setup())
+            except Full:
+                logger.warning('Signal queue'+q.name+'is full')
+
+    def run(self):
         for q in self.sig_queues.values():
             try:
                 q.put_nowait(Spike.run())
-            except Full as f:
+            except Full:
                 logger.warning('Signal queue'+q.name+'is full')
                 #queue full, keep going anyway TODO: add repeat trying as async task
 
@@ -247,8 +256,8 @@ class Nexus():
         for q in self.sig_queues.values():
             try:
                 q.put_nowait(Spike.quit())
-            except Full as e:
-                logger.warning('Signal queue '+q.name+' full, cannot tell it to quit')
+            except Full as f:
+                logger.warning('Signal queue '+q.name+' full, cannot tell it to quit: {}'.format(f))
 
         self.processes.append(self.p_GUI)
         for p in self.processes:
@@ -285,10 +294,6 @@ class Nexus():
                         self.processModuleSignal(r, pollingNames[i])
                     tasks[i] = (asyncio.ensure_future(polling[i].get_async()))
 
-            # try:
-            #     print('Store has ', len(self.limbo.get_all()), ' objects')
-            # except:
-            #     pass
             self.listing.append(self.limbo.notify())
 
         logger.warning('Shutting down polling')
@@ -296,13 +301,17 @@ class Nexus():
     def processGuiSignal(self, flag):
         '''Receive flags from the Front End as user input
             List of flags: 0 = run(), 1 = quit, 2 = load tweak
+            TODO: Not all needed
         '''
         logger.info('Received signal from GUI: '+flag[0])
-        if flag[0] in self.flags.keys():
+        if flag[0]:
             if flag[0] == Spike.run():
                 logger.info('Begin run!')
-                self.flags['run'] = True
+                #self.flags['run'] = True
                 self.run()
+            elif flag[0] == Spike.setup():
+                logger.info('Running setup')
+                self.setup()
             elif flag[0] == Spike.quit():
                 logger.warning('Quitting the program!')
                 self.flags['quit'] = True
@@ -357,7 +366,9 @@ class Nexus():
         except Exception as e:
             logger.exception('Store cannot be started: {0}'.format(e))
 
-    async def stop_polling(signal, loop):
+    async def stop_polling(self, signal, loop):
+        ''' TODO: update asyncio library calls
+        '''
         logging.info(f'Received exit signal {signal.name}...')
         
         tasks = [t for t in asyncio.all_tasks() if t is not
@@ -515,13 +526,11 @@ class MultiAsyncQueue(AsyncQueue):
 
 
 if __name__ == '__main__':
+    set_start_method('fork')
+
     nexus = Nexus('Nexus')
     nexus.createNexus()
-    nexus.setupAll()
-    
-    #cwd = os.getcwd()
-    #nexus.setupAcquirer(cwd+'/../data/Eva/zf1.h5')
-    
+    #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
     
     
