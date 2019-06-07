@@ -43,7 +43,7 @@ class MeanAnalysis(Analysis):
         self.updateCoordsTime = []
 
     def run(self):
-        with RunManager(self.runAvg, self.setup, self.q_sig) as rm:
+        with RunManager(self.runAvg, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
         # ests structure: np.array([components, frames])
         # total_times = []
@@ -156,7 +156,7 @@ class MeanAnalysis(Analysis):
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame)))
 
         self.q_out.put(ids)
-        self.q_comm.put([self.frame])
+        #self.q_comm.put([self.frame])
 
     def stimAvg(self, ests):
         ''' Using stimInd as mask, average ests across each input stimulus

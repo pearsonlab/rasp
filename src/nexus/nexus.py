@@ -185,17 +185,7 @@ class Nexus():
         self.loadTweak() #TODO: filename?
 
         self.flags.update({'quit':False, 'run':False, 'load':False})
-
-    # def setupAll(self):
-    #     '''Setup all modules
-    #     '''
-    #     for name,m in self.tweak.modules.items(): # m is TweakModule 
-    #         try: #self.modules[name] is the module instance
-    #             self.modules[name].setup(**m.options)
-    #         except Exception as e:
-    #             logger.error('Exception in setting up module {}'.format(name)+': {}'.format(e))
-
-    #     logger.info('Finished setup for all modules')
+        self.allowStart = False
 
     def runModule(self, module):
         '''Run the module continually; for in separate process
@@ -240,12 +230,13 @@ class Nexus():
                 logger.warning('Signal queue'+q.name+'is full')
 
     def run(self):
-        for q in self.sig_queues.values():
-            try:
-                q.put_nowait(Spike.run())
-            except Full:
-                logger.warning('Signal queue'+q.name+'is full')
-                #queue full, keep going anyway TODO: add repeat trying as async task
+        if self.allowStart:
+            for q in self.sig_queues.values():
+                try:
+                    q.put_nowait(Spike.run())
+                except Full:
+                    logger.warning('Signal queue'+q.name+'is full')
+                    #queue full, keep going anyway TODO: add repeat trying as async task
 
     def quit(self):
         with open('timing/noticiations.txt', 'w') as output:
@@ -272,6 +263,7 @@ class Nexus():
 
     async def pollQueues(self):
         self.listing = []
+        self.moduleStates = dict.fromkeys(self.modules.keys())
         gui_fut = None
         acq_fut = None
         proc_fut = None
@@ -289,20 +281,20 @@ class Nexus():
                 if t in done or polling[i].status == 'done': #catch tasks that complete await wait/gather
                     r = polling[i].result
                     if 'GUI' in pollingNames[i]:
-                        self.processGuiSignal(r)
+                        self.processGuiSignal(r, pollingNames[i])
                     else:
                         self.processModuleSignal(r, pollingNames[i])
                     tasks[i] = (asyncio.ensure_future(polling[i].get_async()))
 
-            self.listing.append(self.limbo.notify())
+            #self.listing.append(self.limbo.notify())
 
         logger.warning('Shutting down polling')
 
-    def processGuiSignal(self, flag):
+    def processGuiSignal(self, flag, name):
         '''Receive flags from the Front End as user input
-            List of flags: 0 = run(), 1 = quit, 2 = load tweak
             TODO: Not all needed
         '''
+        name = name.split('_')[0]
         logger.info('Received signal from GUI: '+flag[0])
         if flag[0]:
             if flag[0] == Spike.run():
@@ -312,6 +304,9 @@ class Nexus():
             elif flag[0] == Spike.setup():
                 logger.info('Running setup')
                 self.setup()
+            elif flag[0] == Spike.ready():
+                logger.info('GUI ready')
+                self.moduleStates[name] = flag[0]
             elif flag[0] == Spike.quit():
                 logger.warning('Quitting the program!')
                 self.flags['quit'] = True
@@ -319,18 +314,21 @@ class Nexus():
             elif flag[0] == Spike.load():
                 logger.info('Loading Tweak config from file '+flag[1])
                 self.loadTweak(flag[1])
-            elif flag[0] == Spike.stop():
-                logger.info('Stopping processes')
-                # TODO. Also pause, resume, reset
+            elif flag[0] == Spike.pause():
+                logger.info('Pausing processes')
+                # TODO. Alsoresume, reset
         else:
             logger.error('Signal received from Nexus but cannot identify {}'.format(flag))
 
     def processModuleSignal(self, sig, name):
-        pass
-        #if sig is not None:
-        #    logger.info('Received signal '+str(sig[0])+' from '+name)
-        #TODO
-
+        if sig is not None:
+            logger.info('Received signal '+str(sig[0])+' from '+name)
+            if sig[0]==Spike.ready():
+                self.moduleStates[name.split('_')[0]] = sig[0]
+                if all(val==Spike.ready() for val in self.moduleStates.values()):
+                    self.allowStart = True      #TODO: replace with q_sig to FE/Visual
+                    logger.info('Allowing start')
+            
     def destroyNexus(self):
         ''' Method that calls the internal method
             to kill the process running the store (plasma server)

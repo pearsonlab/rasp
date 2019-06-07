@@ -140,16 +140,21 @@ class Spike():
     def setup():
         return 'setup'
 
+    @staticmethod
+    def ready():
+        return 'ready'
+
 
 class RunManager():
     ''' TODO: Update logger messages with module's name
     '''
-    def __init__(self, runMethod, setup, q_sig):
+    def __init__(self, runMethod, setup, q_sig, q_comm):
         self.run = False
         self.config = False
         self.runMethod = runMethod
         self.setup = setup
         self.q_sig = q_sig
+        self.q_comm = q_comm
 
     def __enter__(self):
         self.start = time.time()
@@ -163,6 +168,7 @@ class RunManager():
             elif self.config:
                 try:
                     self.setup() #subfunction for setting up the module
+                    self.q_comm.put([Spike.ready()])
                 except Exception as e:
                     logger.error('Module exception during setup: {}'.format(e))  
                     raise Exception

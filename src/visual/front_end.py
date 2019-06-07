@@ -135,7 +135,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def _runProcess(self):
         '''Run ImageProcessor in separate thread
         '''
-        self.flag = True
+        #self.flag = True
         self.comm.put([Spike.run()])
         logger.info('-------------------------   put run in comm')
         #TODO: grey out button until self.t is done, but allow other buttons to be active
@@ -187,7 +187,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
-            logger.error('Error in {}'.format(e))
+            logger.error('Error in FrontEnd update Video:  {}'.format(e))
 
         #print('update Video time ', time.time()-t)
 
@@ -200,11 +200,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         penW=pyqtgraph.mkPen(width=2, color='w')
         penR=pyqtgraph.mkPen(width=2, color='r')
         C = None
+        Cx = None
         tune = None
         try:
             (Cx, C, Cpop, tune) = self.visual.getCurves()
+        except TypeError:
+            pass
         except Exception as e:
-            logger.error('output does not yet exist. error: {}'.format(e))
+            logger.error('Output does not likely exist. Error: {}'.format(e))
 
         if(C is not None and Cx is not None):
             self.c1.setData(Cx, Cpop, pen=penW)

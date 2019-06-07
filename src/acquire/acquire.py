@@ -43,7 +43,6 @@ class FileAcquirer(Acquirer):
            #TODO: implement more than h5 files
         '''        
         #self.lower_priority = True
-        logger.info('------------------filename '+self.filename)
 
         if os.path.exists(self.filename):
             print('Looking for ', self.filename)
@@ -71,7 +70,7 @@ class FileAcquirer(Acquirer):
         '''
         self.total_times = []
 
-        with RunManager(self.runAcquirer, self.setup, self.q_sig) as rm:
+        with RunManager(self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
             print(rm)
 
         # #self.changePriority() #run once, at start of process
@@ -118,7 +117,7 @@ class FileAcquirer(Acquirer):
             id = self.client.put(frame, str(self.frame_num))
             try:
                 self.q_out.put([{str(self.frame_num):id}])
-                self.q_comm.put([self.frame_num]) #TODO: needed?
+                #self.q_comm.put([self.frame_num]) #TODO: needed?
                 self.frame_num += 1
 
                 self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?               
@@ -178,7 +177,7 @@ class BehaviorAcquirer(Module):
     def run(self):
         ''' Run continuously, waiting for input
         '''
-        with RunManager(self.getInput, self.setup, self.q_sig) as rm:
+        with RunManager(self.getInput, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
         # while True:
         #     if self.flag:

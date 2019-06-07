@@ -132,7 +132,7 @@ class CaimanProcessor(Processor):
         self.shape_time = []
         self.flag = False
 
-        with RunManager(self.runProcess, self.setup, self.q_sig) as rm:
+        with RunManager(self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
 
         # total_times = []
@@ -283,7 +283,7 @@ class CaimanProcessor(Processor):
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
         self.q_out.put(ids)
-        self.q_comm.put([self.frame_number])
+        #self.q_comm.put([self.frame_number])
     
     def _updateCoords(self, A, dims):
         '''See if we need to recalculate the coords

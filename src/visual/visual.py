@@ -9,7 +9,7 @@ from PyQt5 import QtGui, QtWidgets
 import pyqtgraph as pg
 from visual.front_end import FrontEnd
 import sys
-from nexus.module import Module
+from nexus.module import Module, Spike
 from queue import Empty
 
 import logging; logger = logging.getLogger(__name__)
@@ -28,6 +28,8 @@ class DisplayVisual(Module):
         self.rasp = FrontEnd(self.visual, self.q_comm)
         self.rasp.show()
         logger.info('GUI ready')
+        self.q_comm.put([Spike.ready()])
+        self.visual.q_comm.put([Spike.ready()])
         self.app.exec_()
         logger.info('Done running GUI')
 
@@ -149,21 +151,24 @@ class CaimanVisual(Visual):
             based on threshold value of sliders (user-selected)
         '''
         image = self.raw
-        image2 = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
-        image2[...,3] = 100
-        if self.coords is not None:
-            coords = [o['coordinates'] for o in self.coords]
-            for i,c in enumerate(coords):
-                c = np.array(c)
-                ind = c[~np.isnan(c).any(axis=1)].astype(int)
-                cv2.fillConvexPoly(image2, ind, self._threshNeuron(i, thresh_r))
+        if image is not None:
+            image2 = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
+            image2[...,3] = 100
+            if self.coords is not None:
+                coords = [o['coordinates'] for o in self.coords]
+                for i,c in enumerate(coords):
+                    c = np.array(c)
+                    ind = c[~np.isnan(c).any(axis=1)].astype(int)
+                    cv2.fillConvexPoly(image2, ind, self._threshNeuron(i, thresh_r))
 
-        if self.color.shape[0] < self.color.shape[1]:
-            self.flip = True
-        else:
-            np.swapaxes(image2,0,1)
-        #TODO: add rotation to user preferences and/or user clickable input
-        return np.rot90(image2,1)
+            if self.color.shape[0] < self.color.shape[1]:
+                self.flip = True
+            else:
+                np.swapaxes(image2,0,1)
+            #TODO: add rotation to user preferences and/or user clickable input
+            return np.rot90(image2,1)
+        else: 
+            return None
 
     def _threshNeuron(self, ind, thresh_r):
         ests = self.tune[0]
