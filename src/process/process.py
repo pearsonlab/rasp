@@ -131,11 +131,10 @@ class CaimanProcessor(Processor):
         self.detect_time = []
         self.shape_time = []
         self.flag = False
+        self.total_times = []
 
         with RunManager(self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
-
-        # total_times = []
 
         # while True:
         #     t = time.time()
@@ -173,7 +172,7 @@ class CaimanProcessor(Processor):
         #     except Empty as e:
         #         pass #no signal from Nexus
             
-        # print('Processor broke, avg time per frame: ', np.mean(total_times))
+        print('Processor broke, avg time per frame: ', np.mean(self.total_times))
         print('Processor got through ', self.frame_number, ' frames')
 
     def runProcess(self):
@@ -191,6 +190,7 @@ class CaimanProcessor(Processor):
         frame = self._checkFrames()
         
         if frame is not None:
+            t = time.time()
             self.done = False
             try:
                 self.frame = self.client.getID(frame[0][str(self.frame_number)])
@@ -211,6 +211,7 @@ class CaimanProcessor(Processor):
                 # Proceed at all costs
                 self.dropped_frames.append(self.frame_number)
             self.frame_number += 1
+            self.total_times.append(time.time()-t)
         else:
             pass
             # logger.error('Done with all available frames: {0}'.format(self.frame_number))

@@ -171,8 +171,7 @@ class BehaviorAcquirer(Module):
             except Exception as e:
                 logger.exception('File cannot be loaded. {0}'.format(e))
         else:
-            self.behaviors = ['0', '1', '2', '3', '4', 
-                                '5', '6', '7', '8', '9'] #10 sets of input stimuli
+            self.behaviors = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] #10 sets of input stimuli
 
     def run(self):
         ''' Run continuously, waiting for input

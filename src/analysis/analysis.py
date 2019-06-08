@@ -43,10 +43,11 @@ class MeanAnalysis(Analysis):
         self.updateCoordsTime = []
 
     def run(self):
+        self.total_times = []
+
         with RunManager(self.runAvg, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
         # ests structure: np.array([components, frames])
-        # total_times = []
         # while True:
         #     t = time.time()
         #     if self.flag:
@@ -82,7 +83,7 @@ class MeanAnalysis(Analysis):
         #         #TODO: other errors
                     
         #     total_times.append(time.time()-t)
-        #print('Analysis broke, avg time per frame: ', np.mean(total_times))
+        print('Analysis broke, avg time per frame: ', np.mean(self.total_times))
         print('Analysis got through ', self.frame, ' frames')
 
 
@@ -90,6 +91,13 @@ class MeanAnalysis(Analysis):
         ''' Take numpy estimates and frame_number
             Create X and Y for plotting
         '''
+        t = time.time()
+        try: 
+            sig = self.links['input_stim_queue'].get(timeout=0.005)
+            self.updateStim(sig)
+        except Empty as e:
+            pass #no change in input stimulus
+            #TODO: other errors
         try:
             #TODO: add error handling for if we received some but not all of these
             ids = self.q_in.get(timeout=0.005)
@@ -103,10 +111,6 @@ class MeanAnalysis(Analysis):
             self.frame = self.C.shape[1]
             # From the input_stim_queue update the current stimulus (once per frame)
             self.stimInd.append(self.curr_stim)
-            
-            # Update coordinates (if necessary)
-            # dims = self.image.shape
-            # self.coords = self._updateCoords(A, dims)
             
             # Compute tuning curves based on input stimulus
             # Just do overall average activity for now
@@ -129,6 +133,7 @@ class MeanAnalysis(Analysis):
                 self.Call = self.C[:,self.frame-window:self.frame]
             
             self.putAnalysis()
+            self.total_times.append(time.time()-t)
         except ObjectNotFoundError:
             logger.error('Estimates unavailable from store, droppping')
         except Empty as e:
@@ -140,7 +145,8 @@ class MeanAnalysis(Analysis):
         ''' Recevied new signal from Behavior Acquirer to change input stimulus
             [possibly other action items here...? Validation?]
         '''
-        self.curr_stim = stim
+        # stim in format n:value
+        self.curr_stim = list(stim.values())[0]
 
     def putAnalysis(self):
         ''' Throw things to DS and put IDs in queue for Visual
@@ -162,10 +168,11 @@ class MeanAnalysis(Analysis):
         ''' Using stimInd as mask, average ests across each input stimulus
         '''
         estsAvg = []
+        stimInd = np.array(self.stimInd[:ests.shape[1]])
         for i in range(ests.shape[0]): #for each component
             tmpList = []
-            for j in range(int(np.floor(ests.shape[1]/100))+1): #average over stim window
-                tmp = np.mean(ests[int(i)][int(j)*100:int(j)*100+100])
+            for j in range(0, self.num_stim):
+                tmp = np.mean(ests[i][np.where(stimInd == j)[0]])
                 tmpList.append(tmp)
             estsAvg.append(tmpList)
         self.estsAvg = np.array(estsAvg)             

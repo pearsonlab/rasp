@@ -64,7 +64,8 @@ class Limbo(StoreInterface):
             Updates the client internal
         '''
         try:
-            self.client = plasma.connect(store_loc)
+            #self.client = plasma.connect(store_loc)
+            self.client = plasma.connect(store_loc, '', 0)
             logger.info('Successfully connected to store')
         except Exception as e:
             logger.exception('Cannot connect to store: {0}'.format(e))
