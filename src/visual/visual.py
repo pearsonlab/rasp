@@ -119,7 +119,7 @@ class CaimanVisual(Visual):
     def getFrames(self):
         ''' Return the raw and colored frames for display
         '''
-        return self.raw, self.color
+        return self.raw, np.rot90(self.color,1)
 
     def selectNeurons(self, x, y):
         ''' x and y are coordinates
