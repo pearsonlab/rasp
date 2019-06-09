@@ -169,7 +169,7 @@ class Nexus():
             self.modules[classname].addLink(linktype, link)
 
     def createNexus(self):
-        self._startStore(100000000000) #default size should be system-dependent
+        self._startStore(10000000000) #default size should be system-dependent
     
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
@@ -181,6 +181,8 @@ class Nexus():
         self.modules = {}
         self.flags = {}
         self.processes = []
+
+        self.startWatcher()
 
         self.loadTweak() #TODO: filename?
 
@@ -213,6 +215,16 @@ class Nexus():
                 s, lambda s=s: asyncio.ensure_future(self.stop_polling(s, loop))) #TODO
 
         loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
+
+    def startWatcher(self):
+        self.watcher = store.Watcher('watcher', store.Limbo('watcher'))
+        q_sig = Link('watcher_sig', self.name, 'watcher')
+        self.watcher.setLinks(q_sig)
+        self.sig_queues.update({q_sig.name:q_sig})
+
+        self.p_watch = Process(target=self.watcher.run, name='watcher_process')
+        self.p_watch.daemon = True
+        self.p_watch.start()
 
     def start(self):
         logger.info('Starting processes')
