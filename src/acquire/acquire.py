@@ -27,14 +27,16 @@ class FileAcquirer(Acquirer):
     '''Class to import data from files and output
        frames in a buffer, or discrete.
     '''
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, filename=None, framerate=30, **kwargs):
         super().__init__(*args, **kwargs)
         self.frame_num = 0
         self.data = None
         self.done = False
         self.flag = False
+        self.filename = filename
+        self.framerate = 1/framerate 
 
-    def setup(self, filename, framerate=30):
+    def setup(self):
         '''Get file names from config or user input
             Also get specified framerate, or default is 10 Hz
            Open file stream
@@ -42,20 +44,18 @@ class FileAcquirer(Acquirer):
         '''        
         #self.lower_priority = True
 
-        self.framerate = 1/framerate 
-
-        if os.path.exists(filename):
-            print('Looking for ', filename)
-            n, ext = os.path.splitext(filename)[:2]
+        if os.path.exists(self.filename):
+            print('Looking for ', self.filename)
+            n, ext = os.path.splitext(self.filename)[:2]
             if ext == '.h5' or ext == '.hdf5':
-                with h5py.File(filename, 'r') as file:
+                with h5py.File(self.filename, 'r') as file:
                     keys = list(file.keys())
                     self.data = file[keys[0]].value #only one dset per file atm
                         #frames = np.array(dset).squeeze() #not needed?
                     print('data is ', len(self.data))
         else: raise FileNotFoundError
 
-        save_file = filename.split('.')[0]+'_backup'+'.h5' #TODO: make parameter in setup ?
+        save_file = self.filename.split('.')[0]+'_backup'+'.h5' #TODO: make parameter in setup ?
         self.f = h5py.File(save_file, 'w', libver='latest')
         self.dset = self.f.create_dataset("default", (len(self.data),)) #TODO: need to set maxsize to none?
 
@@ -70,7 +70,7 @@ class FileAcquirer(Acquirer):
         '''
         self.total_times = []
 
-        with RunManager(self.runAcquirer, self.q_sig) as rm:
+        with RunManager(self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
             print(rm)
 
         # #self.changePriority() #run once, at start of process
@@ -117,7 +117,7 @@ class FileAcquirer(Acquirer):
             id = self.client.put(frame, str(self.frame_num))
             try:
                 self.q_out.put([{str(self.frame_num):id}])
-                self.q_comm.put([self.frame_num]) #TODO: needed?
+                #self.q_comm.put([self.frame_num]) #TODO: needed?
                 self.frame_num += 1
 
                 self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?               
@@ -154,52 +154,56 @@ class BehaviorAcquirer(Module):
         TODO: needs to be associated with time, then frame number
     '''
 
-    def setup(self, param_file=None):
+    def __init__(self, *args, param_file=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.param_file = param_file
+
+    def setup(self):
         ''' Pre-define set of input stimuli
         '''
-        self.flag = False
         self.n = 0 #our fake frame number here
         #TODO: Consider global frame_number in store...or signal from Nexus
 
         #TODO: Convert this to Tweak and load from there
-        if param_file is not None:
+        if self.param_file is not None:
             try:
                 params_dict = None #self._load_params_from_file(param_file)
             except Exception as e:
                 logger.exception('File cannot be loaded. {0}'.format(e))
         else:
-            self.behaviors = ['0', '1', '2', '3', '4', 
-                                '5', '6', '7', '8', '9'] #10 sets of input stimuli
+            self.behaviors = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] #10 sets of input stimuli
 
     def run(self):
         ''' Run continuously, waiting for input
         '''
-        while True:
-            if self.flag:
-                try:
-                    self.getInput()
-                    if self.done:
-                        logger.info('BehaviorAcquirer is done, exiting')
-                        return
-                except Exception as e:
-                    logger.error('BehaviorAcquirer exception during run: {}'.format(e))
-                    break 
-            try: 
-                signal = self.q_sig.get(timeout=0.005)
-                if signal == Spike.run(): 
-                    self.flag = True
-                    logger.warning('Received run signal, begin running')
-                elif signal == Spike.quit():
-                    logger.warning('Received quit signal, aborting')
-                    break
-                elif signal == Spike.pause():
-                    logger.warning('Received pause signal, pending...')
-                    self.flag = False
-                elif signal == Spike.resume(): #currently treat as same as run
-                    logger.warning('Received resume signal, resuming')
-                    self.flag = True
-            except Empty as e:
-                pass #no signal from Nexus
+        with RunManager(self.getInput, self.setup, self.q_sig, self.q_comm) as rm:
+            logger.info(rm)
+        # while True:
+        #     if self.flag:
+        #         try:
+        #             self.getInput()
+        #             if self.done:
+        #                 logger.info('BehaviorAcquirer is done, exiting')
+        #                 return
+        #         except Exception as e:
+        #             logger.error('BehaviorAcquirer exception during run: {}'.format(e))
+        #             break 
+        #     try: 
+        #         signal = self.q_sig.get(timeout=0.005)
+        #         if signal == Spike.run(): 
+        #             self.flag = True
+        #             logger.warning('Received run signal, begin running')
+        #         elif signal == Spike.quit():
+        #             logger.warning('Received quit signal, aborting')
+        #             break
+        #         elif signal == Spike.pause():
+        #             logger.warning('Received pause signal, pending...')
+        #             self.flag = False
+        #         elif signal == Spike.resume(): #currently treat as same as run
+        #             logger.warning('Received resume signal, resuming')
+        #             self.flag = True
+        #     except Empty as e:
+        #         pass #no signal from Nexus
 
     def getInput(self):
         ''' Check for input from behavioral control

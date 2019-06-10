@@ -7,13 +7,12 @@ modules:
   Acquirer:
     package: acquire.acquire
     class: FileAcquirer
-    filename: data/Tolias_mesoscope_2.hdf5
-    framerate: 20
+    filename: data/Tolias_mesoscope_1.hdf5
+    framerate: 35
 
   Processor:
     package: process.process
     class: CaimanProcessor
-    config_file: data/caiman_config.txt
 
   Visual:
     package: visual.visual

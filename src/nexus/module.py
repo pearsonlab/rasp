@@ -10,12 +10,12 @@ class Module():
        Needs to have a store and links for communication
        Also needs at least a setup and run function
     '''
-    def __init__(self, name):
+    def __init__(self, name, links={}, **kwargs):
         ''' Require a name for multiple instances of the same module/class
             Create initial empty dict of Links for easier referencing
         '''
         self.name = name
-        self.links = {}
+        self.links = links
         self.done = False #Needed?
 
         self.lower_priority = False 
@@ -35,8 +35,13 @@ class Module():
         '''
         self.client = client
 
-    def setLinks(self, q_comm, q_sig):
-        ''' Set explicit links (q_comm, q_sig)
+    def setLinks(self, links):
+        ''' General full dict set for links
+        '''
+        self.links = links
+
+    def setCommLinks(self, q_comm, q_sig):
+        ''' Set explicit communication links to/from Nexus (q_comm, q_sig)
             q_comm is for messages from this module to Nexus
             q_sig is signals from Nexus and must be checked first
         '''
@@ -57,7 +62,7 @@ class Module():
         self.links.update({'q_out':self.q_out})
 
     def addLink(self, name, link):
-        ''' Function provided to add additional data links 
+        ''' Function provided to add additional data links by name
             using same form as q_in or q_out
             Must be done during registration and not during run
         '''
@@ -65,7 +70,12 @@ class Module():
         # User can then use: self.my_queue = self.links['my_queue'] in a setup fcn,
         # or continue to reference it using self.links['my_queue']
 
-    def setup(self, **kwargs):
+    def getLinks(self):
+        ''' Returns dictionary of links
+        '''
+        return self.links
+
+    def setup(self):
         ''' Essenitally the registration process
             Can also be an initialization for the module
             options is a list of options, can be empty
@@ -79,35 +89,8 @@ class Module():
         '''
         raise NotImplementedError
 
-        ''' Suggested implementation for synchronous running
+        ''' Suggested implementation for synchronous running: see RunManager class below
         TODO: define async example that checks for signals _while_ running
-        TODO: Make this a context manager
-        while True:
-            if self.flag:
-                try:
-                    self.runModule() #subfunction for running singly
-                    if self.done:
-                        logger.info('Module is done, exiting')
-                        return
-                except Exception as e:
-                    logger.error('Module exception during run: {}'.format(e))
-                    break 
-            try: 
-                signal = self.q_sig.get(timeout=1)
-                if signal == Spike.run(): 
-                    self.flag = True
-                    logger.warning('Received run signal, begin running')
-                elif signal == Spike.quit():
-                    logger.warning('Received quit signal, aborting')
-                    break
-                elif signal == Spike.pause():
-                    logger.warning('Received pause signal, pending...')
-                    self.flag = False
-                elif signal == Spike.resume(): #currently treat as same as run
-                    logger.warning('Received resume signal, resuming')
-                    self.flag = True
-            except Empty as e:
-                pass #no signal from Nexus
         '''
 
     def changePriority(self):
@@ -153,36 +136,59 @@ class Spike():
     def load():
         return 'load'
 
+    @staticmethod
+    def setup():
+        return 'setup'
+
+    @staticmethod
+    def ready():
+        return 'ready'
+
 
 class RunManager():
-    def __init__(self, runMethod, q_sig):
-        self.flag = False
+    ''' TODO: Update logger messages with module's name
+    '''
+    def __init__(self, runMethod, setup, q_sig, q_comm):
+        self.run = False
+        self.config = False
         self.runMethod = runMethod
+        self.setup = setup
         self.q_sig = q_sig
+        self.q_comm = q_comm
 
     def __enter__(self):
         self.start = time.time()
 
         while True:
-            if self.flag:
+            if self.run:
                 try:
                     self.runMethod() #subfunction for running singly
                 except Exception as e:
                     logger.error('Module exception during run: {}'.format(e))
+            elif self.config:
+                try:
+                    self.setup() #subfunction for setting up the module
+                    self.q_comm.put([Spike.ready()])
+                except Exception as e:
+                    logger.error('Module exception during setup: {}'.format(e))  
+                    raise Exception
+                self.config = False #Run once
             try: 
                 signal = self.q_sig.get(timeout=0.005)
                 if signal == Spike.run(): 
-                    self.flag = True
+                    self.run = True
                     logger.warning('Received run signal, begin running')
+                elif signal == Spike.setup():
+                    self.config = True
                 elif signal == Spike.quit():
                     logger.warning('Received quit signal, aborting')
                     break
                 elif signal == Spike.pause():
                     logger.warning('Received pause signal, pending...')
-                    self.flag = False
+                    self.run = False
                 elif signal == Spike.resume(): #currently treat as same as run
                     logger.warning('Received resume signal, resuming')
-                    self.flag = True
+                    self.run = True
             except Empty as e:
                 pass #no signal from Nexus
         return None #Status...?

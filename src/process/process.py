@@ -14,7 +14,7 @@ import caiman as cm
 from os.path import expanduser
 import os
 from queue import Empty
-from nexus.module import Module, Spike
+from nexus.module import Module, Spike, RunManager
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -37,10 +37,11 @@ class CaimanProcessor(Processor):
        interface with our pipeline.
        Uses code from caiman/source_extraction/cnmf/online_cnmf.py
     '''
-    def __init__(self, *args):
+    def __init__(self, *args, config_file=None):
         super().__init__(*args)
         self.ests = None #neural activity
         self.coords = None
+        self.param_file = config_file
 
     def loadParams(self, param_file=None):
         ''' Load parameters from file or 'defaults' into store
@@ -49,6 +50,7 @@ class CaimanProcessor(Processor):
             that CaimanProcessor needs with Nexus
         '''
         #TODO: Convert this to Tweak and load from there
+
         if param_file is not None:
             try:
                 params_dict = self._load_params_from_file(param_file)
@@ -58,7 +60,6 @@ class CaimanProcessor(Processor):
             # defaults from demo scripts; CNMFParams does not set
             # each parameter needed by default (TODO change that?)
             # TODO add parameter validation inside Tweak
-
             home = expanduser("~")
             cwd = os.getcwd()
             params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'], #cwd+'/data/Tolias_mesoscope_2.hdf5'],
@@ -94,7 +95,7 @@ class CaimanProcessor(Processor):
         '''
         return {}
 
-    def setup(self, config_file = None):
+    def setup(self):
         ''' Create OnACID object and initialize it
                 (runs initialize online)
             limboClient is a client to the data store server
@@ -106,7 +107,7 @@ class CaimanProcessor(Processor):
         self.ests = None
         self.A = None
 
-        self.loadParams()
+        self.loadParams(param_file=self.param_file)
         self.params = self.client.get('params_dict')
         
         # MUST include inital set of frames
@@ -130,46 +131,48 @@ class CaimanProcessor(Processor):
         self.detect_time = []
         self.shape_time = []
         self.flag = False
+        self.total_times = []
 
-        total_times = []
+        with RunManager(self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
+            logger.info(rm)
 
-        while True:
-            t = time.time()
-            if self.flag: #if we have received run signal
-                try: 
-                    self.runProcess()
-                    # if self.done:
-                    #     logger.info('Done running Process')
-                    #     print('Dropped frames: ', self.dropped_frames)
-                    #     print('Total number of dropped frames ', len(self.dropped_frames))
-                    #     print('mean time per fit frame ', np.mean(self.process_time))
-                    #     #return
-                    total_times.append(time.time()-t)
-                except Exception as e:
-                    logger.exception('What happened: {0}'.format(e))
-                    #break  
-            try: 
-                signal = self.q_sig.get(timeout=0.005)
-                if signal == Spike.run(): 
-                    self.flag = True
-                    logger.warning('Received run signal, begin running process')
-                elif signal == Spike.quit():
-                    print('Total number of dropped frames ', len(self.dropped_frames))
-                    print('mean time per fit frame ', np.mean(self.process_time))
-                    print('mean time per process frame ', np.mean(self.procFrame_time))
-                    print('mean time per put analysis ', np.mean(self.putAnalysis_time))
-                    logger.warning('Received quit signal, aborting')
-                    break
-                elif signal == Spike.pause():
-                    logger.warning('Received pause signal, pending...')
-                    self.flag = False
-                elif signal == Spike.resume(): #currently treat as same as run
-                    logger.warning('Received resume signal, resuming')
-                    self.flag = True
-            except Empty as e:
-                pass #no signal from Nexus
+        # while True:
+        #     t = time.time()
+        #     if self.flag: #if we have received run signal
+        #         try: 
+        #             self.runProcess()
+        #             # if self.done:
+        #             #     logger.info('Done running Process')
+        #             #     print('Dropped frames: ', self.dropped_frames)
+        #             #     print('Total number of dropped frames ', len(self.dropped_frames))
+        #             #     print('mean time per fit frame ', np.mean(self.process_time))
+        #             #     #return
+        #             total_times.append(time.time()-t)
+        #         except Exception as e:
+        #             logger.exception('What happened: {0}'.format(e))
+        #             #break  
+        #     try: 
+        #         signal = self.q_sig.get(timeout=0.005)
+        #         if signal == Spike.run(): 
+        #             self.flag = True
+        #             logger.warning('Received run signal, begin running process')
+        #         elif signal == Spike.quit():
+        #             print('Total number of dropped frames ', len(self.dropped_frames))
+        #             print('mean time per fit frame ', np.mean(self.process_time))
+        #             print('mean time per process frame ', np.mean(self.procFrame_time))
+        #             print('mean time per put analysis ', np.mean(self.putAnalysis_time))
+        #             logger.warning('Received quit signal, aborting')
+        #             break
+        #         elif signal == Spike.pause():
+        #             logger.warning('Received pause signal, pending...')
+        #             self.flag = False
+        #         elif signal == Spike.resume(): #currently treat as same as run
+        #             logger.warning('Received resume signal, resuming')
+        #             self.flag = True
+        #     except Empty as e:
+        #         pass #no signal from Nexus
             
-        print('Processor broke, avg time per frame: ', np.mean(total_times))
+        print('Processor broke, avg time per frame: ', np.mean(self.total_times))
         print('Processor got through ', self.frame_number, ' frames')
 
     def runProcess(self):
@@ -187,6 +190,7 @@ class CaimanProcessor(Processor):
         frame = self._checkFrames()
         
         if frame is not None:
+            t = time.time()
             self.done = False
             try:
                 self.frame = self.client.getID(frame[0][str(self.frame_number)])
@@ -197,7 +201,7 @@ class CaimanProcessor(Processor):
                 self.process_time.append([time.time()-t])
                 #if frame_count % 5 == 0: 
                 t = time.time()
-                self.putEstimates(self.onAc.estimates, output) # currently every frame. User-specified?
+                self.putEstimates(self.onAc.estimates, output)
                 self.putAnalysis_time.append([time.time()-t])
             except ObjectNotFoundError:
                 logger.error('Processor: Frame unavailable from store, droppping')
@@ -207,6 +211,7 @@ class CaimanProcessor(Processor):
                 # Proceed at all costs
                 self.dropped_frames.append(self.frame_number)
             self.frame_number += 1
+            self.total_times.append(time.time()-t)
         else:
             pass
             # logger.error('Done with all available frames: {0}'.format(self.frame_number))
@@ -279,7 +284,7 @@ class CaimanProcessor(Processor):
         ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
         self.q_out.put(ids)
-        self.q_comm.put([self.frame_number])
+        #self.q_comm.put([self.frame_number])
     
     def _updateCoords(self, A, dims):
         '''See if we need to recalculate the coords

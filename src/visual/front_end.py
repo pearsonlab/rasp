@@ -15,6 +15,7 @@ from multiprocessing import Process
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from matplotlib import cm
 from queue import Empty
+from nexus.module import Spike
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -44,6 +45,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         self.pushButton_3.clicked.connect(_call(self._runProcess)) #Tell Nexus to start
         self.pushButton_3.clicked.connect(_call(self.update)) #Update front-end graphics
+        self.pushButton_2.clicked.connect(_call(self._setup))
         self.pushButton.clicked.connect(_call(self._loadParams)) #File Dialog, then tell Nexus to load tweak
         self.checkBox.stateChanged.connect(self.update) #Show live front-end updates
         
@@ -133,10 +135,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def _runProcess(self):
         '''Run ImageProcessor in separate thread
         '''
-        self.flag = True
-        self.comm.put(['run'])
+        #self.flag = True
+        self.comm.put([Spike.run()])
         logger.info('-------------------------   put run in comm')
         #TODO: grey out button until self.t is done, but allow other buttons to be active
+
+    def _setup(self):
+        self.comm.put([Spike.setup()])
+        self.visual.setup()
 
     def _loadTweak(self, file):
         self.comm.put(['load', file])
@@ -181,7 +187,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
-            logger.error('Error in {}'.format(e))
+            logger.error('Error in FrontEnd update Video:  {}'.format(e))
 
         #print('update Video time ', time.time()-t)
 
@@ -194,11 +200,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         penW=pyqtgraph.mkPen(width=2, color='w')
         penR=pyqtgraph.mkPen(width=2, color='r')
         C = None
+        Cx = None
         tune = None
         try:
             (Cx, C, Cpop, tune) = self.visual.getCurves()
+        except TypeError:
+            pass
         except Exception as e:
-            logger.error('output does not yet exist. error: {}'.format(e))
+            logger.error('Output does not likely exist. Error: {}'.format(e))
 
         if(C is not None and Cx is not None):
             self.c1.setData(Cx, Cpop, pen=penW)

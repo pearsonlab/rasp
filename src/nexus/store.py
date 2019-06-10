@@ -6,9 +6,12 @@ import pyarrow as arrow
 from pyarrow import PlasmaObjectExists
 import pyarrow.plasma as plasma
 from pyarrow.plasma import ObjectNotAvailable
+from pyarrow.lib import ArrowIOError
 import subprocess
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
+from queue import Empty
+from nexus.module import Spike
 
 import logging; logger=logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -63,7 +66,8 @@ class Limbo(StoreInterface):
             Updates the client internal
         '''
         try:
-            self.client = plasma.connect(store_loc)
+            #self.client = plasma.connect(store_loc)
+            self.client = plasma.connect(store_loc, '', 0)
             logger.info('Successfully connected to store')
         except Exception as e:
             logger.exception('Cannot connect to store: {0}'.format(e))
@@ -83,7 +87,9 @@ class Limbo(StoreInterface):
     def notify(self):
         try:
             notification_info = self.client.get_next_notification()
-            recv_objid, recv_dsize, recv_msize = notification_info
+            #recv_objid, recv_dsize, recv_msize = notification_info
+        except ArrowIOError as e:
+            notification_info = None
         except Exception as e:
             logger.exception('Notification error: {}'.format(e))
             raise Exception
@@ -282,8 +288,6 @@ class Limbo(StoreInterface):
         '''
         raise NotImplementedError
 
-
-
 class HStore(StoreInterface):
     ''' Implementation of the data store on disk.
         Using dict-like structure, employs h5py via hickle
@@ -318,3 +322,59 @@ class ObjectNotFoundError(Exception):
 
 class CannotGetObjectError(Exception):
     pass
+
+import pickle
+
+class Watcher():
+    ''' Monitors the store as separate process
+    '''
+    def __init__(self, name, client):
+        self.name = name
+        self.client = client
+        self.flag = False
+
+        self.client.subscribe()
+        self.n = 0
+
+    def setLinks(self, links):
+        self.q_sig = links
+
+    def run(self):
+        while True:
+            if self.flag:
+                try:
+                    self.checkStore()
+                except Exception as e:
+                    logger.error('Watcher exception during run: {}'.format(e))
+                    #break 
+            try: 
+                signal = self.q_sig.get(timeout=0.005)
+                if signal == Spike.run(): 
+                    self.flag = True
+                    logger.warning('Received run signal, begin running')
+                elif signal == Spike.quit():
+                    logger.warning('Received quit signal, aborting')
+                    break
+                elif signal == Spike.pause():
+                    logger.warning('Received pause signal, pending...')
+                    self.flag = False
+                elif signal == Spike.resume(): #currently treat as same as run
+                    logger.warning('Received resume signal, resuming')
+                    self.flag = True
+            except Empty as e:
+                pass #no signal from Nexus
+
+    def checkStore(self):
+        notification_info = self.client.notify()
+        recv_objid, recv_dsize, recv_msize = notification_info
+        obj = self.client.getID(recv_objid)
+        try:
+            self.saveObj(obj)
+            self.n += 1
+        except Exception as e:
+            logger.error('Watcher error: {}'.format(e))
+
+    def saveObj(self, obj):
+        with open('dump/dump'+str(self.n)+'.pkl', 'wb') as output:
+            pickle.dump(obj, output)
+            
