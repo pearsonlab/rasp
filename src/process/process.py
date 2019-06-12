@@ -62,7 +62,7 @@ class CaimanProcessor(Processor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'], #cwd+'/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': [cwd+'/data/tbif_ex.h5'], #cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (3,3),
@@ -133,7 +133,7 @@ class CaimanProcessor(Processor):
         self.flag = False
         self.total_times = []
 
-        with RunManager(self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
+        with RunManager(self.name, self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
 
         # while True:
@@ -210,6 +210,9 @@ class CaimanProcessor(Processor):
                 logger.error('Processor: Key error... {0}'.format(e))
                 # Proceed at all costs
                 self.dropped_frames.append(self.frame_number)
+            except Exception as e:
+                logger.error('Processor unknown error: {}'.format(e))
+                self.dropped_frames.append(self.frame_number)
             self.frame_number += 1
             self.total_times.append(time.time()-t)
         else:
@@ -281,7 +284,7 @@ class CaimanProcessor(Processor):
         ids.append(self.client.put(np.array(C), str(self.frame_number)))
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'image'+str(self.frame_number)))
-        ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
+        #ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
         self.q_out.put(ids)
         #self.q_comm.put([self.frame_number])
@@ -344,7 +347,7 @@ class CaimanProcessor(Processor):
             TODO: rework logic since not accessing store directly here anymore
         '''
         try:
-            res = self.q_in.get(timeout=0.005)
+            res = self.q_in.get(timeout=0.0001)
             return res
             #return self.client.get('frame')
         # except CannotGetObjectError:

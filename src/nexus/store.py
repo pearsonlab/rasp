@@ -224,6 +224,9 @@ class Limbo(StoreInterface):
         else:
             return res
 
+    def getList(self, ids):
+        return self.client.get(ids)
+
 
     def deleteName(self, object_name):
         ''' Deletes an object from the store based on name
@@ -327,11 +330,13 @@ import pickle
 
 class Watcher():
     ''' Monitors the store as separate process
+        TODO: Facilitate Watcher being used in multiple processes (shared list)
     '''
     def __init__(self, name, client):
         self.name = name
         self.client = client
         self.flag = False
+        self.saved_ids = []
 
         self.client.subscribe()
         self.n = 0
@@ -343,7 +348,7 @@ class Watcher():
         while True:
             if self.flag:
                 try:
-                    self.checkStore()
+                    self.checkStore2()
                 except Exception as e:
                     logger.error('Watcher exception during run: {}'.format(e))
                     #break 
@@ -364,17 +369,37 @@ class Watcher():
             except Empty as e:
                 pass #no signal from Nexus
 
-    def checkStore(self):
-        notification_info = self.client.notify()
-        recv_objid, recv_dsize, recv_msize = notification_info
-        obj = self.client.getID(recv_objid)
-        try:
-            self.saveObj(obj)
-            self.n += 1
-        except Exception as e:
-            logger.error('Watcher error: {}'.format(e))
+    # def checkStore(self):
+    #     notification_info = self.client.notify()
+    #     recv_objid, recv_dsize, recv_msize = notification_info
+    #     obj = self.client.getID(recv_objid)
+    #     try:
+    #         self.saveObj(obj)
+    #         self.n += 1
+    #     except Exception as e:
+    #         logger.error('Watcher error: {}'.format(e))
 
-    def saveObj(self, obj):
-        with open('dump/dump'+str(self.n)+'.pkl', 'wb') as output:
+    def saveObj(self, obj, name):
+        with open('dump/dump'+name+'.pkl', 'wb') as output:
             pickle.dump(obj, output)
+
+    def checkStore2(self):
+        objs = list(self.client.get_all().keys())
+        ids_to_save = list(set(objs) - set(self.saved_ids))
+
+        # with Pool() as pool:
+        #     saved_ids = pool.map(saveObjbyID, ids_to_save)
+        # print('Saved :', len(saved_ids))
+        # self.saved_ids.extend(saved_ids)
+
+        for id in ids_to_save:
+            self.saveObj(self.client.getID(id), str(id))
+            self.saved_ids.append(id)
+
+def saveObjbyID(id):
+    client = plasma.connect('/tmp/store')
+    obj = client.get(id)
+    with open('dump/dump'+str(id)+'.pkl', 'wb') as output:
+        pickle.dump(obj, output)
+    return id
             

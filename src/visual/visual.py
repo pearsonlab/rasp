@@ -86,13 +86,21 @@ class CaimanVisual(Visual):
 
     def getData(self):
         t = time.time()
+        try:
+            id = self.links['raw_frame_queue'].get(timeout=0.0001)
+            self.raw_frame_number = list(id[0].keys())[0]
+            self.raw = self.client.getID(id[0][self.raw_frame_number])
+        except Empty as e:
+            pass
+        except Exception as e:
+            logger.error('Visual: Exception in get data: {}'.format(e))
         try: 
-            ids = self.q_in.get(timeout=0.005)
-            res = []
-            for id in ids:
-                res.append(self.client.getID(id))
+            ids = self.q_in.get(timeout=0.0001)
+            # res = []
+            # for id in ids:
+            #     res.append(self.client.getID(id))
             # expect Cx, C, tune, raw, color, coords from Analysis module
-            (self.Cx, self.C, self.Cpop, self.tune, self.raw, self.color, self.coords) = res
+            (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids) #res
             ##############FIXME frame number!
             self.frame_num += 1
         except Empty as e:
@@ -119,7 +127,7 @@ class CaimanVisual(Visual):
     def getFrames(self):
         ''' Return the raw and colored frames for display
         '''
-        return self.raw, np.rot90(self.color,1)
+        return self.raw, self.color
 
     def selectNeurons(self, x, y):
         ''' x and y are coordinates
@@ -161,12 +169,12 @@ class CaimanVisual(Visual):
                     ind = c[~np.isnan(c).any(axis=1)].astype(int)
                     cv2.fillConvexPoly(image2, ind, self._threshNeuron(i, thresh_r))
 
-            if self.color.shape[0] < self.color.shape[1]:
-                self.flip = True
-            else:
-                np.swapaxes(image2,0,1)
-            #TODO: add rotation to user preferences and/or user clickable input
-            return np.rot90(image2,1)
+            # if self.color.shape[0] < self.color.shape[1]:
+            #     self.flip = True
+            # else:
+            #     np.swapaxes(image2,0,1)
+            # #TODO: add rotation to user preferences and/or user clickable input
+            return image2
         else: 
             return None
 
@@ -174,7 +182,7 @@ class CaimanVisual(Visual):
         ests = self.tune[0]
         thresh = np.max(thresh_r)
         display = (255,255,255,150)
-        act = np.zeros(11)
+        act = np.zeros(ests.shape[1])
         if ests[ind] is not None:
             intensity = np.max(ests[ind])
             act[:len(ests[ind])] = ests[ind]

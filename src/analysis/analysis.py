@@ -29,11 +29,12 @@ class MeanAnalysis(Analysis):
         '''
         '''
         # TODO: same as behaviorAcquisition, need number of stimuli here. TODO: make adaptive later
-        self.num_stim = 10 
+        self.num_stim = 21 
         self.frame = 0
         self.flag = False
         self.curr_stim = 0 #start with zeroth stim unless signaled otherwise
         self.stimInd = []
+        self.onoff = []
         self.window = 200 #TODO: make user input, choose scrolling window for Visual
         self.A = None
         self.C = None
@@ -42,11 +43,15 @@ class MeanAnalysis(Analysis):
         self.Cpop = None
         self.coords = None
         self.updateCoordsTime = []
+        self.color = None
 
     def run(self):
         self.total_times = []
+        self.puttime = []
+        self.colortime = []
+        self.stimtime = []
 
-        with RunManager(self.runAvg, self.setup, self.q_sig, self.q_comm) as rm:
+        with RunManager(self.name, self.runAvg, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
         # ests structure: np.array([components, frames])
         # while True:
@@ -85,6 +90,9 @@ class MeanAnalysis(Analysis):
                     
         #     total_times.append(time.time()-t)
         print('Analysis broke, avg time per frame: ', np.mean(self.total_times))
+        print('Analysis broke, avg time per put analysis: ', np.mean(self.puttime))
+        print('Analysis broke, avg time per color frame: ', np.mean(self.colortime))
+        print('Analysis broke, avg time per stim avg: ', np.mean(self.stimtime))
         print('Analysis got through ', self.frame, ' frames')
 
 
@@ -94,18 +102,18 @@ class MeanAnalysis(Analysis):
         '''
         t = time.time()
         try: 
-            sig = self.links['input_stim_queue'].get(timeout=0.005)
+            sig = self.links['input_stim_queue'].get(timeout=0.0001)
             self.updateStim(sig)
         except Empty as e:
             pass #no change in input stimulus
             #TODO: other errors
         try:
             #TODO: add error handling for if we received some but not all of these
-            ids = self.q_in.get(timeout=0.005)
-            res = []
-            for id in ids:
-                res.append(self.client.getID(id))
-            (self.C, self.coordDict, self.image, self.raw) = res
+            ids = self.q_in.get(timeout=0.0001)
+            # res = []
+            # for id in ids:
+            #     res.append(self.client.getID(id))
+            (self.C, self.coordDict, self.image) = self.client.getList(ids) #res
 
             self.coords = [o['coordinates'] for o in self.coordDict]
 
@@ -115,16 +123,18 @@ class MeanAnalysis(Analysis):
             # From the input_stim_queue update the current stimulus (once per frame)
             #DANGER FIXME TODO Use a timestamp here
             self.stimInd.append(self.curr_stim)
+            self.onoff.append(self.onoff_stim)
             
             # Compute tuning curves based on input stimulus
             # Just do overall average activity for now
             self.tuning_all = self.stimAvg(self.C)
-            self.globalAvg = np.array(np.mean(self.tuning_all, axis=0))
+            self.globalAvg = np.mean(self.tuning_all, axis=0)
             self.tune = [self.tuning_all, self.globalAvg]
 
             # Compute coloring of neurons for processed frame
             # Also rotate and stack as needed for plotting
-            self.color = self.plotColorFrame()
+            if self.frame % 2 == 0: #TODO: move to viz, but we don't need to compute this 30 times/sec
+                self.color = self.plotColorFrame()
 
             if self.frame >= self.window:
                 window = self.window
@@ -150,42 +160,62 @@ class MeanAnalysis(Analysis):
             [possibly other action items here...? Validation?]
         '''
         # stim in format n:value
-        self.curr_stim = list(stim.values())[0]
+        #print('stim---------------: ', stim[0][1])
+        if(self.curr_stim != stim[0][0]):
+            logger.info('Changed stimulus: '+str(stim[0][0]))
+        self.curr_stim = stim[0][0]
+        self.onoff_stim = (1 if abs(stim[0][1]) > 1 else 0)
 
     def putAnalysis(self):
         ''' Throw things to DS and put IDs in queue for Visual
         '''
-        #t = time.time()
+        t = time.time()
         ids = []
         ids.append(self.client.put(self.Cx, 'Cx'+str(self.frame)))
         ids.append(self.client.put(self.Call, 'Call'+str(self.frame)))
         ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
         ids.append(self.client.put(self.tune, 'tune'+str(self.frame)))
-        ids.append(self.client.put(self.raw, 'raw'+str(self.frame)))
+        #ids.append(self.client.put(self.raw, 'raw'+str(self.frame)))
         ids.append(self.client.put(self.color, 'color'+str(self.frame)))
         ids.append(self.client.put(self.coordDict, 'coords'+str(self.frame)))
 
         self.q_out.put(ids)
         #print('time put analysis: ', time.time()-t)
+        self.puttime.append(time.time()-t)
         #self.q_comm.put([self.frame])
 
     def stimAvg(self, ests):
         ''' Using stimInd as mask, average ests across each input stimulus
         '''
-        #t = time.time()
+        t = time.time()
         estsAvg = []
         stimInd = np.array(self.stimInd[:ests.shape[1]])
+        onoff = np.array(self.onoff[:ests.shape[1]])
+        on = np.where(onoff==1, 1, np.nan)
+        off = np.where(onoff==0, 1, np.nan)
         for j in range(0, self.num_stim):
-            tmp = np.nanmean(np.where(stimInd==j, ests, np.nan), axis=1)
+            #tmp = np.nanmean(np.where(stimInd==j, ests, np.nan), axis=1)
+            tmpEsts = np.where(stimInd==j, ests, np.nan)
+            tmpOn = np.where(stimInd==j, on, np.nan)      
+            tmpOff = np.where(stimInd==j, off, np.nan)      
+            onEsts = np.nanmean(tmpEsts*tmpOn, axis=1)
+            offEsts = np.nanmean(tmpEsts*tmpOff, axis=1)
+            tmp = (onEsts / offEsts) - 1 #np.clip((onEsts / offEsts) - 1, 0, 10000) #TODO: modify?
+            tmp = np.where(np.isnan(tmp), 0, tmp)
+            # if np.any(np.isnan(tmp)):
+            #     print('tmp has nan?')
+            #     print('j is ', j)
+            #     print('stimInd ', stimInd)
             estsAvg.append(tmp)
         self.estsAvg = np.transpose(np.array(estsAvg))        
         #print('time stimAvg ', time.time()-t)     
+        self.stimtime.append(time.time()-t)
         return self.estsAvg
 
     def plotColorFrame(self):
         ''' Computes colored nicer background+components frame
         '''
-        #t = time.time()
+        t = time.time()
         image = self.image
         color = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
         color[...,3] = 255
@@ -201,17 +231,20 @@ class MeanAnalysis(Analysis):
         # else:
         #     np.swapaxes(color,0,1)
         #TODO: user input for rotating frame? See Visual class
-        #print('time plotColorFRame ', time.time()-t)
+        #print('time plotColorFrame ', time.time()-t)
+        self.colortime.append(time.time()-t)
         return color
 
     def _tuningColor(self, ind, inten):
         if self.estsAvg[ind] is not None:
-            #ests = np.array(self.estsAvg[ind])
-            h = np.nanargmax(self.estsAvg[ind])*36/360
-            intensity = 1- np.mean(inten[0][0])/255.0
-            r, g, b, = colorsys.hls_to_rgb(h, intensity, 0.8)
-            r, g, b = [x*255.0 for x in (r, g, b)]
-            return (r, g, b)+ (intensity*150,)
+            try:
+                h = np.nanargmax(self.estsAvg[ind])*36/360
+                intensity = 1- np.mean(inten[0][0])/255.0
+                r, g, b, = colorsys.hls_to_rgb(h, intensity, 0.8)
+                r, g, b = [x*255.0 for x in (r, g, b)]
+                return (r, g, b)+ (intensity*150,)
+            except ValueError:
+                return (255,255,255,0)
         else:
             return (255,255,255,0)
 

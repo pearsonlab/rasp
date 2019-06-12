@@ -77,6 +77,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.activePlot = 'r'
 
         #polar plotting
+        self.num = 10
         theta = np.linspace(0, 2*np.pi, 10)
         theta = np.append(theta,0)
         self.theta = theta
@@ -93,7 +94,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             # Add polar grid lines
             polar.addLine(x=0, pen=0.2)
             polar.addLine(y=0, pen=0.2)
-            for r in range(1, 8, 2):
+            for r in range(1, 5, 1):
                 circle = pyqtgraph.QtGui.QGraphicsEllipseItem(-r, -r, r*2, r*2)
                 circle.setPen(pyqtgraph.mkPen(0.1))
                 polar.addItem(circle)
@@ -105,7 +106,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.polar1.setData(x, y)
         self.polar2.setData(x, y)
 
-        for r in range(10, 12, 2):
+        for r in range(2, 12, 2):
                 circle = pyqtgraph.QtGui.QGraphicsEllipseItem(-r, -r, r*2, r*2)
                 circle.setPen(pyqtgraph.mkPen(0.1))
                 polars[2].addItem(circle)
@@ -179,12 +180,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             image = self.visual.plotThreshFrame(self.thresh_r)
             if raw is not None:
                 if np.unique(raw).size > 1:
-                    self.rawplot.setImage(raw.T, autoHistogramRange=False)
-                    self.rawplot.ui.histogram.vb.setLimits(yMin=0.02, yMax=0.55)
-                    self.rawplot_2.setImage(color)
-                    self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
-                    self.rawplot_3.setImage(image)
-                    self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
+                    self.rawplot.setImage(raw, autoHistogramRange=False)
+                    self.rawplot.ui.histogram.vb.setLimits(yMin=50)
+            if color is not None:
+                self.rawplot_2.setImage(color)
+                self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
+            if image is not None:
+                self.rawplot_3.setImage(image)
+                self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
             logger.error('Error in FrontEnd update Video:  {}'.format(e))
@@ -220,15 +223,19 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #TODO: rewrite as set of polar[] and set of tune[]
         if tune:
+            self.num = tune[0].shape[0]
+            theta = np.linspace(0, 2*np.pi, self.num-1)
+            theta = np.append(theta,0)
+            self.theta = theta  
             if(tune[0] is not None):
-                self.radius = np.zeros(11)
+                self.radius = np.zeros(self.num)
                 self.radius[:len(tune[0])] = tune[0]
                 self.x = self.radius * np.cos(self.theta)
                 self.y = self.radius * np.sin(self.theta)
                 self.polar2.setData(self.x, self.y, pen=penR)
 
             if(tune[1] is not None):
-                self.radius2 = np.zeros(11)
+                self.radius2 = np.zeros(self.num)
                 self.radius2[:len(tune[1])] = tune[1]
                 self.x2 = self.radius2 * np.cos(self.theta)
                 self.y2 = self.radius2 * np.sin(self.theta)
@@ -251,7 +258,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def sliderMoved(self):
         val = self.slider.value()
         if np.count_nonzero(self.thresh_r) == 0:
-            r = np.full(11,val)
+            r = np.full(self.num,val)
         else:
             r = self.thresh_r
             r[np.nonzero(r)] = val
@@ -259,21 +266,22 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def slider2Moved(self):
         r1,r2 = self.slider2.range()
-        r = np.full(11, self.slider.value())
+        r = np.full(self.num, self.slider.value())
         r1 = 4*np.pi*(r1-4)/360
         r2 = 4*np.pi*(r2-4)/360
         t1 = np.argmin(np.abs(np.array(r1)-self.theta))
         t2 = np.argmin(np.abs(np.array(r2)-self.theta))
         r[0:t1] = 0
-        r[t2+1:11] = 0
+        r[t2+1:self.num] = 0
         self.updateThreshGraph(r)
 
     def updateThreshGraph(self, r):
-        self.thresh_r = r
-        if np.count_nonzero(r) == 11:
-            r[10] = 0
-        x = r * np.cos(self.theta)
-        y = r * np.sin(self.theta)
+        self.thresh_r = np.full(self.theta.shape, r[0])
+        # self.thresh_r = r
+        # if np.count_nonzero(r) == self.num:
+        #     r[self.num-1] = 0
+        x = self.thresh_r * np.cos(self.theta)
+        y = self.thresh_r * np.sin(self.theta)
         self.polar3.setData(x, y, pen=pyqtgraph.mkPen(width=2, color='g'))
 
     def _updateRedCirc(self):
