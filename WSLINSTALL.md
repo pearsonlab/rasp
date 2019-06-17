@@ -6,19 +6,21 @@
 
 # Setup
 ## I. Install WSL
-After WSL installation, the WSL distro can be activated by the `wsl` command in Command Prompt.
+After completing the following WSL installation, the WSL distro can be activated by the `wsl` command in Command Prompt.
 1. Enable WSL via Powershell as administrator
     ```
     Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
     ```
 2. Restart system
-3. Install Ubuntu 18.04 (or other distro) from Windows Store
-4. Initialize distro (set username, password)
+3. Install Ubuntu 18.04 (or other distro) from [Windows Store](https://www.microsoft.com/en-us/p/ubuntu-1804-lts/9n9tngvndl3q?activetab=pivot%3Aoverviewtab)
+4. Initialize distro 
+    - Set username, password when prompted
 
 ## II. WSL File System
 WSL files can be accessed by `~`, which is equivalent to `/home/[USER]`, within the WSL. Windows files, specifically the C: drive can be accessed through the path: `/mnt/c`. For RASP purposes, only the plasma store and the anaconda environment used to execute RASP is within the WSL system. The RASP program is located within Windows file system.
 
 ## III. Adding to PATH in WSL
+Certain directories must be added to the path in order for RASP to run properly.
 1. Use vim to edit `~/.profile`
     ```
     vim ~/.profile
@@ -26,8 +28,8 @@ WSL files can be accessed by `~`, which is equivalent to `/home/[USER]`, within 
 2. Add `export PATH="[PATH]:$PATH"` to end of `~/.profile` file
 3. Restart WSL
 
-## IV. Install Anaconda3 in WSL
-1. Find latest version of Anaconda for Linux on https://repo.continuum.io/archive
+## IV. Install Anaconda 3 in WSL
+1. Find latest version of [Anaconda 3 for Linux](https://repo.continuum.io/archive)
 2. Install latest version within WSL
     ```
     wget https://repo.continuum.io/archive/Anaconda3-[VERSION]-Linux-x86_64.sh
@@ -36,14 +38,14 @@ WSL files can be accessed by `~`, which is equivalent to `/home/[USER]`, within 
     ```
     bash Anaconda-[VERSION]-Linux-x86_64.sh
     ```
-4. Opt to install Visual Studio Code
+4. Opt to install Visual Studio Code when prompted
 5. Add Anaconda to `$PATH` (see [Section III](#IV.-Install-Anaconda3-in-WSL))
     ```
     export PATH="~/anaconda3/bin:$PATH"
     ```
 
 ## V. Installing & Running X Server for GUI Framework
-1. Download and install VcXsrv from https://sourceforge.net/projects/vcxsrv/
+1. Download and install [VcXsrv](https://sourceforge.net/projects/vcxsrv/)
 2. Run XLaunch
     - Set Display number to "0"
     - Select Disable access control
@@ -65,34 +67,55 @@ This creates a new anaconda environment named `caiman` using Python 3.6, which s
     pip install .
     ```
 
-## VII. RASP Installation & Execution
+## VII. RASP Installation
 1. Clone RASP
     ```
     git clone https://github.com/pearsonlab/rasp
     ```
-2. Activate `caiman` environment 
+2. Clone RASP submodules
+    ```
+    git submodule update --init
+    ```
+3. Create Anaconda environment <br>
+This creates a new anaconda environment named `caiman` using Python 3.6, which should be used for all future RASP installations and executions. Execute the following command in the CaImAn dir.
+    ```
+    conda env create -f environment.yml -n caiman
+    conda activate caiman 
+    ```
+4. Install CaImAn module <br>
+Execute the following command within the CaImAn directory and `caiman` env.
+    ```
+    pip install .
+    ```
+5. Install the following dependencies.
+    - pyarrow
+    - pyqtgraph
+    ```
+    conda install [PACKAGE]
+    ```
+
+## VIII. Run RASP
+1. Activate `caiman` environment 
     ```
     conda activate caiman
     ```
-3. cd into `rasp/src` <br>
+2. cd into `rasp/src` <br>
 This step is not needed if `rasp` is added to the `$PYTHONPATH`
-4. Turn on `plasma_store_server` <br>
+3. Turn on `plasma_store_server` <br>
 `plasma_store_server` is most likely located in `~/anaconda3/envs/caiman/bin` <br>
 This step is not needed if the path is hardcoded into `src/nexus.py`
     ```
     ./plasma_store_server -m [MEMORY AMOUNT] -s /tmp/store
     ```
-5. Run XLaunch and set display (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
+4. Run XLaunch and set display (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
     ```
     export DISPLAY=:0
     ```
-6. Run RASP 
+5. Run RASP 
     ```
     python -m nexus.nexus
     ```
-7. See [Common Issues](#Common-Issues) for errors and missing dependencies that might need to be installed, such as the following
-    - pyarrow
-    - pyqtgraph
+6. See [Common Issues](#Common-Issues) for errors and missing dependencies that might need to be installed.
 
 <br>
 
@@ -113,6 +136,10 @@ Several issues can appear during the CaImAn installation process. It is recommen
         ```
         conda update --all
         ```
+2. If CaImAn installation goes awry, existing installations can be uninstalled using the following command
+    ```
+    pip uninstall caiman
+    ```
 
 ## III. Errors Running RASP
 
