@@ -1,6 +1,7 @@
 import time
 import os
 import h5py
+import struct
 import numpy as np
 import random
 from nexus.module import Module, Spike, RunManager
@@ -21,8 +22,7 @@ class Acquirer(Module):
     #    # provide function for grabbing the next single frame
     #    raise NotImplementedError
     # TODO: require module-specific functions or no?
-
-
+    
 class FileAcquirer(Acquirer):
     '''Class to import data from files and output
        frames in a buffer, or discrete.
@@ -53,11 +53,12 @@ class FileAcquirer(Acquirer):
                     self.data = file[keys[0]].value #only one dset per file atm
                         #frames = np.array(dset).squeeze() #not needed?
                     print('data is ', len(self.data))
+
         else: raise FileNotFoundError
 
-        save_file = self.filename.split('.')[0]+'_backup'+'.h5' #TODO: make parameter in setup ?
-        self.f = h5py.File(save_file, 'w', libver='latest')
-        self.dset = self.f.create_dataset("default", (len(self.data),)) #TODO: need to set maxsize to none?
+        # save_file = self.filename.split('.')[0]+'_backup'+'.h5' #TODO: make parameter in setup ?
+        # self.f = h5py.File(save_file, 'w', libver='latest')
+        # self.dset = self.f.create_dataset("default", (len(self.data),)) #TODO: need to set maxsize to none?
 
     def getFrame(self, num):
         ''' Can be live acquistion from disk (?) #TODO
@@ -69,39 +70,14 @@ class FileAcquirer(Acquirer):
         ''' Run indefinitely. Calls runAcquirer after checking for singals
         '''
         self.total_times = []
-
-        with RunManager(self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
-            print(rm)
-
         # #self.changePriority() #run once, at start of process
-        # while True:
-        #     t = time.time()
-        #     if self.flag:
-        #         try:
-        #             self.runAcquirer()
-        #         except Exception as e:
-        #             logger.error('Acquirer exception during run: {}'.format(e))
-        #             #break 
-        #     try: 
-        #         signal = self.q_sig.get(timeout=0.005)
-        #         if signal == Spike.run(): 
-        #             self.flag = True
-        #             logger.warning('Received run signal, begin running acquirer')
-        #         elif signal == Spike.quit():
-        #             logger.warning('Received quit signal, aborting')
-        #             break
-        #         elif signal == Spike.pause():
-        #             logger.warning('Received pause signal, pending...')
-        #             self.flag = False
-        #         elif signal == Spike.resume(): #currently treat as same as run
-        #             logger.warning('Received resume signal, resuming')
-        #             self.flag = True
-        #     except Empty as e:
-        #         pass #no signal from Nexus
-            
+
+        with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
+            print(rm)            
             
         print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
         print('Acquire got through ', self.frame_num, ' frames')
+
 
     def runAcquirer(self):
         '''While frames exist in location specified during setup,
@@ -117,10 +93,8 @@ class FileAcquirer(Acquirer):
             id = self.client.put(frame, str(self.frame_num))
             try:
                 self.q_out.put([{str(self.frame_num):id}])
-                #self.q_comm.put([self.frame_num]) #TODO: needed?
                 self.frame_num += 1
-
-                self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?               
+                self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?     
             except Exception as e:
                 logger.error('Acquirer general exception: {}'.format(e))
 
@@ -129,13 +103,11 @@ class FileAcquirer(Acquirer):
         else: # essentially a done signal from the source (eg, camera)
             logger.error('Done with all available frames: {0}'.format(self.frame_num))
             self.data = None
-            self.q_out.put(None)
             self.q_comm.put(None)
             self.done = True
-            self.f.close()
+            #self.f.close()
 
         self.total_times.append(time.time()-t)
-
 
     def saveFrame(self, frame):
         ''' TODO: this
@@ -143,6 +115,77 @@ class FileAcquirer(Acquirer):
         pass
         # self.dset[self.frame_num-1] = frame
         # self.f.flush()
+
+class TbifAcquirer(FileAcquirer):
+    def setup(self):
+        if os.path.exists(self.filename):
+            print('Looking for ', self.filename)
+            n, ext = os.path.splitext(self.filename)[:2]
+            if ext == '.tbif':
+                self.data = []
+                self.stim = []
+                self.zpos = []
+                with open(self.filename, mode='rb') as f:
+                    data = f.read()
+                    header = struct.unpack("=IdHHffffdd", data[0:48])
+                    #res is: fpp, spf, w, h, 
+                    print('loading : ', header)
+                    img_size = header[2]*header[3]
+                    dt = np.dtype('uint16')
+                    # -------- repeats here, starts at 48, read 4, 12, img_size
+                    for i in range(0,2878):
+                        zpos, = struct.unpack("=f", data[48+(16+img_size*2)*i:52+(16+img_size*2)*i])
+                        self.zpos.append(zpos)
+                        stim = struct.unpack("=fff", data[52+(16+img_size*2)*i:64+(16+img_size*2)*i])
+                        self.stim.append(np.asarray(stim))
+                        img = struct.unpack("="+str(img_size)+"H", data[64+(16+img_size*2)*i:64+img_size*2+(16+img_size*2)*i])
+                        tmp = np.reshape(np.asarray(img, dtype='uint16'), (header[2], header[3]), order='F')
+                        self.data.append(tmp.transpose())
+                    self.data = np.array(self.data)
+
+                    # fp = np.memmap('data/tbif_tmp.mmap', dtype='uint16', mode='w+', shape=(len(self.data), header[2], header[3]))
+                    # fp[:] = self.data
+                    # del fp
+
+                    print('data is ', len(self.data))
+            else: 
+                logger.error('Cannot load file, bad extension')
+                raise Exception
+        else: raise FileNotFoundError
+
+    def runAcquirer(self):
+        t = time.time()
+
+        if self.done:
+            pass 
+        elif(self.frame_num < len(self.data)*10):
+            frame = self.getFrame(self.frame_num)
+            id = self.client.put(frame, str(self.frame_num))
+            try:
+                self.q_out.put([{str(self.frame_num):id}])
+                self.links['stim_queue'].put({self.frame_num:self.stim[self.frame_num % len(self.stim)]})
+                self.frame_num += 1
+                self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?     
+            except Exception as e:
+                logger.error('Acquirer general exception: {}'.format(e))
+
+            time.sleep(self.framerate) #pretend framerate
+
+        else:
+            logger.error('Done with all available frames: {0}'.format(self.frame_num))
+            self.data = None
+            self.q_comm.put(None)
+            self.done = True
+
+        # self.total_times.append(time.time()-t)
+
+    def getFrame(self, num):
+        '''
+            Here just return frame from loaded data
+        '''
+        if num >= len(self.data):
+            num = num % len(self.data)
+        return self.data[num,:,:]
 
 
 class BehaviorAcquirer(Module):
@@ -176,44 +219,23 @@ class BehaviorAcquirer(Module):
     def run(self):
         ''' Run continuously, waiting for input
         '''
-        with RunManager(self.getInput, self.setup, self.q_sig, self.q_comm) as rm:
+        with RunManager(self.name, self.getInput, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
-        # while True:
-        #     if self.flag:
-        #         try:
-        #             self.getInput()
-        #             if self.done:
-        #                 logger.info('BehaviorAcquirer is done, exiting')
-        #                 return
-        #         except Exception as e:
-        #             logger.error('BehaviorAcquirer exception during run: {}'.format(e))
-        #             break 
-        #     try: 
-        #         signal = self.q_sig.get(timeout=0.005)
-        #         if signal == Spike.run(): 
-        #             self.flag = True
-        #             logger.warning('Received run signal, begin running')
-        #         elif signal == Spike.quit():
-        #             logger.warning('Received quit signal, aborting')
-        #             break
-        #         elif signal == Spike.pause():
-        #             logger.warning('Received pause signal, pending...')
-        #             self.flag = False
-        #         elif signal == Spike.resume(): #currently treat as same as run
-        #             logger.warning('Received resume signal, resuming')
-        #             self.flag = True
-        #     except Empty as e:
-        #         pass #no signal from Nexus
 
     def getInput(self):
         ''' Check for input from behavioral control
         '''
         #Faking it for now. TODO: Talk to Max about his format
-        if self.n % 500 == 0:
-            self.curr_stim = random.choice(self.behaviors)
-            self.q_out.put({self.n:self.curr_stim})
-            logger.warning('Changed stimulus! {}'.format(self.curr_stim))
-            #self.q_comm.put()
-
+        self.curr_stim = random.choice(self.behaviors)
+        self.onoff = random.choice([0,20])
+        self.q_out.put({self.n:[self.curr_stim, self.onoff]})
+        #logger.info('Changed stimulus! {}'.format(self.curr_stim))
+        #self.q_comm.put()
+        time.sleep(0.1)
         self.n += 1
 
+if __name__ == '__main__':
+    FA = TbifAcquirer('FA', filename='data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif')
+    FA.setup()
+    while True:
+       FA.runAcquirer()

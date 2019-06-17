@@ -67,7 +67,7 @@ class Nexus():
         '''
         #TODO load from file or user input, as in dialogue through FrontEnd?
 
-        self.tweak = Tweak(file)
+        self.tweak = Tweak(configFile = file)
         self.tweak.createConfig()
 
         # create all data links requested from Tweak config
@@ -168,7 +168,7 @@ class Nexus():
         else:
             self.modules[classname].addLink(linktype, link)
 
-    def createNexus(self):
+    def createNexus(self, file=None):
         self._startStore(100000000000) #default size should be system-dependent
     
         #connect to store and subscribe to notifications
@@ -184,7 +184,7 @@ class Nexus():
 
         self.startWatcher()
 
-        self.loadTweak() #TODO: filename?
+        self.loadTweak(file=file) #TODO: filename?
 
         self.flags.update({'quit':False, 'run':False, 'load':False})
         self.allowStart = False
@@ -263,9 +263,10 @@ class Nexus():
                 logger.warning('Signal queue '+q.name+' full, cannot tell it to quit: {}'.format(f))
 
         self.processes.append(self.p_GUI)
+        self.processes.append(self.p_watch)
         for p in self.processes:
-            if p.is_alive():
-                p.terminate()
+            # if p.is_alive():
+            #     p.terminate()
             p.join()
 
         logger.warning('Done with available frames')
@@ -539,7 +540,7 @@ if __name__ == '__main__':
     set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus()
+    nexus.createNexus(file='basic_demo.yaml')
     #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
     

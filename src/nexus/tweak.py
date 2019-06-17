@@ -12,13 +12,13 @@ class Tweak():
     '''
 
     def __init__(self, configFile=None):
+        cwd = os.getcwd()
         if configFile is None:
             # Going with default config
-            cwd = os.getcwd()
             self.configFile = cwd+'/basic_demo.yaml'
         else:
             # Reading config from other yaml file
-            self.configFile = configFile
+            self.configFile = cwd+'/'+configFile
         
         self.modules = {}
         self.connections = {}

@@ -147,14 +147,19 @@ class Spike():
 
 class RunManager():
     ''' TODO: Update logger messages with module's name
+    TODO: make async version of runmanager
     '''
-    def __init__(self, runMethod, setup, q_sig, q_comm):
+    def __init__(self, name, runMethod, setup, q_sig, q_comm):
         self.run = False
         self.config = False
         self.runMethod = runMethod
         self.setup = setup
         self.q_sig = q_sig
         self.q_comm = q_comm
+        self.moduleName = name
+
+        #TODO make this tunable
+        self.timeout = 0.000001
 
     def __enter__(self):
         self.start = time.time()
@@ -164,17 +169,17 @@ class RunManager():
                 try:
                     self.runMethod() #subfunction for running singly
                 except Exception as e:
-                    logger.error('Module exception during run: {}'.format(e))
+                    logger.error('Module '+self.moduleName+' exception during run: {}'.format(e))
             elif self.config:
                 try:
                     self.setup() #subfunction for setting up the module
                     self.q_comm.put([Spike.ready()])
                 except Exception as e:
-                    logger.error('Module exception during setup: {}'.format(e))  
+                    logger.error('Module '+self.moduleName+' exception during setup: {}'.format(e))  
                     raise Exception
                 self.config = False #Run once
             try: 
-                signal = self.q_sig.get(timeout=0.005)
+                signal = self.q_sig.get(timeout=self.timeout)
                 if signal == Spike.run(): 
                     self.run = True
                     logger.warning('Received run signal, begin running')
