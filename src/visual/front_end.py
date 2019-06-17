@@ -3,7 +3,7 @@ import os
 from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import pyqtSignal, Qt
-from visual import rasp_ui_large as rasp_ui
+from visual import rasp_ui_huge as rasp_ui
 from nexus.store import Limbo
 import numpy as np
 from math import floor
@@ -55,8 +55,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
-        self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
-        #self.slider2.setGeometry(QtCore.QRect(55, 120, 155, 50))
+        #self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
+        self.slider2.setGeometry(QtCore.QRect(55, 120, 155, 50))
         self.slider2.setObjectName("slider2")
         self.slider2.rangeChanged.connect(_call(self.slider2Moved)) #Threshold for angular selection
 
@@ -94,7 +94,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             # Add polar grid lines
             polar.addLine(x=0, pen=0.2)
             polar.addLine(y=0, pen=0.2)
-            for r in range(1, 5, 1):
+            for r in range(0, 4, 1):
                 circle = pyqtgraph.QtGui.QGraphicsEllipseItem(-r, -r, r*2, r*2)
                 circle.setPen(pyqtgraph.mkPen(0.1))
                 polar.addItem(circle)
@@ -176,7 +176,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         image = None
         try:
             raw, color = self.visual.getFrames()
-            #logger.info('Got frames: ', raw)
             image = self.visual.plotThreshFrame(self.thresh_r)
             if raw is not None:
                 if np.unique(raw).size > 1:
@@ -240,6 +239,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 self.x2 = self.radius2 * np.cos(self.theta)
                 self.y2 = self.radius2 * np.sin(self.theta)
                 self.polar1.setData(self.x2, self.y2, pen=penW)
+        else:
+            logger.error('Visual received None tune')
         
         #print('Full update Lines time ', time.time()-t)
 

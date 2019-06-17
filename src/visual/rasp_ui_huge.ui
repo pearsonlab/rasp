@@ -190,8 +190,7 @@ Parameters</string>
       </rect>
      </property>
      <property name="text">
-      <string>Select
-Processor</string>
+      <string>Setup</string>
      </property>
     </widget>
     <widget class="QPushButton" name="pushButton_3">
@@ -204,8 +203,7 @@ Processor</string>
       </rect>
      </property>
      <property name="text">
-      <string>Run
-Process</string>
+      <string>Run</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="checkBox">

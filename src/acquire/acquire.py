@@ -158,12 +158,12 @@ class TbifAcquirer(FileAcquirer):
 
         if self.done:
             pass 
-        elif(self.frame_num < len(self.data)):
+        elif(self.frame_num < len(self.data)*10):
             frame = self.getFrame(self.frame_num)
             id = self.client.put(frame, str(self.frame_num))
             try:
                 self.q_out.put([{str(self.frame_num):id}])
-                self.links['stim_queue'].put([self.stim[self.frame_num]])
+                self.links['stim_queue'].put({self.frame_num:self.stim[self.frame_num % len(self.stim)]})
                 self.frame_num += 1
                 self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?     
             except Exception as e:
@@ -177,7 +177,15 @@ class TbifAcquirer(FileAcquirer):
             self.q_comm.put(None)
             self.done = True
 
-        self.total_times.append(time.time()-t)
+        # self.total_times.append(time.time()-t)
+
+    def getFrame(self, num):
+        '''
+            Here just return frame from loaded data
+        '''
+        if num >= len(self.data):
+            num = num % len(self.data)
+        return self.data[num,:,:]
 
 
 class BehaviorAcquirer(Module):
@@ -218,14 +226,16 @@ class BehaviorAcquirer(Module):
         ''' Check for input from behavioral control
         '''
         #Faking it for now. TODO: Talk to Max about his format
-        if self.n % 5000 == 0:
-            self.curr_stim = random.choice(self.behaviors)
-            self.q_out.put({self.n:self.curr_stim})
-            #logger.info('Changed stimulus! {}'.format(self.curr_stim))
-            #self.q_comm.put()
-
+        self.curr_stim = random.choice(self.behaviors)
+        self.onoff = random.choice([0,20])
+        self.q_out.put({self.n:[self.curr_stim, self.onoff]})
+        #logger.info('Changed stimulus! {}'.format(self.curr_stim))
+        #self.q_comm.put()
+        time.sleep(0.1)
         self.n += 1
 
 if __name__ == '__main__':
-    FA = FileAcquirer('FA', filename='data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif')
+    FA = TbifAcquirer('FA', filename='data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif')
     FA.setup()
+    while True:
+       FA.runAcquirer()

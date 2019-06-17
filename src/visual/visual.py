@@ -96,11 +96,7 @@ class CaimanVisual(Visual):
             logger.error('Visual: Exception in get data: {}'.format(e))
         try: 
             ids = self.q_in.get(timeout=0.0001)
-            # res = []
-            # for id in ids:
-            #     res.append(self.client.getID(id))
-            # expect Cx, C, tune, raw, color, coords from Analysis module
-            (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids) #res
+            (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids)
             ##############FIXME frame number!
             self.frame_num += 1
         except Empty as e:
@@ -121,7 +117,7 @@ class CaimanVisual(Visual):
         '''
         if self.tune is not None:
             self.selectedTune = self.tune[0][self.selectedNeuron,:]
-
+        
         return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, [self.selectedTune, self.tune[1]]
 
     def getFrames(self):
@@ -158,14 +154,16 @@ class CaimanVisual(Visual):
         ''' Computes shaded frame for targeting panel
             based on threshold value of sliders (user-selected)
         '''
-        image = self.raw
+        #image = self.raw
+        bnd_Y = np.percentile(self.raw, (0.001,100-0.001))
+        image = (self.raw - bnd_Y[0])/np.diff(bnd_Y)
         if image is not None:
             image2 = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
             image2[...,3] = 100
             if self.coords is not None:
                 coords = [o['coordinates'] for o in self.coords]
                 for i,c in enumerate(coords):
-                    c = np.array(c)
+                    #c = np.array(c)
                     ind = c[~np.isnan(c).any(axis=1)].astype(int)
                     cv2.fillConvexPoly(image2, ind, self._threshNeuron(i, thresh_r))
 

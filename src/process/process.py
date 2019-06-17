@@ -262,6 +262,12 @@ class CaimanProcessor(Processor):
         A = self.onAc.estimates.Ab[:, nb:]
         #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
+
+        if self.onAc.estimates.OASISinstances is not None:
+            S = np.stack([osi.s for osi in self.onAc.estimates.OASISinstances])
+            #print('Got s! ', S[0])
+        else:
+            self.onAc.estimates.S = np.zeros_like(C)
         #f = self.onAc.estimates.C_on[:nb, :self.frame_number]
         
         #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
@@ -318,6 +324,10 @@ class CaimanProcessor(Processor):
             logger.info('ValueError: {0}'.format(ve))
 
         cor_frame = (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
+
+        # print('dtype raw frame:', self.frame.dtype)
+        # print('dtype cor_frame:', cor_frame.dtype)
+
         return image, cor_frame
 
     def _finalAnalysis(self, t):

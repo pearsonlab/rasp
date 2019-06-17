@@ -7,8 +7,8 @@ modules:
   Acquirer:
     package: acquire.acquire
     class: FileAcquirer
-    filename: data/Tolias_mesoscope_1.hdf5
-    framerate: 35
+    filename: data/tbif_ex.h5
+    framerate: 15
 
   Processor:
     package: process.process

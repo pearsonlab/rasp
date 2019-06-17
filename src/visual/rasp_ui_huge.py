@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'src/visual/rasp_ui_huge.ui'
 #
-# Created by: PyQt5 UI code generator 5.6
+# Created by: PyQt5 UI code generator 5.12.1
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -311,10 +312,8 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
         self.pushButton.setText(_translate("MainWindow", "Load\n"
 "Parameters"))
-        self.pushButton_2.setText(_translate("MainWindow", "Select\n"
-"Processor"))
-        self.pushButton_3.setText(_translate("MainWindow", "Run\n"
-"Process"))
+        self.pushButton_2.setText(_translate("MainWindow", "Setup"))
+        self.pushButton_3.setText(_translate("MainWindow", "Run"))
         self.checkBox.setText(_translate("MainWindow", " Live Update"))
         self.label.setText(_translate("MainWindow", "Targeting Selection"))
         self.pushButton_4.setText(_translate("MainWindow", "Stimulate"))
@@ -328,7 +327,9 @@ class Ui_MainWindow(object):
         self.label_5.setText(_translate("MainWindow", "Processed Frame"))
         self.menuRASP_Display.setTitle(_translate("MainWindow", "Nexus Display"))
 
+
 from pyqtgraph import ImageView, PlotWidget
+
 
 if __name__ == "__main__":
     import sys
@@ -338,4 +339,3 @@ if __name__ == "__main__":
     ui.setupUi(MainWindow)
     MainWindow.show()
     sys.exit(app.exec_())
-
