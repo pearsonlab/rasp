@@ -6,7 +6,7 @@
 
 # Setup
 ## I. Install WSL
-After completing the following WSL installation, the WSL distro can be activated by the `wsl` command in Command Prompt.
+After completing the following WSL installation, the WSL shell can be activated by the `wsl` command in Command Prompt.
 1. Enable WSL via Powershell as administrator
     ```
     Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
@@ -16,19 +16,17 @@ After completing the following WSL installation, the WSL distro can be activated
 4. Initialize distro 
     - Set username, password when prompted
 
-## II. WSL File System
-WSL files can be accessed by `~`, which is equivalent to `/home/[USER]`, within the WSL. Windows files, specifically the C: drive can be accessed through the path: `/mnt/c`. For RASP purposes, only the plasma store and the anaconda environment used to execute RASP is within the WSL system. The RASP program is located within Windows file system.
+WSL files can be accessed through the path: `~`, which is equivalent to `/home/[USER]`, within the WSL shell. Windows files, specifically the C: drive can be accessed through the path: `/mnt/c`. For RASP purposes, only the plasma store and the anaconda environment used to execute RASP is within the WSL system. The RASP code is located within Windows file system.
 
-## III. Adding to PATH in WSL
-Certain directories must be added to the path in order for RASP to run properly.
+Furthermore, certain directories must be added to the PATH environmental variable in Linux in order for RASP to run properly. Below are the steps to "permanently" adding to the Linux $PATH.
 1. Use vim to edit `~/.profile`
     ```
     vim ~/.profile
     ```
-2. Add `export PATH="[PATH]:$PATH"` to end of `~/.profile` file
+2. Add `export PATH="[PATH]:$PATH"` to end of `~/.profile`
 3. Restart WSL
 
-## IV. Install Anaconda 3 in WSL
+## II. Install Anaconda 3 in WSL
 1. Find latest version of [Anaconda 3 for Linux](https://repo.continuum.io/archive)
 2. Install latest version within WSL
     ```
@@ -39,12 +37,12 @@ Certain directories must be added to the path in order for RASP to run properly.
     bash Anaconda-[VERSION]-Linux-x86_64.sh
     ```
 4. Opt to install Visual Studio Code when prompted
-5. Add Anaconda to `$PATH` (see [Section III](#IV.-Install-Anaconda3-in-WSL))
+5. Add Anaconda to `$PATH` (see [Section I](#I.-Install-WSL))
     ```
     export PATH="~/anaconda3/bin:$PATH"
     ```
 
-## V. Installing & Running X Server for GUI Framework
+## III. Installing & Running X Server for RASP GUI
 1. Download and install [VcXsrv](https://sourceforge.net/projects/vcxsrv/)
 2. Run XLaunch
     - Set Display number to "0"
@@ -56,18 +54,7 @@ Certain directories must be added to the path in order for RASP to run properly.
     export DISPLAY=:0
     ```
 
-## VI. Create CaImAn environment
-1. Install CaImAn <br>
-This creates a new anaconda environment named `caiman` using Python 3.6, which should be used for all future RASP installations and executions.
-    ```
-    git clone https://github.com/flatironinstitute/CaImAn
-    cd CaImAn
-    conda env create -f environment.yml -n caiman
-    conda activate caiman
-    pip install .
-    ```
-
-## VII. RASP Installation
+## IV. RASP Installation
 1. Clone RASP
     ```
     git clone https://github.com/pearsonlab/rasp
@@ -94,7 +81,7 @@ Execute the following command within the CaImAn directory and `caiman` env.
     conda install [PACKAGE]
     ```
 
-## VIII. Run RASP
+## V. Run RASP
 1. Activate `caiman` environment 
     ```
     conda activate caiman
@@ -124,7 +111,7 @@ This step is not needed if the path is hardcoded into `src/nexus.py`
 If Ubuntu cannot be downloaded and installed from the Windows Store, it can be instead manually downloaded and installed through the following instructions.
 
 1. Go to https://docs.microsoft.com/en-us/windows/wsl/install-manual to download distro or https://aka.ms/wsl-ubuntu-1804 to directly download Ubuntu 18.04
-2. If running the .appx file downloaded does not successfull install, rename .appx extension to .zip and uncompress
+2. If running the .appx file downloaded does not successfully install, rename .appx extension to .zip and uncompress
 3. Run `ubuntu18.04.exe` or altenerative distro executable
 4. Complete initialization and rest of installation
 
