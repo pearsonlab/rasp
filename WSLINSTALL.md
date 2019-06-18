@@ -37,7 +37,11 @@ Furthermore, certain directories must be added to the PATH environmental variabl
     bash Anaconda-[VERSION]-Linux-x86_64.sh
     ```
 4. Opt to install Visual Studio Code when prompted
-5. Add Anaconda to `$PATH` (see [Section I](#I.-Install-WSL))
+5. Update Anaconda if prompted or if necessary
+    ```
+    conda update anaconda
+    ```
+6. Add Anaconda to `$PATH` (see [Section I](#I.-Install-WSL))
     ```
     export PATH="~/anaconda3/bin:$PATH"
     ```
@@ -72,7 +76,7 @@ This creates a new anaconda environment named `caiman` using Python 3.6, which s
 4. Install CaImAn module <br>
 Execute the following command within the CaImAn directory and `caiman` env.
     ```
-    pip install .
+    pip install -e .
     ```
 5. Install the following dependencies.
     - pyarrow
@@ -82,27 +86,29 @@ Execute the following command within the CaImAn directory and `caiman` env.
     ```
 
 ## V. Run RASP
+See [Common Issues](#Common-Issues) for errors and missing dependencies that might need to be installed.
+
 1. Activate `caiman` environment 
     ```
     conda activate caiman
     ```
 2. cd into `rasp/src` <br>
 This step is not needed if `rasp` is added to the `$PYTHONPATH`
-3. Turn on `plasma_store_server` <br>
-`plasma_store_server` is most likely located in `~/anaconda3/envs/caiman/bin` <br>
+3. Move `basic_demo.yml` file to `src` dir
+4. Turn on `plasma_store_server` <br>
+`plasma_store_server` is most likely located in `~/anaconda3/envs/caiman/bin`. You can find where your environment is installed by entering `conda info --envs`. <br>
 This step is not needed if the path is hardcoded into `src/nexus.py`
     ```
     ./plasma_store_server -m [MEMORY AMOUNT] -s /tmp/store
     ```
-4. Run XLaunch and set display (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
+5. Run XLaunch and set display (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
     ```
     export DISPLAY=:0
     ```
-5. Run RASP 
+6. Run RASP 
     ```
     python -m nexus.nexus
     ```
-6. See [Common Issues](#Common-Issues) for errors and missing dependencies that might need to be installed.
 
 <br>
 
@@ -115,18 +121,22 @@ If Ubuntu cannot be downloaded and installed from the Windows Store, it can be i
 3. Run `ubuntu18.04.exe` or altenerative distro executable
 4. Complete initialization and rest of installation
 
-## II. CaImAn Installation
-Several issues can appear during the CaImAn installation process. It is recommended that if any severe issues appear, one should delete and then recreate the caiman conda environment from scratch. Some of the following issues might appear:
+## II. CaImAn/Anaconda Installation
+Several issues can appear during the CaImAn installation process. It is recommended that if any severe issues appear, one should delete and then recreate the caiman conda environment from scratch. Or, caiman can be uninstalled (`pip uinstall caiman`) and installation can be reattempted. Some of the following issues might appear:
 
 1. `Aborted (core dumped)` when activating the `caiman` env
     - Solved by updating all packages
         ```
         conda update --all
         ```
-2. If CaImAn installation goes awry, existing installations can be uninstalled using the following command
-    ```
-    pip uninstall caiman
-    ```
+2. `Failed building wheel for caiman`: `command 'gcc' failed with exit status 1`
+    - This error could be due to gcc or g++ not being installed. Follow these steps to install both. 
+        ```
+        conda update -all
+        sudo apt-get update
+        sudo apt-get install gcc
+        sudo apt-get install g++
+        ```
 
 ## III. Errors Running RASP
 
@@ -140,13 +150,23 @@ Several issues can appear during the CaImAn installation process. It is recommen
 2. `ImportError: libopencv_reg.so.3.4: cannot enable executable stack as shared object`
     - Solved by running the following (second line contains path of opencv installation)
         ```
+        sudo apt-get update
         sudo apt-get install execstack
         sudo execstack -c ~/anaconda3/envs/caiman/lib/libopencv_*
         ```
 3. `This application failed to start because it could not find or load the Qt platform plugin "xcb"`
     - Solved by running the following
         ```
+        sudo apt-get update
         sudo apt-get install libqt5x11extras5
+        ```
+4. `gcc: error trying to exec 'cc1plus': execvp: No such file or directory`
+    - Solved by installing gcc and g++
+        ```
+        conda update -all
+        sudo apt-get update
+        sudo apt-get install gcc
+        sudo apt-get install g++
         ```
 
 
