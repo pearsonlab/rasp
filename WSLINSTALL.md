@@ -24,7 +24,7 @@ Furthermore, certain directories must be added to the PATH environmental variabl
     vim ~/.profile
     ```
 2. Add `export PATH="[PATH]:$PATH"` to end of `~/.profile`
-3. Restart WSL
+3. Restart WSL shell
 
 ## II. Install Anaconda 3 in WSL
 1. Find latest version of [Anaconda 3 for Linux](https://repo.continuum.io/archive)
@@ -84,28 +84,29 @@ Execute the following command within the CaImAn directory and `caiman` env.
     ```
     conda install [PACKAGE]
     ```
+6. Add pyarrow `plasma_store_server` to path (See [Section I](I.-Install-WSL)) <br>
+`plasma_store_server` is most likely located in the bin directory of the `caiman` conda environment: `~/anaconda3/envs/caiman/bin`. You can find where your environment is installed by entering `conda info --envs`. <br>
+
 
 ## V. Run RASP
 See [Common Issues](#Common-Issues) for errors and missing dependencies that might need to be installed.
 
-1. Activate `caiman` environment 
+1. Activate WSL
+    ```
+    wsl
+    ```
+2. Activate `caiman` environment 
     ```
     conda activate caiman
     ```
-2. cd into `rasp/src` <br>
+3. cd into `rasp/src` <br>
 This step is not needed if `rasp` is added to the `$PYTHONPATH`
-3. Move `basic_demo.yml` file to `src` dir
-4. Turn on `plasma_store_server` <br>
-`plasma_store_server` is most likely located in `~/anaconda3/envs/caiman/bin`. You can find where your environment is installed by entering `conda info --envs`. <br>
-This step is not needed if the path is hardcoded into `src/nexus.py`
-    ```
-    ./plasma_store_server -m [MEMORY AMOUNT] -s /tmp/store
-    ```
-5. Run XLaunch and set display (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
+4. Move `basic_demo.yml` file to `src` dir
+6. Run XLaunch and set display (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
     ```
     export DISPLAY=:0
     ```
-6. Run RASP 
+7. Run RASP 
     ```
     python -m nexus.nexus
     ```
