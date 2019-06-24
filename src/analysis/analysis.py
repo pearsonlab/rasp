@@ -51,6 +51,9 @@ class MeanAnalysis(Analysis):
         self.puttime = []
         self.colortime = []
         self.stimtime = []
+        self.timestamp = []
+
+        np.seterr(divide='raise')
 
         with RunManager(self.name, self.runAvg, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
@@ -60,6 +63,14 @@ class MeanAnalysis(Analysis):
         print('Analysis broke, avg time per color frame: ', np.mean(self.colortime))
         print('Analysis broke, avg time per stim avg: ', np.mean(self.stimtime))
         print('Analysis got through ', self.frame, ' frames')
+
+        np.savetxt('timing/analysis_frame_time.txt', np.array(self.total_times))
+        np.savetxt('timing/analysis_timestamp.txt', np.array(self.timestamp))
+        np.savetxt('analysis_estsAvg.txt', np.array(self.estsAvg))
+        np.savetxt('analysis_estsOn.txt', np.array(self.estsOn))
+        np.savetxt('analysis_estsOff.txt', np.array(self.estsOff))
+        np.savetxt('analysis_proc_C.txt', np.array(self.C))
+        np.savetxt('analysis_spikeAvg.txt', np.array(self.spikeAvg))
 
 
     def runAvg(self):
@@ -76,7 +87,7 @@ class MeanAnalysis(Analysis):
         try:
             #TODO: add error handling for if we received some but not all of these
             ids = self.q_in.get(timeout=0.0001)
-            (self.C, self.coordDict, self.image) = self.client.getList(ids) #res
+            (self.C, self.coordDict, self.image, self.S) = self.client.getList(ids) #res
 
             self.coords = [o['coordinates'] for o in self.coordDict]
 
@@ -109,6 +120,7 @@ class MeanAnalysis(Analysis):
                 self.Call = self.C[:,self.frame-window:self.frame]
             
             self.putAnalysis()
+            self.timestamp.append([time.time(), self.frame])
             self.total_times.append(time.time()-t)
         except ObjectNotFoundError:
             logger.error('Estimates unavailable from store, droppping')
@@ -152,7 +164,7 @@ class MeanAnalysis(Analysis):
         ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
         ids.append(self.client.put(self.tune, 'tune'+str(self.frame)))
         ids.append(self.client.put(self.color, 'color'+str(self.frame)))
-        ids.append(self.client.put(self.coordDict, 'coords'+str(self.frame)))
+        ids.append(self.client.put(self.coordDict, 'analys_coords'+str(self.frame)))
 
         self.q_out.put(ids)
         #print('time put analysis: ', time.time()-t)
@@ -161,29 +173,47 @@ class MeanAnalysis(Analysis):
 
     def stimAvg(self):
         ests = self.C
+        S = self.S
         t = time.time()
         estsAvg = [np.zeros(ests.shape[0])]*self.num_stim
+        spikeAvg = [np.zeros(ests.shape[0])]*self.num_stim
         estsStd = [np.zeros(ests.shape[0])]*self.num_stim
+        onStim = [np.zeros(ests.shape[0])]*self.num_stim
+        offStim = [np.zeros(ests.shape[0])]*self.num_stim
         for s,l in self.stim.items():
             if 'on' in l.keys() and 'off' in l.keys():
                 onInd = np.array(l['on'])
                 offInd = np.array(l['off'])
                 try:
                     on = np.mean(ests[:,onInd], axis=1)
+                    spikeOn = np.mean(S[:,onInd], axis=1)
                     onS = np.std(ests[:,onInd], axis=1)
                     off = np.mean(ests[:,offInd], axis=1)
+                    spikeOff = np.mean(S[:,offInd], axis=1)
                     offS = np.std(ests[:,offInd], axis=1)
                     tmp = (on / off) - 1
                     tmpS = np.sqrt(np.square(onS)+np.square(offS))
                     estsAvg[int(s)] = tmp
                     estsStd[int(s)] = tmpS
+                    onStim[int(s)] = on
+                    offStim[int(s)] = off
+                    try:
+                        spikeAvg[int(s)] = spikeOn/spikeOff - 1
+                    except FloatingPointError:
+                        spikeAvg[int(s)] = spikeOn
                 except IndexError:
                     pass
             else:
                 estsAvg[int(s)] = np.zeros(ests.shape[0])
                 estsStd[int(s)] = np.zeros(ests.shape[0])
+                onStim[int(s)] = np.zeros(ests.shape[0])
+                offStim[int(s)] = np.zeros(ests.shape[0])
+                spikeAvg[int(s)] = np.zeros(ests.shape[0])
         self.estsAvg = np.transpose(np.array(estsAvg))
         self.estsStd = np.transpose(np.array(estsStd))
+        self.estsOn = np.transpose(np.array(onStim))
+        self.estsOff = np.transpose(np.array(offStim))
+        self.spikeAvg = np.transpose(np.array(spikeAvg))
         self.estsAvg = np.where(np.isnan(self.estsAvg), 0, self.estsAvg)
         self.stimtime.append(time.time()-t)
 

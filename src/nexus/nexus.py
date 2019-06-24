@@ -28,8 +28,8 @@ import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logging.basicConfig(level=logging.INFO,
+logger.setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG,
                     format='%(name)s %(message)s',
                     handlers=[logging.FileHandler("example2.log"),
                               logging.StreamHandler()])
@@ -169,7 +169,7 @@ class Nexus():
             self.modules[classname].addLink(linktype, link)
 
     def createNexus(self, file=None):
-        self._startStore(100000000000) #default size should be system-dependent
+        self._startStore(35000000000) #default size should be system-dependent; this is 35 GB
     
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
@@ -182,7 +182,7 @@ class Nexus():
         self.flags = {}
         self.processes = []
 
-        self.startWatcher()
+        #self.startWatcher()
 
         self.loadTweak(file=file) #TODO: filename?
 
@@ -263,7 +263,7 @@ class Nexus():
                 logger.warning('Signal queue '+q.name+' full, cannot tell it to quit: {}'.format(f))
 
         self.processes.append(self.p_GUI)
-        self.processes.append(self.p_watch)
+        #self.processes.append(self.p_watch)
         for p in self.processes:
             # if p.is_alive():
             #     p.terminate()
@@ -540,7 +540,7 @@ if __name__ == '__main__':
     set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='basic_demo.yaml')
+    nexus.createNexus(file='eva_demo.yaml')
     #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
     

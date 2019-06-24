@@ -70,6 +70,7 @@ class FileAcquirer(Acquirer):
         ''' Run indefinitely. Calls runAcquirer after checking for singals
         '''
         self.total_times = []
+        self.timestamp = []
         # #self.changePriority() #run once, at start of process
 
         with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
@@ -77,6 +78,8 @@ class FileAcquirer(Acquirer):
             
         print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
         print('Acquire got through ', self.frame_num, ' frames')
+        np.savetxt('timing/acquire_frame_time.txt', np.array(self.total_times))
+        np.savetxt('timing/acquire_timestamp.txt', np.array(self.timestamp))
 
 
     def runAcquirer(self):
@@ -90,7 +93,8 @@ class FileAcquirer(Acquirer):
             #return
         elif(self.frame_num < len(self.data)):
             frame = self.getFrame(self.frame_num)
-            id = self.client.put(frame, str(self.frame_num))
+            id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
+            self.timestamp.append([time.time(), self.frame_num])
             try:
                 self.q_out.put([{str(self.frame_num):id}])
                 self.frame_num += 1
@@ -143,10 +147,6 @@ class TbifAcquirer(FileAcquirer):
                         self.data.append(tmp.transpose())
                     self.data = np.array(self.data)
 
-                    # fp = np.memmap('data/tbif_tmp.mmap', dtype='uint16', mode='w+', shape=(len(self.data), header[2], header[3]))
-                    # fp[:] = self.data
-                    # del fp
-
                     print('data is ', len(self.data))
             else: 
                 logger.error('Cannot load file, bad extension')
@@ -158,12 +158,14 @@ class TbifAcquirer(FileAcquirer):
 
         if self.done:
             pass 
-        elif(self.frame_num < len(self.data)*10):
+        elif(self.frame_num < len(self.data)):
             frame = self.getFrame(self.frame_num)
-            id = self.client.put(frame, str(self.frame_num))
+            id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
+            self.timestamp.append([time.time(), self.frame_num])
             try:
                 self.q_out.put([{str(self.frame_num):id}])
                 self.links['stim_queue'].put({self.frame_num:self.stim[self.frame_num % len(self.stim)]})
+                #logger.info('Current stim: {}'.format(self.stim[self.frame_num]))
                 self.frame_num += 1
                 self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?     
             except Exception as e:
@@ -177,7 +179,7 @@ class TbifAcquirer(FileAcquirer):
             self.q_comm.put(None)
             self.done = True
 
-        # self.total_times.append(time.time()-t)
+        self.total_times.append(time.time()-t)
 
     def getFrame(self, num):
         '''

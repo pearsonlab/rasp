@@ -312,6 +312,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             print('Visual broke, avg time per frame: ', np.mean(self.visual.total_times))
             print('Visual got through ', self.visual.frame_num, ' frames')
             print('GUI avg time ', np.mean(self.total_times))
+            np.savetxt('timing/visual_frame_time.txt', np.array(self.visual.total_times))
+            np.savetxt('timing/visual_timestamp.txt', np.array(self.visual.timestamp))
             event.accept()
         else: event.ignore()
             

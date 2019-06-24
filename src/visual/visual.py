@@ -83,6 +83,7 @@ class CaimanVisual(Visual):
         self.coords = None
 
         self.total_times = []
+        self.timestamp = []
 
     def getData(self):
         t = time.time()
@@ -99,6 +100,7 @@ class CaimanVisual(Visual):
             (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids)
             ##############FIXME frame number!
             self.frame_num += 1
+            self.timestamp.append([time.time(), self.frame_num])
         except Empty as e:
             pass #logger.info('Visual: No data from queue') #no data
         except ObjectNotFoundError as e:
@@ -106,7 +108,7 @@ class CaimanVisual(Visual):
         except Exception as e:
             logger.error('Visual: Exception in get data: {}'.format(e))
 
-        self.total_times.append(time.time()-t)  
+        self.total_times.append(time.time()-t)
 
     def getCurves(self):
         ''' Return the fluorescence traces and calculated tuning curves

@@ -14,7 +14,7 @@ from queue import Empty
 from nexus.module import Spike
 
 import logging; logger=logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 #TODO: Use Apache Arrow for better memory usage with the Plasma store
 
@@ -55,6 +55,7 @@ class Limbo(StoreInterface):
         ''' Reset client connection
         '''
         self.client = self.connectStore(self.store_loc)
+        logger.debug('Reset local connection to store')
 
     def release(self):
         self.client.disconnect()
@@ -112,12 +113,17 @@ class Limbo(StoreInterface):
         try:
             object_id = self.client.put(object)
             self.updateStored(object_name, object_id)
-            logger.debug('object successfully stored: '+object_name)
+            saveObj(object, object_id)
+            #logger.debug('object successfully stored: '+object_name)
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
             #raise PlasmaObjectExists
+        except ArrowIOError as e:
+            logger.error('Could not store object '+object_name+': {} {}'.format(type(e).__name__, e))
+            logger.info('Refreshing connection and continuing')
+            self.reset()
         except Exception as e:
-            logger.error('Could not store object '+object_name+': {0}'.format(e))
+            logger.error('Could not store object '+object_name+': {} {}'.format(type(e).__name__, e))
         return object_id
 
     def _put(self, obj, id):
@@ -167,7 +173,6 @@ class Limbo(StoreInterface):
             Report to Nexus that we updated the store
                 (did a put or delete/replace)
         '''
-    
         self.stored.update({object_name:object_id})
 
 
@@ -203,12 +208,10 @@ class Limbo(StoreInterface):
             Assumes we know the id for the object_name
             Raises ObjectNotFound if object_id returns no object from the store
         '''
-        #print('trying to get object, ', object_name)
         res = self.client.get(self.stored.get(object_name), 0)
         # Can also use contains() to check
         if isinstance(res, ObjectNotAvailable):
             logger.warning('Object {} cannot be found.'.format(object_name))
-            #print(self.client.list())
             raise ObjectNotFoundError
         elif isinstance(res, arrow.lib.Buffer):
             logger.info('Deserializing first')
@@ -227,7 +230,6 @@ class Limbo(StoreInterface):
     def getList(self, ids):
         return self.client.get(ids)
 
-
     def deleteName(self, object_name):
         ''' Deletes an object from the store based on name
             assumes we have id from name
@@ -240,9 +242,7 @@ class Limbo(StoreInterface):
             # Don't know anything about this object, treat as problematic
             raise CannotGetObjectError
         else:
-            #print('trying to delete ', object_name, ' ID ', self.stored.get(object_name))
             retcode = self._delete(object_name)
-            #print(self.client.list())
             self.stored.pop(object_name)
             
     def delete(self, id):
@@ -254,16 +254,11 @@ class Limbo(StoreInterface):
     def _delete(self, object_name):
         ''' Deletes object from store
         '''
-        #print('id to delete is : ', self.stored.get(object_name))
         tmp_id = self.stored.get(object_name)
 
         new_client = plasma.connect('/tmp/store', '', 0)
         new_client.delete([tmp_id])
-        #self.client.delete([tmp_id])
         new_client.disconnect()
-        
-        #redo with object_id as argument?
-
 
     def saveStore(self, fileName='/home/store_dump'):
         ''' Save the entire store to disk
@@ -277,13 +272,11 @@ class Limbo(StoreInterface):
             Tweak is pickleable
             TODO: move this to Nexus' domain?
         '''
-        #tweakids list of Tweak items stored. Tweak is list of results
         tweak = self.client.get(tweak_ids)
         #for object ID in list of items in tweak, get from store
         #and put into dict (?)
         with open(fileName, 'wb') as output:
             pickle.dump(tweak, output, -1)
-
 
     def saveSubstore(self, keys, fileName='/home/substore_dump'):
         ''' Save portion of store based on keys
@@ -315,6 +308,10 @@ class HStore(StoreInterface):
 
     def subscribe(self):
         pass
+
+def saveObj(obj, name):
+    with open('/media/hawkwings/Ext Hard Drive/dump/dump'+str(name)+'.pkl', 'wb') as output:
+        pickle.dump(obj, output)
 
 #class LStore(StoreInterface):
 #   ''' Implement data store using LMDB in python. TODO?
@@ -380,7 +377,7 @@ class Watcher():
     #         logger.error('Watcher error: {}'.format(e))
 
     def saveObj(self, obj, name):
-        with open('dump/dump'+name+'.pkl', 'wb') as output:
+        with open('/media/hawkwings/Ext Hard Drive/dump/dump'+name+'.pkl', 'wb') as output:
             pickle.dump(obj, output)
 
     def checkStore2(self):
@@ -396,10 +393,10 @@ class Watcher():
             self.saveObj(self.client.getID(id), str(id))
             self.saved_ids.append(id)
 
-def saveObjbyID(id):
-    client = plasma.connect('/tmp/store')
-    obj = client.get(id)
-    with open('dump/dump'+str(id)+'.pkl', 'wb') as output:
-        pickle.dump(obj, output)
-    return id
+# def saveObjbyID(id):
+#     client = plasma.connect('/tmp/store')
+#     obj = client.get(id)
+#     with open('/media/hawkwings/Ext\ Hard\ Drive/dump/dump'+str(id)+'.pkl', 'wb') as output:
+#         pickle.dump(obj, output)
+#     return id
             

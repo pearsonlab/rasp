@@ -15,6 +15,7 @@ from os.path import expanduser
 import os
 from queue import Empty
 from nexus.module import Module, Spike, RunManager
+import traceback
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -65,7 +66,7 @@ class CaimanProcessor(Processor):
             params_dict = {'fnames': [cwd+'/data/tbif_ex.h5'], #cwd+'/data/Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
-                   'gSig': (3,3),
+                   'gSig': (5,5),
                    'p': 1,
                    'min_SNR': 1,
                    'rval_thr': 0.9,
@@ -132,6 +133,7 @@ class CaimanProcessor(Processor):
         self.shape_time = []
         self.flag = False
         self.total_times = []
+        self.timestamp = []
 
         with RunManager(self.name, self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
@@ -174,6 +176,19 @@ class CaimanProcessor(Processor):
             
         print('Processor broke, avg time per frame: ', np.mean(self.total_times))
         print('Processor got through ', self.frame_number, ' frames')
+        np.savetxt('timing/process_frame_time.txt', np.array(self.total_times))
+        np.savetxt('timing/process_timestamp.txt', np.array(self.timestamp))
+
+        if self.onAc.estimates.OASISinstances is not None:
+            try:
+                S = np.stack([osi.s for osi in self.onAc.estimates.OASISinstances])
+                np.savetxt('end_spikes.txt', S)
+            except Exception as e:
+                #logger.error('Exception {}: {} during frame number {}'.format(type(e).__name__, e, self.frame_number))
+                print(traceback.format_exc())
+        else:
+            print('No OASIS')
+        
 
     def runProcess(self):
         ''' Run process. Runs once per frame.
@@ -203,15 +218,18 @@ class CaimanProcessor(Processor):
                 t = time.time()
                 self.putEstimates(self.onAc.estimates, output)
                 self.putAnalysis_time.append([time.time()-t])
+                self.timestamp.append([time.time(), self.frame_number])
             except ObjectNotFoundError:
-                logger.error('Processor: Frame unavailable from store, droppping')
+                logger.error('Processor: Frame {} unavailable from store, droppping'.format(self.frame_number))
                 self.dropped_frames.append(self.frame_number)
             except KeyError as e:
                 logger.error('Processor: Key error... {0}'.format(e))
                 # Proceed at all costs
                 self.dropped_frames.append(self.frame_number)
             except Exception as e:
-                logger.error('Processor unknown error: {}'.format(e))
+                logger.error('Processor unknown error: {}: {} during frame number {}'.format(type(e).__name__, 
+                                                                                            e, self.frame_number))
+                print(traceback.format_exc())
                 self.dropped_frames.append(self.frame_number)
             self.frame_number += 1
             self.total_times.append(time.time()-t)
@@ -264,11 +282,14 @@ class CaimanProcessor(Processor):
         C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
 
         if self.onAc.estimates.OASISinstances is not None:
-            S = np.stack([osi.s for osi in self.onAc.estimates.OASISinstances])
-            #print('Got s! ', S[0])
+            try:
+                S = np.stack([osi.s for osi in self.onAc.estimates.OASISinstances])
+            except Exception as e:
+                logger.error('Exception {}: {} during frame number {}'.format(type(e).__name__, e, self.frame_number))
+                print([osi.s.shape for osi in self.onAc.estimates.OASISinstances])
         else:
             self.onAc.estimates.S = np.zeros_like(C)
-        #f = self.onAc.estimates.C_on[:nb, :self.frame_number]
+        # f = self.onAc.estimates.C_on[:nb, :self.frame_number]
         
         #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
@@ -287,9 +308,10 @@ class CaimanProcessor(Processor):
         # print('total put time: ', time.time()-t)
 
         ids = []
-        ids.append(self.client.put(np.array(C), str(self.frame_number)))
+        ids.append(self.client.put(np.array(C), 'C'+str(self.frame_number)))
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
-        ids.append(self.client.put(image, 'image'+str(self.frame_number)))
+        ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
+        ids.append(self.client.put(S, 'S'+str(self.frame_number)))
         #ids.append(self.client.put(np.array(cor_frame), 'cor_frame'+str(self.frame_number)))
 
         self.q_out.put(ids)
@@ -412,7 +434,7 @@ class CaimanProcessor(Processor):
         try:
             self.onAc.fit_next(frame_number, frame)
         except Exception as e:
-            print('Message: {0}'.format(e))
+            print('Fit frame Error!! {}: {}'.format(type(e).__name__, e))
             raise Exception
 
     def _normAnalysis(self):
