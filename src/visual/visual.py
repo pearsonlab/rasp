@@ -125,6 +125,10 @@ class CaimanVisual(Visual):
     def getFrames(self):
         ''' Return the raw and colored frames for display
         '''
+        if self.raw.shape[0] > self.raw.shape[1]:
+            self.raw = np.rot90(self.raw, 1)
+            self.color = np.rot90(self.color, 1)
+
         return self.raw, self.color
 
     def selectNeurons(self, x, y):
@@ -159,6 +163,8 @@ class CaimanVisual(Visual):
         #image = self.raw
         bnd_Y = np.percentile(self.raw, (0.001,100-0.001))
         image = (self.raw - bnd_Y[0])/np.diff(bnd_Y)
+        if image.shape[0] > image.shape[1]:
+                image = np.rot90(image,1)
         if image is not None:
             image2 = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
             image2[...,3] = 100
@@ -174,6 +180,7 @@ class CaimanVisual(Visual):
             # else:
             #     np.swapaxes(image2,0,1)
             # #TODO: add rotation to user preferences and/or user clickable input
+            
             return image2
         else: 
             return None

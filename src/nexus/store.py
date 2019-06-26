@@ -113,7 +113,7 @@ class Limbo(StoreInterface):
         try:
             object_id = self.client.put(object)
             self.updateStored(object_name, object_id)
-            saveObj(object, object_id)
+            # saveObj(object, object_id)
             #logger.debug('object successfully stored: '+object_name)
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')

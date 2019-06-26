@@ -103,6 +103,7 @@ class FileAcquirer(Acquirer):
                 logger.error('Acquirer general exception: {}'.format(e))
 
             time.sleep(self.framerate) #pretend framerate
+            self.total_times.append(time.time()-t)
 
         else: # essentially a done signal from the source (eg, camera)
             logger.error('Done with all available frames: {0}'.format(self.frame_num))
@@ -110,8 +111,6 @@ class FileAcquirer(Acquirer):
             self.q_comm.put(None)
             self.done = True
             #self.f.close()
-
-        self.total_times.append(time.time()-t)
 
     def saveFrame(self, frame):
         ''' TODO: this

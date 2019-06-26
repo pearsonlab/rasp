@@ -191,9 +191,11 @@ class MeanAnalysis(Analysis):
                     off = np.mean(ests[:,offInd], axis=1)
                     spikeOff = np.mean(S[:,offInd], axis=1)
                     offS = np.std(ests[:,offInd], axis=1)
-                    tmp = (on / off) - 1
                     tmpS = np.sqrt(np.square(onS)+np.square(offS))
-                    estsAvg[int(s)] = tmp
+                    try:
+                        estsAvg[int(s)] = (on / off) - 1
+                    except FloatingPointError:
+                        estsAvg[int(s)] = on
                     estsStd[int(s)] = tmpS
                     onStim[int(s)] = on
                     offStim[int(s)] = off
