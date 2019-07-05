@@ -63,7 +63,7 @@ class CaimanProcessor(Processor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'],
+            params_dict = {'fnames': [cwd+'/data/tbif_ex.h5'], #Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (5,5),
@@ -77,12 +77,11 @@ class CaimanProcessor(Processor):
                    'init_method': 'bare',
                    'normalize': True,
                    'sniper_mode': True,
-                   'K': 10,
+                   'K': 2,
                    'epochs': 1,
                    'max_shifts_online': np.ceil(10).astype('int'),
                    'pw_rigid': False,
                    'dist_shape_update': True,
-                   'min_num_trial': 10,
                    'show_movie': False,
                    'update_freq': 500,
                    'minibatch_shape': 100,
@@ -134,48 +133,10 @@ class CaimanProcessor(Processor):
         self.flag = False
         self.total_times = []
         self.timestamp = []
+        self.counter = 0
 
         with RunManager(self.name, self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
-
-        # while True:
-        #     # t = time.time()
-        #     if self.flag: #if we have received run signal
-        #         try: 
-        #             self.runProcess()
-        #             # if self.done:
-        #             #     logger.info('Done running Process')
-        #             #     print('Dropped frames: ', self.dropped_frames)
-        #             #     print('Total number of dropped frames ', len(self.dropped_frames))
-        #             #     print('mean time per fit frame ', np.mean(self.process_time))
-        #             #     #return
-        #             # total_times.append(time.time()-t)
-        #         except Exception as e:
-        #             logger.exception('What happened: {0}'.format(e))
-        #             #break  
-        #     try: 
-        #         signal = self.q_sig.get(timeout=0.0001)
-        #         if signal == Spike.run(): 
-        #             self.flag = True
-        #             logger.warning('Received run signal, begin running process')
-        #         elif signal == Spike.quit():
-        #             print('Total number of dropped frames ', len(self.dropped_frames))
-        #             print('mean time per fit frame ', np.mean(self.process_time))
-        #             print('mean time per process frame ', np.mean(self.procFrame_time))
-        #             print('mean time per put analysis ', np.mean(self.putAnalysis_time))
-        #             logger.warning('Received quit signal, aborting')
-        #             break
-        #         elif signal == Spike.pause():
-        #             logger.warning('Received pause signal, pending...')
-        #             self.flag = False
-        #         elif signal == Spike.resume(): #currently treat as same as run
-        #             logger.warning('Received resume signal, resuming')
-        #             self.flag = True
-        #         elif signal == Spike.setup():
-        #             self.setup()
-        #             self.q_comm.put([Spike.ready()])
-        #     except Empty as e:
-        #         pass #no signal from Nexus
             
         print('Processor broke, avg time per frame: ', np.mean(self.total_times))
         print('Processor got through ', self.frame_number, ' frames')
@@ -189,6 +150,8 @@ class CaimanProcessor(Processor):
         np.savetxt('timing/detect_time.txt', self.detect_time)
         np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
         np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
+
+        print('Number of times coords updated ', self.counter)
 
         if self.onAc.estimates.OASISinstances is not None:
             try:
@@ -240,7 +203,7 @@ class CaimanProcessor(Processor):
                 print(traceback.format_exc())
                 self.dropped_frames.append(self.frame_number)
             self.frame_number += 1
-            self.total_times.append(time.time()-t)
+            self.total_times.append([time.time(), time.time()-t])
         else:
             pass
             # logger.error('Done with all available frames: {0}'.format(self.frame_number))
@@ -276,30 +239,37 @@ class CaimanProcessor(Processor):
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
         #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
-        C = self.onAc.estimates.C_on[nb:self.onAc.M, :self.frame_number]
-
+        before = self.frame_number-500 if self.frame_number > 500 else 0
+        #C = self.onAc.estimates.C_on.get_ordered()
+        t2 = time.time()
         if self.onAc.estimates.OASISinstances is not None:
             try:
-                S = np.stack([osi.s for osi in self.onAc.estimates.OASISinstances])
+                S = np.stack([osi.s[before:self.frame_number] for osi in self.onAc.estimates.OASISinstances])
+            except ValueError:
+                max_len = max([len(osi.s[before:self.frame_number]) for osi in self.onAc.estimates.OASISinstances])
+                S = np.array([np.lib.pad(osi.s[before:self.frame_number], (0, max_len-len(osi.s[before:self.frame_number])), 'constant', constant_values=0) for osi in self.onAc.estimates.OASISinstances])
             except Exception as e:
                 logger.error('Exception {}: {} during frame number {}'.format(type(e).__name__, e, self.frame_number))
                 print([osi.s.shape for osi in self.onAc.estimates.OASISinstances])
         else:
-            self.onAc.estimates.S = np.zeros_like(C)
+            S = None #self.onAc.estimates.S = np.zeros_like(C)
+        t3 = time.time()
         # f = self.onAc.estimates.C_on[:nb, :self.frame_number]
         
         #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
-        image, cor_frame = self.makeImage()
+        image = self.makeImage()
+        t4 = time.time()
         dims = image.shape
         self._updateCoords(A,dims)
+        t5 = time.time()
 
         ids = []
-        ids.append(self.client.put(np.array(C), 'C'+str(self.frame_number)))
+        #ids.append(self.client.put(np.array(C), 'C'+str(self.frame_number)))
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
         ids.append(self.client.put(S, 'S'+str(self.frame_number)))
-
+        t6 = time.time()
         self.q_out.put(ids)
         #self.q_comm.put([self.frame_number])
 
@@ -313,9 +283,14 @@ class CaimanProcessor(Processor):
             self.A = A
             self.coords = get_contours(A, dims)
 
-        elif np.shape(A)[1] > np.shape(self.A)[1]: #Only recalc if we have new components
+        elif np.shape(A)[1] > np.shape(self.A)[1] and self.frame_number % 10 == 0: 
+            #Only recalc if we have new components
+            # FIXME: Since this is only for viz, only do this every 100 frames
+            # TODO: maybe only recalc coords that are new? 
+            print('Recalc coords ', self.counter)
             self.A = A
             self.coords = get_contours(A, dims)
+            self.counter += 1
 
     def makeImage(self):
         '''Create image data for visualiation
@@ -326,19 +301,19 @@ class CaimanProcessor(Processor):
         mn = self.onAc.M - self.onAc.N
         image = None
         try:
-            components = self.onAc.estimates.Ab[:,mn:].dot(self.onAc.estimates.C_on[mn:self.onAc.M,self.frame_number-1]).reshape(self.onAc.dims, order='F')
-            background = self.onAc.estimates.Ab[:,:mn].dot(self.onAc.estimates.C_on[:mn,self.frame_number-1]).reshape(self.onAc.dims, order='F')
+            components = self.onAc.estimates.Ab[:,mn:].dot(self.onAc.estimates.C_on[mn:self.onAc.M,(self.frame_number-1)%self.onAc.window]).reshape(self.onAc.dims, order='F')
+            background = self.onAc.estimates.Ab[:,:mn].dot(self.onAc.estimates.C_on[:mn,(self.frame_number-1)%self.onAc.window]).reshape(self.onAc.dims, order='F')
             image = ((components + background) - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
             image = np.minimum((image*255.),255).astype('u1')
         except ValueError as ve:
             logger.info('ValueError: {0}'.format(ve))
 
-        cor_frame = (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
+        #cor_frame = (self.frame - self.onAc.bnd_Y[0])/np.diff(self.onAc.bnd_Y)
 
         # print('dtype raw frame:', self.frame.dtype)
         # print('dtype cor_frame:', cor_frame.dtype)
 
-        return image, cor_frame
+        return image
 
     def _finalAnalysis(self, t):
         ''' Some kind of final steps for estimates
@@ -395,7 +370,7 @@ class CaimanProcessor(Processor):
         if self.onAc.params.get('online', 'motion_correct'):
             try:
                 templ = self.onAc.estimates.Ab.dot(
-                self.onAc.estimates.C_on[:self.onAc.M, frame_number-1]).reshape(
+                self.onAc.estimates.C_on[:self.onAc.M, (frame_number-1)%self.onAc.window]).reshape(
                 self.onAc.params.get('data', 'dims'), order='F')*self.onAc.img_norm
             except Exception as e:
                 logger.error('Unknown exception {0}'.format(e))

@@ -82,6 +82,8 @@ class CaimanVisual(Visual):
         self.color = None
         self.coords = None
 
+        self.draw = True
+
         self.total_times = []
         self.timestamp = []
 
@@ -97,7 +99,11 @@ class CaimanVisual(Visual):
             logger.error('Visual: Exception in get data: {}'.format(e))
         try: 
             ids = self.q_in.get(timeout=0.0001)
-            (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids)
+            if self.draw:
+                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids)
+                self.getCurves()
+                self.getFrames()
+                self.total_times.append([time.time(), time.time()-t])
             ##############FIXME frame number!
             self.frame_num += 1
             self.timestamp.append([time.time(), self.frame_num])
@@ -107,8 +113,6 @@ class CaimanVisual(Visual):
             logger.error('Object not found, continuing...')
         except Exception as e:
             logger.error('Visual: Exception in get data: {}'.format(e))
-
-        self.total_times.append(time.time()-t)
 
     def getCurves(self):
         ''' Return the fluorescence traces and calculated tuning curves
@@ -127,6 +131,7 @@ class CaimanVisual(Visual):
         '''
         if self.raw.shape[0] > self.raw.shape[1]:
             self.raw = np.rot90(self.raw, 1)
+        if self.color.shape[0] > self.color.shape[1]:
             self.color = np.rot90(self.color, 1)
 
         return self.raw, self.color
@@ -137,50 +142,47 @@ class CaimanVisual(Visual):
             and updates plotEstimates to use that neuron
         '''
         #TODO: flip x and y if self.flip = True 
-
         neurons = [o['neuron_id']-1 for o in self.coords]
         com = np.array([o['CoM'] for o in self.coords])
-        dist = cdist(com, [np.array([y, x])])
+        #dist = cdist(com, [np.array([y, self.raw.shape[0]-x])])
+        dist = cdist(com, [np.array([x, y])])
         if np.min(dist) < 50:
             selected = neurons[np.argmin(dist)]
             self.selectedNeuron = selected
-            self.com1 = com[selected]
+            #self.com1 = [np.array([self.raw.shape[0]-com[selected][1], com[selected][0]])]
+            self.com1 = [com[selected]]
         else:
             logger.error('No neurons nearby where you clicked')
-            self.com1 = com[0]
+            #self.com1 = [np.array([self.raw.shape[0]-com[0][1], com[0][0]])]
+            self.com1 = [com[0]]
         return self.com1
 
     def getFirstSelect(self):
         first = None
-        if self.neurons:
-            first = [np.array(self.neurons[0])]
+        if self.coords:
+            com = [o['CoM'] for o in self.coords] #TODO make one line
+            #first = [np.array([self.raw.shape[0]-com[0][1], com[0][0]])]
+            first = [com[0]]
         return first
 
     def plotThreshFrame(self, thresh_r):
         ''' Computes shaded frame for targeting panel
             based on threshold value of sliders (user-selected)
         '''
-        #image = self.raw
         bnd_Y = np.percentile(self.raw, (0.001,100-0.001))
         image = (self.raw - bnd_Y[0])/np.diff(bnd_Y)
         if image.shape[0] > image.shape[1]:
                 image = np.rot90(image,1)
         if image is not None:
             image2 = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
-            image2[...,3] = 100
+            image2[...,3] = 150
             if self.coords is not None:
                 coords = [o['coordinates'] for o in self.coords]
                 for i,c in enumerate(coords):
                     #c = np.array(c)
                     ind = c[~np.isnan(c).any(axis=1)].astype(int)
+                    #rot_ind = np.array([[i[1],self.raw.shape[0]-i[0]] for i in ind])
                     cv2.fillConvexPoly(image2, ind, self._threshNeuron(i, thresh_r))
-
-            # if self.color.shape[0] < self.color.shape[1]:
-            #     self.flip = True
-            # else:
-            #     np.swapaxes(image2,0,1)
-            # #TODO: add rotation to user preferences and/or user clickable input
-            
             return image2
         else: 
             return None

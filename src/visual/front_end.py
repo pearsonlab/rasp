@@ -3,7 +3,7 @@ import os
 from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import pyqtSignal, Qt
-from visual import rasp_ui_large as rasp_ui
+from visual import rasp_ui_huge as rasp_ui
 from nexus.store import Limbo
 import numpy as np
 from math import floor
@@ -55,13 +55,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
-        self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
-        #self.slider2.setGeometry(QtCore.QRect(55, 120, 155, 50))
+        #self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
+        self.slider2.setGeometry(QtCore.QRect(55, 120, 155, 50))
         self.slider2.setObjectName("slider2")
         self.slider2.rangeChanged.connect(_call(self.slider2Moved)) #Threshold for angular selection
 
     def customizePlots(self):
         self.checkBox.setChecked(True)
+        self.draw = True
 
         #init line plot
         self.flag = True
@@ -77,11 +78,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.activePlot = 'r'
 
         #polar plotting
-        self.num = 10
-        theta = np.linspace(0, 2*np.pi, 10)
+        self.num = 21
+        theta = np.linspace(0, 2*np.pi, self.num-1)
         theta = np.append(theta,0)
         self.theta = theta
-        radius = np.zeros(11)
+        radius = np.zeros(self.num)
         self.thresh_r = radius + 1
         x = radius * np.cos(theta)
         y = radius * np.sin(theta)
@@ -153,19 +154,24 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         '''
         t = time.time()
         #start looking for data to display
-        if self.flag:
-           self.visual.getData()
-           #logger.info('Did I get something:', self.visual.Cx)
+        self.visual.getData()
+        #logger.info('Did I get something:', self.visual.Cx)
 
-        #plot lines
-        self.updateLines()
+        if self.draw:
+            #plot lines
+            self.updateLines()
 
-        #plot video
-        self.updateVideo()
+            #plot video
+            self.updateVideo()
 
         #re-update
         if self.checkBox.isChecked():
-            QtCore.QTimer.singleShot(10, self.update)
+            self.draw = True
+        else:
+            self.draw = False    
+        self.visual.draw = self.draw
+            
+        QtCore.QTimer.singleShot(10, self.update)
         
         self.total_times.append(time.time()-t)
     
@@ -277,10 +283,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.updateThreshGraph(r)
 
     def updateThreshGraph(self, r):
-        self.thresh_r = np.full(self.theta.shape, r[0])
-        # self.thresh_r = r
-        # if np.count_nonzero(r) == self.num:
-        #     r[self.num-1] = 0
+        self.thresh_r = r 
         x = self.thresh_r * np.cos(self.theta)
         y = self.thresh_r * np.sin(self.theta)
         self.polar3.setData(x, y, pen=pyqtgraph.mkPen(width=2, color='g'))
@@ -293,12 +296,12 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         '''
         ROIpen1=pyqtgraph.mkPen(width=1, color='r')
         if self.flag:
-            self.red_circ = CircleROI(pos = np.array([self.selected[0][1], self.selected[0][0]])-5, size=10, movable=False, pen=ROIpen1)
+            self.red_circ = CircleROI(pos = np.array([self.selected[0][0], self.selected[0][1]])-5, size=10, movable=False, pen=ROIpen1)
             self.rawplot_2.getView().addItem(self.red_circ)
             self.flag = False
         if np.count_nonzero(self.selected[0]) > 0:
             self.rawplot_2.getView().removeItem(self.red_circ)
-            self.red_circ = CircleROI(pos = np.array([self.selected[0][1], self.selected[0][0]])-5, size=10, movable=False, pen=ROIpen1)
+            self.red_circ = CircleROI(pos = np.array([self.selected[0][0], self.selected[0][1]])-5, size=10, movable=False, pen=ROIpen1)
             self.rawplot_2.getView().addItem(self.red_circ)
 
     def closeEvent(self, event):

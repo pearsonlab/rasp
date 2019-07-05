@@ -91,8 +91,10 @@ class FileAcquirer(Acquirer):
         if self.done:
             pass #logger.info('Acquirer is done, exiting')
             #return
-        elif(self.frame_num < len(self.data)):
-            frame = self.getFrame(self.frame_num)
+        elif(self.frame_num < len(self.data)*300):
+            frame = self.getFrame(self.frame_num % len(self.data))
+            if self.frame_num > 2000 and self.frame_num < 3000:
+                frame = None
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
             self.timestamp.append([time.time(), self.frame_num])
             try:
@@ -157,8 +159,10 @@ class TbifAcquirer(FileAcquirer):
 
         if self.done:
             pass 
-        elif(self.frame_num < len(self.data)):
+        elif(self.frame_num < len(self.data)*5):
             frame = self.getFrame(self.frame_num)
+            if self.frame_num > 1000 and self.frame_num < 2000:
+                frame = None
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
             self.timestamp.append([time.time(), self.frame_num])
             try:
@@ -232,7 +236,7 @@ class BehaviorAcquirer(Module):
         self.q_out.put({self.n:[self.curr_stim, self.onoff]})
         #logger.info('Changed stimulus! {}'.format(self.curr_stim))
         #self.q_comm.put()
-        time.sleep(0.1)
+        time.sleep(0.5)
         self.n += 1
 
 if __name__ == '__main__':
