@@ -53,7 +53,7 @@ Furthermore, certain directories must be added to the PATH environmental variabl
     - Select Disable access control
     - Keep other default settings
 3. Allow access through Windows firewall if prompted
-4. Set display when running RASP
+4. Use vim to set display in `~/.profile` (See [Section 1](#I.-Install-WSL]))
     ```
     export DISPLAY=:0
     ```
@@ -84,7 +84,7 @@ Execute the following command within the CaImAn directory and `caiman` env.
     ```
     conda install [PACKAGE]
     ```
-6. Add pyarrow `plasma_store_server` to path (See [Section I](I.-Install-WSL)) <br>
+6. Add pyarrow `plasma_store_server` to path (See [Section I](#I.-Install-WSL)) <br>
 `plasma_store_server` is most likely located in the bin directory of the `caiman` conda environment: `~/anaconda3/envs/caiman/bin`. You can find where your environment is installed by entering `conda info --envs`. <br>
 
 
@@ -102,10 +102,7 @@ See [Common Issues](#Common-Issues) for errors and missing dependencies that mig
 3. cd into `rasp/src` <br>
 This step is not needed if `rasp` is added to the `$PYTHONPATH`
 4. Move `basic_demo.yml` file to `src` dir
-6. Run XLaunch and set display (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
-    ```
-    export DISPLAY=:0
-    ```
+6. Run XLaunch (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
 7. Run RASP 
     ```
     python -m nexus.nexus
