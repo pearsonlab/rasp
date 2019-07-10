@@ -45,12 +45,18 @@ class MeanAnalysis(Analysis):
         self.coords = None
         self.updateCoordsTime = []
         self.color = None
+        self.stimDict = {}
+        self.onSum = 0
+        self.offSum = 0
 
     def run(self):
         self.total_times = []
         self.puttime = []
         self.colortime = []
         self.stimtime = []
+        self.timestamp = []
+
+        np.seterr(divide='raise')
 
         with RunManager(self.name, self.runAvg, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
@@ -60,6 +66,14 @@ class MeanAnalysis(Analysis):
         print('Analysis broke, avg time per color frame: ', np.mean(self.colortime))
         print('Analysis broke, avg time per stim avg: ', np.mean(self.stimtime))
         print('Analysis got through ', self.frame, ' frames')
+
+        np.savetxt('timing/analysis_frame_time.txt', np.array(self.total_times))
+        np.savetxt('timing/analysis_timestamp.txt', np.array(self.timestamp))
+        np.savetxt('analysis_estsAvg.txt', np.array(self.estsAvg))
+        np.savetxt('analysis_estsOn.txt', np.array(self.estsOn))
+        np.savetxt('analysis_estsOff.txt', np.array(self.estsOff))
+        np.savetxt('analysis_proc_C.txt', np.array(self.C))
+        np.savetxt('analysis_spikeAvg.txt', np.array(self.spikeAvg))
 
 
     def runAvg(self):
@@ -76,8 +90,8 @@ class MeanAnalysis(Analysis):
         try:
             #TODO: add error handling for if we received some but not all of these
             ids = self.q_in.get(timeout=0.0001)
-            (self.C, self.coordDict, self.image) = self.client.getList(ids) #res
-
+            (self.coordDict, self.image, self.S) = self.client.getList(ids) #res
+            self.C = self.S
             self.coords = [o['coordinates'] for o in self.coordDict]
 
             # Keep internal running count 
@@ -109,13 +123,14 @@ class MeanAnalysis(Analysis):
                 self.Call = self.C[:,self.frame-window:self.frame]
             
             self.putAnalysis()
-            self.total_times.append(time.time()-t)
+            self.timestamp.append([time.time(), self.frame])
         except ObjectNotFoundError:
             logger.error('Estimates unavailable from store, droppping')
         except Empty as e:
             pass
         except Exception as e:
             logger.exception('Error in analysis: {}'.format(e))
+        self.total_times.append([time.time(), time.time()-t])
 
     def updateStim(self, stim):
         ''' Recevied new signal from some Acquirer to change input stimulus
@@ -124,10 +139,6 @@ class MeanAnalysis(Analysis):
         # stim in format dict frame_num:[n, on/off]
         frame = list(stim.keys())[0]
         whichStim = stim[frame][0]
-        # if(self.curr_stim != stim[0][0]):
-        #     logger.info('Changed stimulus: '+str(whichStim))
-        # self.curr_stim = stim[0][0]
-        # self.onoff_stim = (1 if abs(stim[0][1]) > 1 else 0)
 
         # stim is dict with stimID as key and lists for indexing on/off into that stim
         # length is number of frames
@@ -141,6 +152,14 @@ class MeanAnalysis(Analysis):
             if 'off' not in self.stim[whichStim].keys():
                 self.stim[whichStim].update({'off':[]})
             self.stim[whichStim]['off'].append(frame)
+    
+    def updateStimSingle(self, stim):
+        ''' {frame number: [stimnumber, on/off] 
+        '''
+        frame = list(stim.keys())[0]
+        whichStim = stim[frame][0]
+        self.stimDict.update(stim)
+        self.count[whichStim]
 
     def putAnalysis(self):
         ''' Throw things to DS and put IDs in queue for Visual
@@ -152,7 +171,7 @@ class MeanAnalysis(Analysis):
         ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
         ids.append(self.client.put(self.tune, 'tune'+str(self.frame)))
         ids.append(self.client.put(self.color, 'color'+str(self.frame)))
-        ids.append(self.client.put(self.coordDict, 'coords'+str(self.frame)))
+        ids.append(self.client.put(self.coordDict, 'analys_coords'+str(self.frame)))
 
         self.q_out.put(ids)
         #print('time put analysis: ', time.time()-t)
@@ -160,32 +179,109 @@ class MeanAnalysis(Analysis):
         #self.q_comm.put([self.frame])
 
     def stimAvg(self):
-        ests = self.C
+        ests = self.S #ests = self.C
+        S = self.S
         t = time.time()
         estsAvg = [np.zeros(ests.shape[0])]*self.num_stim
+        spikeAvg = [np.zeros(ests.shape[0])]*self.num_stim
         estsStd = [np.zeros(ests.shape[0])]*self.num_stim
+        onStim = [np.zeros(ests.shape[0])]*self.num_stim
+        offStim = [np.zeros(ests.shape[0])]*self.num_stim
         for s,l in self.stim.items():
             if 'on' in l.keys() and 'off' in l.keys():
                 onInd = np.array(l['on'])
                 offInd = np.array(l['off'])
                 try:
                     on = np.mean(ests[:,onInd], axis=1)
+                    spikeOn = np.mean(S[:,onInd], axis=1)
                     onS = np.std(ests[:,onInd], axis=1)
                     off = np.mean(ests[:,offInd], axis=1)
+                    spikeOff = np.mean(S[:,offInd], axis=1)
                     offS = np.std(ests[:,offInd], axis=1)
-                    tmp = (on / off) - 1
                     tmpS = np.sqrt(np.square(onS)+np.square(offS))
-                    estsAvg[int(s)] = tmp
+                    try:
+                        estsAvg[int(s)] = (on / off) - 1
+                    except FloatingPointError:
+                        estsAvg[int(s)] = on
                     estsStd[int(s)] = tmpS
+                    onStim[int(s)] = on
+                    offStim[int(s)] = off
+                    try:
+                        spikeAvg[int(s)] = spikeOn/spikeOff - 1
+                    except FloatingPointError:
+                        spikeAvg[int(s)] = spikeOn
                 except IndexError:
                     pass
             else:
                 estsAvg[int(s)] = np.zeros(ests.shape[0])
                 estsStd[int(s)] = np.zeros(ests.shape[0])
+                onStim[int(s)] = np.zeros(ests.shape[0])
+                offStim[int(s)] = np.zeros(ests.shape[0])
+                spikeAvg[int(s)] = np.zeros(ests.shape[0])
         self.estsAvg = np.transpose(np.array(estsAvg))
         self.estsStd = np.transpose(np.array(estsStd))
+        self.estsOn = np.transpose(np.array(onStim))
+        self.estsOff = np.transpose(np.array(offStim))
+        self.spikeAvg = np.transpose(np.array(spikeAvg))
         self.estsAvg = np.where(np.isnan(self.estsAvg), 0, self.estsAvg)
+        self.estsAvg = np.clip(self.estsAvg*2, 0, 4)
         self.stimtime.append(time.time()-t)
+
+    # def stimAvgUpdate(self):
+    #     ests = self.C
+    #     S = self.S
+    #     t = time.time()
+    #     stimInfo = self.stimDict[ests.shape[1]] #current frame, on or off TODO try except this
+    #     if ests.shape[0] > self.onSum.shape[0] or stimInfo[0] > min(self.onSum.shape[1], self.offSum.shape[1]):
+    #         # Add components or stimId, need to resize
+    #         self.onSum.resize(ests.shape[0],stimInfo[0])
+    #         self.offSum.resize(ests.shape[0],stimInfo[0])
+    #     if stimInfo[1] == 'on':
+    #         self.onSum[:,stimInfo[0]] += ests[:,-1]
+    #         self.onMean = self.onSum/
+    #     elif stimInfo[1] == 'off':
+    #         self.offSum[:,stimInfo[0]] += ests[:,-1]
+    #     else:
+    #         logger.warning('Stim neither on nor off?')
+
+    #     for s,l in self.stim.items():
+    #         if 'on' in l.keys() and 'off' in l.keys():
+    #             onInd = np.array(l['on'])
+    #             offInd = np.array(l['off'])
+    #             try:
+    #                 on = np.mean(ests[:,onInd], axis=1)
+    #                 spikeOn = np.mean(S[:,onInd], axis=1)
+    #                 onS = np.std(ests[:,onInd], axis=1)
+    #                 off = np.mean(ests[:,offInd], axis=1)
+    #                 spikeOff = np.mean(S[:,offInd], axis=1) 
+    #                 offS = np.std(ests[:,offInd], axis=1)
+    #                 tmpS = np.sqrt(np.square(onS)+np.square(offS))
+    #                 try:
+    #                     estsAvg[int(s)] = (on / off) - 1
+    #                 except FloatingPointError:
+    #                     estsAvg[int(s)] = on
+    #                 estsStd[int(s)] = tmpS
+    #                 onStim[int(s)] = on
+    #                 offStim[int(s)] = off
+    #                 try:
+    #                     spikeAvg[int(s)] = spikeOn/spikeOff - 1
+    #                 except FloatingPointError:
+    #                     spikeAvg[int(s)] = spikeOn
+    #             except IndexError:
+    #                 pass
+    #         else:
+    #             estsAvg[int(s)] = np.zeros(ests.shape[0])
+    #             estsStd[int(s)] = np.zeros(ests.shape[0])
+    #             onStim[int(s)] = np.zeros(ests.shape[0])
+    #             offStim[int(s)] = np.zeros(ests.shape[0])
+    #             spikeAvg[int(s)] = np.zeros(ests.shape[0])
+    #     self.estsAvg = np.transpose(np.array(estsAvg))
+    #     self.estsStd = np.transpose(np.array(estsStd))
+    #     self.estsOn = np.transpose(np.array(onStim))
+    #     self.estsOff = np.transpose(np.array(offStim))
+    #     self.spikeAvg = np.transpose(np.array(spikeAvg))
+    #     self.estsAvg = np.where(np.isnan(self.estsAvg), 0, self.estsAvg)
+    #     self.stimtime.append(time.time()-t)
 
     def plotColorFrame(self):
         ''' Computes colored nicer background+components frame
