@@ -106,6 +106,7 @@ class Module():
             print('Lowered ', os.getpid(), ' for ', self.name)
 
 
+
 class Spike():
     ''' Class containing definition of signals Nexus uses
         to communicate with its modules

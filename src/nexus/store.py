@@ -50,6 +50,9 @@ class Limbo(StoreInterface):
         self.store_loc = store_loc
         self.client = self.connectStore(store_loc)
         self.stored = {}
+        print(str(self.name) + ": Initializing put(), get() Timing Arrays")
+        self.pPutT = np.empty(0)
+        self.pGetT = np.empty(0)
     
     def reset(self):
         ''' Reset client connection
@@ -111,10 +114,20 @@ class Limbo(StoreInterface):
         '''
         object_id = None
         try:
+            print("RECORDING PUT TIME")
+            currT = time.time()
+
             object_id = self.client.put(object)
             self.updateStored(object_name, object_id)
             # saveObj(object, object_id)
             #logger.debug('object successfully stored: '+object_name)
+
+            diff = time.time()-currT
+            self.pPutT = np.append(self.pPutT, diff)
+            print("PUT TIME: " + str(diff))
+            print(self.pPutT)
+            self.savePutTime(self.pPutT, self.name)
+            print("LOGGING PUT TIME")
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
             #raise PlasmaObjectExists
@@ -125,6 +138,9 @@ class Limbo(StoreInterface):
         except Exception as e:
             logger.error('Could not store object '+object_name+': {} {}'.format(type(e).__name__, e))
         return object_id
+
+    def savePutTime(self, time, mName):
+        np.save(str(mName) + "Put", self.pPutT)
 
     def _put(self, obj, id):
         return self.client.put(obj, id)
@@ -220,12 +236,25 @@ class Limbo(StoreInterface):
             return res
 
     def getID(self, obj_id):
+        print("RECORDING GET TIME")
+        currTime = time.time()
+
         res = self.client.get(obj_id,0)
+
+        diff = time.time() - currTime
+        self.pGetT = np.append(self.pGetT, diff)
+        print("GET TIME: " + str(diff))
+        print(self.pGetT)
+        self.saveGetTime(self.pGetT, self.name)
+        print("LOGGING GET TIME")
         if isinstance(res, type):
             logger.warning('Object {} cannot be found.'.format(obj_id))
             raise ObjectNotFoundError
         else:
             return res
+
+    def saveGetTime(self, time, mName):
+        np.save(str(mName) + "Get", self.pGetT)
 
     def getList(self, ids):
         return self.client.get(ids)
@@ -284,6 +313,10 @@ class Limbo(StoreInterface):
         '''
         raise NotImplementedError
 
+    def printPData(self):
+        print(self.pPutT)
+        print(self.pGetT)
+
 class HStore(StoreInterface):
     ''' Implementation of the data store on disk.
         Using dict-like structure, employs h5py via hickle
@@ -335,7 +368,7 @@ class Watcher():
         self.flag = False
         self.saved_ids = []
 
-        self.client.subscribe()
+        #self.client.subscribe()
         self.n = 0
 
     def setLinks(self, links):
