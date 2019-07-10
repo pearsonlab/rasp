@@ -257,7 +257,18 @@ class Limbo(StoreInterface):
         np.save(str(mName) + "Get", self.pGetT)
 
     def getList(self, ids):
-        return self.client.get(ids)
+        print("RECORDING GET TIME")
+        currTime = time.time()
+
+        res = self.client.get(ids)
+
+        diff = time.time() - currTime
+        self.pGetT = np.append(self.pGetT, diff)
+        print("GET TIME: " + str(diff))
+        print(self.pGetT)
+        self.saveGetTime(self.pGetT, self.name)
+        print("LOGGING GET TIME")
+        return res
 
     def deleteName(self, object_name):
         ''' Deletes an object from the store based on name
