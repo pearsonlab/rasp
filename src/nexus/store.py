@@ -1,31 +1,24 @@
-import copy
-import datetime
-import pickle
-import subprocess
-import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
-from multiprocessing import Pool, Process
-from pathlib import Path
-from queue import Empty
-from typing import Dict
-
-import lmdb
+import sys
 import numpy as np
+import pickle
 import pyarrow as arrow
-import pyarrow.plasma as plasma
 from pyarrow import PlasmaObjectExists
-from pyarrow.lib import ArrowIOError
+import pyarrow.plasma as plasma
 from pyarrow.plasma import ObjectNotAvailable
-from scipy.sparse.csc import csc_matrix
-
+from pyarrow.lib import ArrowIOError
+import subprocess
+from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
+from queue import Empty
 from nexus.module import Spike
 
-import logging; logger = logging.getLogger(__name__)
+from scipy.sparse import csc_matrix
+
+import logging; logger=logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 #TODO: Use Apache Arrow for better memory usage with the Plasma store
-
 
 class StoreInterface():
     '''General interface for a store
@@ -42,8 +35,11 @@ class StoreInterface():
     def replace(self):
         raise NotImplementedError
 
+    def subscribe(self):
+        raise NotImplementedError
 
-class Limbo(StoreInterface): # Plasma interface
+
+class Limbo(StoreInterface):
     ''' Basic interface for our specific data store
         implemented with apache arrow plasma
         Objects are stored with object_ids
@@ -233,7 +229,7 @@ class Limbo(StoreInterface): # Plasma interface
 
         # Check/confirm we need to replace
         if object_name in self.stored:
-            logger.debug('replacing ' + object_name)
+            logger.debug('replacing '+object_name)
             #self.saveSubstore(object_name) #TODO
             old_id = self.stored[object_name]
             self.delete(object_name)
@@ -258,20 +254,24 @@ class Limbo(StoreInterface): # Plasma interface
         '''
         buf = arrow.serialize(data).to_buffer()
 
+
     def _getArray(self, buf):
         return arrow.deserialize(buf)
+
 
     def updateStored(self, object_name, object_id):
         ''' Update local dict with info we need locally
             Report to Nexus that we updated the store
                 (did a put or delete/replace)
         '''
-        self.stored.update({object_name: object_id})
+        self.stored.update({object_name:object_id})
+
 
     def getStored(self):
         ''' returns its info about what it has stored
         '''
         return self.stored
+
 
     def get(self, object_name):
         ''' Get a single object from the store
@@ -279,6 +279,7 @@ class Limbo(StoreInterface): # Plasma interface
             Otherwise throw CannotGetObject to request dict update
             TODO: update for lists of objects
         '''
+        #print('trying to get ', object_name)
         if self.stored.get(object_name) is None:
             logger.error('Never recorded storing this object: '+object_name)
             # Don't know anything about this object, treat as problematic
@@ -286,10 +287,12 @@ class Limbo(StoreInterface): # Plasma interface
         else:
             return self._get(object_name)
 
+
     def get_all(self):
         ''' Get a listing of all objects in the store
         '''
         return self.client.list()
+
 
     def _get(self, object_name):
         ''' Get an object from the store using its name
