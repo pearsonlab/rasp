@@ -1,5 +1,6 @@
 import time
 import sys
+import lmdb
 import numpy as np
 import pickle
 import pyarrow as arrow
@@ -12,7 +13,6 @@ from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
 from queue import Empty
 from nexus.module import Spike
-
 from scipy.sparse import csc_matrix
 
 import logging; logger=logging.getLogger(__name__)
@@ -48,8 +48,8 @@ class Limbo(StoreInterface):
     '''
 
     def __init__(self, name='default', store_loc='/tmp/store',
-                 use_hdd=True, hdd_maxstore=1e10, hdd_path='output/', flush_immediately=False,
-                 commit_freq: int = 20):
+                 use_hdd=False, hdd_maxstore=1e10, hdd_path='output/', flush_immediately=False,
+                 commit_freq=20):
 
         """
         Constructor for the Limbo
@@ -161,7 +161,6 @@ class Limbo(StoreInterface):
         :return: Plasma object ID
         :rtype: class 'plasma.ObjectID'
         """
-
         object_id = None
 
         try:
