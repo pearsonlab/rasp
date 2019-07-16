@@ -48,7 +48,7 @@ class Limbo(StoreInterface):
     '''
 
     def __init__(self, name='default', store_loc='/tmp/store',
-                 use_hdd=False, hdd_maxstore=1e10, hdd_path='output/', flush_immediately=False,
+                 use_hdd=True, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
                  commit_freq=20):
 
         """
@@ -71,7 +71,7 @@ class Limbo(StoreInterface):
         self.name = name
         self.store_loc = store_loc
         self.client = self.connectStore(store_loc)
-        self.stored = {} # Dict of all objects
+        self.stored = {}  # Dict of all objects
 
         # Offline db
         self.use_hdd = use_hdd

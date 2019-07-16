@@ -116,3 +116,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+*.xml
+*basic_demo.yaml
+*.iml
+*lmdb*
+*.hdf5
