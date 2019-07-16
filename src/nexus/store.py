@@ -48,7 +48,7 @@ class Limbo(StoreInterface):
     '''
 
     def __init__(self, name='default', store_loc='/tmp/store',
-                 use_hdd=True, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
+                 use_hdd=False, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
                  commit_freq=20):
 
         """
@@ -56,6 +56,7 @@ class Limbo(StoreInterface):
 
         :param name:
         :param store_loc: Apache Arrow Plasma client location
+
         :param use_hdd: bool Also write data to disk using the LMDB
 
         :param hdd_maxstore:
@@ -78,15 +79,9 @@ class Limbo(StoreInterface):
         self.flush_immediately = flush_immediately
 
         if use_hdd:
-            if not isinstance(hdd_path, str):
-                raise ValueError('Invalid disk file path.')
+            self.lmdb_store = HStore(hdd_maxstore=hdd_maxstore, hdd_path=hdd_path, flush_immediately=flush_immediately,
+                                     commit_freq=commit_freq, from_limbo=True)
 
-            filename = f'/lmdb'  # {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
-
-            self.lmdb_env = lmdb.open(hdd_path + filename, map_size=hdd_maxstore, sync=flush_immediately)
-            self.lmdb_commit_freq = commit_freq
-            self.lmdb_put_cache = {}
-            self.lmdb_obj_id_to_key = {}
 
     def reset(self):
         ''' Reset client connection
@@ -97,12 +92,6 @@ class Limbo(StoreInterface):
     def release(self):
         self.client.disconnect()
 
-    def flush(self):
-        """ Must run before exiting. Flushes buffer to disk. """
-        if self.use_hdd:
-            self.lmdb_env.sync()
-            self.lmdb_env.close()
-            print('Flushed!')
 
     def connectStore(self, store_loc):
         ''' Connect to the store at store_loc
@@ -173,7 +162,7 @@ class Limbo(StoreInterface):
             self.updateStored(object_name, object_id)
 
             if self.use_hdd:
-                self._lmdb_helper(obj, object_id, object_name, flush_this_immediately=flush_this_immediately)
+                self.lmdb_store.put(obj, object_name, obj_id=object_id, flush_this_immediately=flush_this_immediately)
 
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
@@ -189,32 +178,6 @@ class Limbo(StoreInterface):
 
         return object_id
 
-    def _lmdb_helper(self, obj, obj_id, object_name, flush_this_immediately):
-        """
-        LMDB interface
-
-        :param obj: Object to be saved
-        :param obj_id: Object_id from Plasma client
-        :type obj_id: class 'plasma.ObjectID'
-        :param object_name:
-        :param flush_this_immediately: Override self.flush_immediately. For storage of critical objects.
-
-        :return: None
-        """
-        put_key: bytes = b''.join([object_name.encode(), pickle.dumps(time.time())])
-
-        self.lmdb_obj_id_to_key[obj_id] = put_key
-        self.lmdb_put_cache[put_key] = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
-
-        if len(self.lmdb_put_cache) > self.lmdb_commit_freq or (self.flush_immediately or flush_this_immediately):
-            with self.lmdb_env.begin(write=True) as txn:
-                for key, value in self.lmdb_put_cache.items():
-                    txn.put(key, value, overwrite=True)
-
-            self.lmdb_put_cache = {}
-
-            if flush_this_immediately:
-                self.lmdb_env.sync()
 
     def _put(self, obj, object_id):
         return self.client.put(obj, object_id)
@@ -310,7 +273,17 @@ class Limbo(StoreInterface):
             return res
 
     def getID(self, obj_id, hdd_only=False):
+        """
+        Get object by object ID
 
+        :param obj_id:
+        :type obj_id: class 'plasma.ObjectID'
+        :param hdd_only:
+
+        :raises ObjectNotFoundError
+
+        :return: Stored object
+        """
         # Check in RAM
         if not hdd_only:
             res = self.client.get(obj_id, 0)  # Timeout = 0 ms
@@ -323,10 +296,7 @@ class Limbo(StoreInterface):
 
         # Check in disk
         if self.use_hdd:
-            with self.lmdb_env.begin() as txn:
-                get_key = self.lmdb_obj_id_to_key[obj_id]
-                res = pickle.loads(txn.get(get_key))
-
+            res = self.lmdb_store.get(obj_id)
             if res is not None:
                 return res
 
@@ -334,6 +304,15 @@ class Limbo(StoreInterface):
         raise ObjectNotFoundError
 
     def getList(self, ids):
+        """
+        Get objects using a list of object ID
+
+        :param ids: List of object IDs
+        :type ids: List[plasma.ObjectID]
+        :return: List of requested objects
+        :rtype: List[object]
+        """
+
         return [self.getID(i) for i in ids]  # self.client.get(ids) # Need to replace to enable LMDB
 
     def deleteName(self, object_name):
@@ -351,9 +330,22 @@ class Limbo(StoreInterface):
             retcode = self._delete(object_name)
             self.stored.pop(object_name)
             
-    def delete(self, id):
+    def delete(self, obj_id):
+        """
+        Delete object from store
+
+        :param obj_id:
+        :type obj_id: class 'plasma.ObjectID'
+        :raises: Exception
+        :return: None
+        """
+
         try:
-            self.client.delete([id])
+            self.client.delete([obj_id])
+
+            if self.use_hdd:
+                self.lmdb_store.delete(obj_id)
+
         except Exception as e:
             logger.error('Couldnt delete: {}'.format(e))
     
@@ -390,30 +382,106 @@ class Limbo(StoreInterface):
         '''
         raise NotImplementedError
 
+
 class HStore(StoreInterface):
-    ''' Implementation of the data store on disk.
-        Using dict-like structure, employs h5py via hickle
-    '''
 
-    def __init__(self):
-        ''' Construct the initial store.
-        '''
-        pass
+    def __init__(self, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
+                 commit_freq=20, from_limbo=False):
+        """
+        Constructor for LMDB store
 
-    def get(self):
-        pass
+        :param hdd_maxstore:
+            Maximum size database may grow to; used to size the memory mapping.
+            If the database grows larger than map_size, a MapFullError will be raised.
+            On 64-bit there is no penalty for making this huge. Must be <2GB on 32-bit.
 
-    def put(self):
-        pass
+        :param hdd_path: Path to LMDB folder.
+        :param flush_immediately: Save objects to disk immediately
+        :param commit_freq: If not flush_immediately, flush data to disk every _ puts.
+        :param from_limbo: If instantiated from Limbo. Enables object ID functionality.
+        """
 
-    def delete(self):
-        pass
+        if not isinstance(hdd_path, str):
+            raise ValueError('Invalid disk file path.')
 
-    def replace(self):
-        pass
+        filename = f'/lmdb'  # {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
 
-    def subscribe(self):
-        pass
+        self.flush_immediately = flush_immediately
+        self.lmdb_env = lmdb.open(hdd_path + filename, map_size=hdd_maxstore, sync=flush_immediately)
+        self.lmdb_commit_freq = commit_freq
+        self.lmdb_obj_id_to_key = {}  # Can be name or key, depending on from_limbo
+        self.lmdb_put_cache = {}
+        self.from_limbo = from_limbo
+
+    def get(self, obj_name_or_id):
+        """
+        Get object from object name (!from_limbo) or ID (from_limbo). Return None if object is not found.
+
+        :param obj_name_or_id:
+        :return: object
+        """
+
+        with self.lmdb_env.begin() as txn:
+            get_key = self.lmdb_obj_id_to_key[obj_name_or_id]
+            return pickle.loads(txn.get(get_key))
+
+    def put(self, obj, obj_name, obj_id=None, flush_this_immediately=False):
+        """
+        Put object ID / object pair into LMDB.
+
+        :param obj: Object to be saved
+        :param obj_name:
+        :type obj_name: str
+        :param obj_id: Object_id from Plasma client
+        :type obj_id: class 'plasma.ObjectID'
+        :param flush_this_immediately: Override self.flush_immediately. For storage of critical objects.
+
+        :return: None
+        """
+
+        put_key: bytes = b''.join([obj_name.encode(), pickle.dumps(time.time())])
+
+        if self.from_limbo:
+            self.lmdb_obj_id_to_key[obj_id] = put_key
+        else:
+            self.lmdb_obj_id_to_key[obj_name] = put_key
+
+        self.lmdb_put_cache[put_key] = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+
+        if len(self.lmdb_put_cache) > self.lmdb_commit_freq or (self.flush_immediately or flush_this_immediately):
+            with self.lmdb_env.begin(write=True) as txn:
+                for key, value in self.lmdb_put_cache.items():
+                    txn.put(key, value, overwrite=True)
+
+            self.lmdb_put_cache = {}
+
+            if flush_this_immediately:
+                self.lmdb_env.sync()
+
+    def delete(self, obj_id):
+        """
+        Delete object from LMDB.
+
+        :param obj_id:
+        :type obj_id: class 'plasma.ObjectID'
+        :raises: ObjectNotFoundError
+        :return:
+        """
+
+        with self.lmdb_env.begin(write=True) as txn:
+            out = txn.pop(self.lmdb_obj_id_to_key[obj_id])
+        if out is None:
+            raise ObjectNotFoundError
+
+    def flush(self):
+        """ Must run before exiting. Flushes buffer to disk. """
+        self.lmdb_env.sync()
+        self.lmdb_env.close()
+        print('Flushed!')
+
+    def replace(self): pass
+
+    def subscribe(self): pass
 
 
 def saveObj(obj, name):
