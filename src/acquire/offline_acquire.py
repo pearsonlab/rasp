@@ -1,3 +1,4 @@
+import logging
 import pickle
 import time
 from typing import List
@@ -7,8 +8,8 @@ import numpy as np
 
 from .acquire import Acquirer
 from nexus.module import RunManager
+from utils import utils
 
-import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -30,13 +31,16 @@ class LMDBAcquirer(Acquirer):
         self.framerate = 1 / framerate
 
     def setup(self):
-        # Load everything into memory right away.
+
+        num_idx = utils.get_num_length_from_key()
         # Get keys associated with raw frames then get objects
         with lmdb.open(self.lmdb_path) as lmdb_env:
             with lmdb_env.begin() as txn:
                 with txn.cursor() as cur:
                     keys = cur.iternext(keys=True, values=False)
-                    keys_raw = (key for key in keys if key.startswith(b'acq_raw'))
+                    # Need to sort since acquirer store frame nums without leading zeroes.
+                    keys_raw = sorted([key for key in keys if key.startswith(b'acq_raw')],
+                                      key=lambda key: int(key[-12-num_idx.send(key):-12]))
                     raw_frames = [pickle.loads(cur.get(key)) for key in keys_raw]  # type: List[np.ndarray]
 
         self.data = np.stack(raw_frames)

@@ -11,6 +11,8 @@ from typing import Dict, Set
 
 import lmdb
 
+from .utils import get_num_length_from_key
+
 
 class LMDBReader:
     def __init__(self, path):
@@ -39,79 +41,60 @@ class LMDBReader:
 
     def get_data_types(self):
         """
-        :return: A set of all data types defined as {object_name} without number when the data were put into Limbo.
+        Return all data types defined as {object_name}, but without number.
+
         :rtype: Set[str]
         """
-        max_num_len = 1  # Keep track of largest digit for performance.
 
-        # Assuming that object name does not have any digits.
-        def get_name_from_key(key):
-            nonlocal max_num_len
-            name_num = key[:-12].decode()
-
-            if not name_num[-max_num_len:].isdigit():
-                i = max_num_len
-                while not name_num[-i:].isdigit():
-                    if i < 0:
-                        return name_num
-                    i -= 1
-                return name_num[:-i]
-
-            while name_num[-(max_num_len + 1):].isdigit():
-                max_num_len += 1
-            return name_num[:-max_num_len]
+        num_idx = get_num_length_from_key()
 
         with LMDBReader._lmdb_cur(self.path) as cur:
-            return {get_name_from_key(key) for key in cur.iternext(values=False)}
+            return {key[:-12 - num_idx.send(key)] for key in cur.iternext(values=False)}
 
     def get_data_by_number(self, t):
         """
-        Return data at a specific frame number
+        Return data at a specific frame number.
 
         :param t: Frame number
         :type t: int
         :return:
         :rtype: Dict[str: object]
         """
-        if not isinstance(t, numbers.Integral):
-            raise TypeError
 
-        max_num_len = 1  # Keep track of largest digit for performance.
+        num_idx = get_num_length_from_key()
 
-        # Assuming that object name does not have any digits.
-        def get_num_from_key(key):
-            nonlocal max_num_len
-            name_num = key[:-12].decode()
-
-            if not name_num[-max_num_len:].isdigit():
-                i = max_num_len
-                while not name_num[-i:].isdigit():
-                    if i < 0:
-                        return -1
-                    i -= 1
-                return name_num[-i:]
-
-            while name_num[-(max_num_len + 1):].isdigit():
-                max_num_len += 1
-            return name_num[-max_num_len:]
+        def check_if_key_equals_t(key):
+            try:
+                return True if int(key[-12 - num_idx.send(key): -12]) == t else False
+            except ValueError:
+                return False
 
         with LMDBReader._lmdb_cur(self.path) as cur:
-            keys = (key for key in cur.iternext(values=False) if int(get_num_from_key(key)) == t)
+            keys = (key for key in cur.iternext(values=False) if check_if_key_equals_t(key))
             return {LMDBReader._decode_key(key): pickle.loads(cur.get(key)) for key in keys}
 
     def get_data_by_type(self, t):
         """
-        Return data with key that starts with {t}
+        Return data with key that starts with {t}.
 
         :param t: Data prefix
         :type t: str
-        :return:
         :rtype: Dict[str: object]
         """
 
         with LMDBReader._lmdb_cur(self.path) as cur:
             keys = (key for key in cur.iternext(values=False) if key.startswith(t.encode()))
             return {LMDBReader._decode_key(key): pickle.loads(cur.get(key)) for key in keys}
+
+    def get_params(self):
+        """
+        Return parameters in a dictionary.
+
+        :rtype: Dict[str: object]
+        """
+        with LMDBReader._lmdb_cur(self.path) as cur:
+            keys = [key for key in cur.iternext(values=False) if key.startswith(b'params_dict')]
+            return pickle.loads(cur.get(keys[-1]))
 
     @staticmethod
     def _decode_key(key):
