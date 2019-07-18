@@ -1,19 +1,19 @@
+import datetime
+import os
+import pickle
 import time
-import sys
+from queue import Empty
+
 import lmdb
 import numpy as np
-import pickle
 import pyarrow as arrow
-from pyarrow import PlasmaObjectExists
 import pyarrow.plasma as plasma
-from pyarrow.plasma import ObjectNotAvailable
+from pyarrow import PlasmaObjectExists
 from pyarrow.lib import ArrowIOError
-import subprocess
-from multiprocessing import Pool
-from concurrent.futures import ThreadPoolExecutor
-from queue import Empty
-from nexus.module import Spike
+from pyarrow.plasma import ObjectNotAvailable
 from scipy.sparse import csc_matrix
+
+from nexus.module import Spike
 
 import logging; logger=logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -79,8 +79,8 @@ class Limbo(StoreInterface):
         self.flush_immediately = flush_immediately
 
         if use_hdd:
-            self.lmdb_store = HStore(hdd_maxstore=hdd_maxstore, hdd_path=hdd_path, flush_immediately=flush_immediately,
-                                     commit_freq=commit_freq, from_limbo=True)
+            self.lmdb_store = LMDBStore(max_size=hdd_maxstore, path=hdd_path, flush_immediately=flush_immediately,
+                                        commit_freq=commit_freq, from_limbo=True)
 
 
     def reset(self):
@@ -383,31 +383,35 @@ class Limbo(StoreInterface):
         raise NotImplementedError
 
 
-class HStore(StoreInterface):
+class LMDBStore(StoreInterface):
 
-    def __init__(self, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
-                 commit_freq=20, from_limbo=False):
+    def __init__(self, path='output/', name=None, max_size=1e12,
+                 flush_immediately=False, commit_freq=20, from_limbo=False):
         """
         Constructor for LMDB store
 
-        :param hdd_maxstore:
+        :param path: Path to LMDB folder.
+        :param name: Name of LMDB. Default to lmdb_[current time in human format].
+        :param max_size:
             Maximum size database may grow to; used to size the memory mapping.
             If the database grows larger than map_size, a MapFullError will be raised.
             On 64-bit there is no penalty for making this huge. Must be <2GB on 32-bit.
-
-        :param hdd_path: Path to LMDB folder.
         :param flush_immediately: Save objects to disk immediately
         :param commit_freq: If not flush_immediately, flush data to disk every _ puts.
         :param from_limbo: If instantiated from Limbo. Enables object ID functionality.
         """
 
-        if not isinstance(hdd_path, str):
-            raise ValueError('Invalid disk file path.')
+        if name is None:
+            name = f'/lmdb_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
 
-        filename = f'/lmdb'  # {datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
+        if not os.path.exists(path):
+            raise FileNotFoundError('Folder to LMDB must exist. Run $mkdir [path].')
+
+        if os.path.exists(path + name):
+            raise FileExistsError('LMDB of the same name already exists.')
 
         self.flush_immediately = flush_immediately
-        self.lmdb_env = lmdb.open(hdd_path + filename, map_size=hdd_maxstore, sync=flush_immediately)
+        self.lmdb_env = lmdb.open(path + name, map_size=max_size, sync=flush_immediately)
         self.lmdb_commit_freq = commit_freq
         self.lmdb_obj_id_to_key = {}  # Can be name or key, depending on from_limbo
         self.lmdb_put_cache = {}
@@ -418,12 +422,16 @@ class HStore(StoreInterface):
         Get object from object name (!from_limbo) or ID (from_limbo). Return None if object is not found.
 
         :param obj_name_or_id:
-        :return: object
+        :return: object or None if object is not found.
         """
 
         with self.lmdb_env.begin() as txn:
             get_key = self.lmdb_obj_id_to_key[obj_name_or_id]
-            return pickle.loads(txn.get(get_key))
+            r = txn.get(get_key)
+            if r is not None:
+                return pickle.loads(r)
+            else:
+                return None
 
     def put(self, obj, obj_name, obj_id=None, flush_this_immediately=False):
         """

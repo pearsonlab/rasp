@@ -118,7 +118,9 @@ dmypy.json
 .pyre/
 
 *.xml
-*basic_demo.yaml
+basic_demo.yaml
 *.iml
 *lmdb*
 *.hdf5
+*.ipynb
+
