@@ -7,7 +7,7 @@ modules:
   Acquirer:
     package: acquire.acquire
     class: FileAcquirer
-    filename: data/tbif_ex.h5
+    filename: /Users/chaichontat/Desktop/Lab/rasp/data/Tolias_mesoscope_2.hdf5
     framerate: 15
 
   Processor:
@@ -22,13 +22,18 @@ modules:
     package: analysis.analysis
     class: MeanAnalysis
 
+  JuliaAnalysis:
+    package: analysis.analysis_julia
+    class: JuliaAnalysis
+
   InputStim:
     package: acquire.acquire
     class: BehaviorAcquirer
 
 
 connections:
-  Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue]
+  Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue, JuliaAnalysis.q_in]
   Processor.q_out: [Analysis.q_in]
   Analysis.q_out: [Visual.q_in]
   InputStim.q_out: [Analysis.input_stim_queue]
+  JuliaAnalysis.q_out: [Analysis.hi]
