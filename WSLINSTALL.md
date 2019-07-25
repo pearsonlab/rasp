@@ -167,4 +167,7 @@ Several issues can appear during the CaImAn installation process. It is recommen
         sudo apt-get install g++
         ```
 
+5. RASP freezing entirely
+    - Solved by commented out `self.limbo.subscribe()` in nexus.py createNexus() function and `self.client.subscribe()` in store.py under the Watcher class
+
 
