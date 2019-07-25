@@ -173,7 +173,7 @@ class Nexus():
     
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
-        self.limbo.subscribe()
+        #self.limbo.subscribe()
 
         self.comm_queues = {}
         self.sig_queues = {}
@@ -540,7 +540,7 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='eva_demo.yaml')
+    nexus.createNexus(file='basic_demo.yaml')
     #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
     

@@ -3,7 +3,7 @@ import os
 from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import pyqtSignal, Qt
-from visual import rasp_ui_huge as rasp_ui
+from visual import rasp_ui_large as rasp_ui
 from nexus.store import Limbo
 import numpy as np
 from math import floor
@@ -79,13 +79,13 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #polar plotting
         self.num = 21
-        theta = np.linspace(0, 2*np.pi, self.num-1)
-        theta = np.append(theta,0)
-        self.theta = theta
+        #theta = np.linspace(0, 2*np.pi, self.num-1)
+        #theta = np.append(theta,0)
+        #self.theta = theta
         radius = np.zeros(self.num)
         self.thresh_r = radius + 1
-        x = radius * np.cos(theta)
-        y = radius * np.sin(theta)
+        #x = radius * np.cos(theta)
+        #y = radius * np.sin(theta)
 
         #polar plots
         polars = [self.grplot_3, self.grplot_4, self.grplot_5]
@@ -104,8 +104,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         
         self.polar1 = polars[0].plot()
         self.polar2 = polars[1].plot()
-        self.polar1.setData(x, y)
-        self.polar2.setData(x, y)
+        #self.polar1.setData(x, y)
+        #self.polar2.setData(x, y)
 
         for r in range(2, 12, 2):
                 circle = pyqtgraph.QtGui.QGraphicsEllipseItem(-r, -r, r*2, r*2)
@@ -228,22 +228,37 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #TODO: rewrite as set of polar[] and set of tune[]
         if tune:
-            self.num = tune[0].shape[0]
+            self.offset = np.pi / 2 # Offset of 90 degrees
+
+            self.num = tune[0].shape[0] # self.num is subject to tune[0] length
             theta = np.linspace(0, 2*np.pi, self.num-1)
             theta = np.append(theta,0)
-            self.theta = theta  
-            if(tune[0] is not None):
+            self.theta = theta
+
+            print("SELF.NUM: " + str(self.num))
+            print("TUNE[0]")
+            print(tune[0])
+            print("TUNE[1]")
+            print(tune[1])
+
+            if (tune[0] is not None):
                 self.radius = np.zeros(self.num)
                 self.radius[:len(tune[0])] = tune[0]
-                self.x = self.radius * np.cos(self.theta)
-                self.y = self.radius * np.sin(self.theta)
+                print("tune[0] theta: ")
+                print(self.theta)
+                self.x = self.radius * np.cos(self.theta + self.offset)
+                print("tune[0] theta + offset: ")
+                print(self.theta + self.offset)
+                print("x: " + str(self.x))
+                self.y = self.radius * np.sin(self.theta + self.offset)
+                print("y: " + str(self.y))
                 self.polar2.setData(self.x, self.y, pen=penR)
 
-            if(tune[1] is not None):
+            if (tune[1] is not None):
                 self.radius2 = np.zeros(self.num)
                 self.radius2[:len(tune[1])] = tune[1]
-                self.x2 = self.radius2 * np.cos(self.theta)
-                self.y2 = self.radius2 * np.sin(self.theta)
+                self.x2 = self.radius2 * np.cos(self.theta + self.offset)
+                self.y2 = self.radius2 * np.sin(self.theta + self.offset)
                 self.polar1.setData(self.x2, self.y2, pen=penW)
         else:
             logger.error('Visual received None tune')

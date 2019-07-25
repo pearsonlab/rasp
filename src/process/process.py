@@ -62,8 +62,9 @@ class CaimanProcessor(Processor):
             # each parameter needed by default (TODO change that?)
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
-            cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/tbif_ex.h5'], #Tolias_mesoscope_2.hdf5'],
+            cwd = os.path.normpath(os.getcwd() + os.sep + os.pardir)
+            print(cwd)
+            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_1.hdf5'], #Tolias_mesoscope_2.hdf5'],
                    'fr': 15,
                    'decay_time': 0.5,
                    'gSig': (5,5),

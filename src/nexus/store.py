@@ -335,7 +335,7 @@ class Watcher():
         self.flag = False
         self.saved_ids = []
 
-        self.client.subscribe()
+        #self.client.subscribe()
         self.n = 0
 
     def setLinks(self, links):
