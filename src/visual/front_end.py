@@ -228,18 +228,18 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #TODO: rewrite as set of polar[] and set of tune[]
         if tune:
-            self.offset = np.pi / 2 # Offset of 90 degrees
+            self.offset = 0 # Offset variable included
 
-            self.num = tune[0].shape[0] # self.num is subject to tune[0] length
+            self.num = tune[0].shape[0]
             theta = np.linspace(0, 2*np.pi, self.num-1)
             theta = np.append(theta,0)
             self.theta = theta
 
-            print("SELF.NUM: " + str(self.num))
-            print("TUNE[0]")
-            print(tune[0])
-            print("TUNE[1]")
-            print(tune[1])
+            #print("SELF.NUM: " + str(self.num))
+            #print("TUNE[0]")
+            #print(tune[0])
+            #print("TUNE[1]")
+            #print(tune[1])
 
             if (tune[0] is not None):
                 self.radius = np.zeros(self.num)
