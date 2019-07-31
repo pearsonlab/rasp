@@ -3,17 +3,13 @@ import time
 from queue import Empty
 
 import colorama
+import julia
 import numpy as np
 
 from nexus.module import RunManager
 from nexus.store import ObjectNotFoundError
 from .analysis import Analysis
 
-"""Need to run this, otherwise https://pyjulia.readthedocs.io/en/latest/troubleshooting.html#your-python-interpreter-is-statically-linked-to-libpython"""
-from julia.api import Julia
-print(f'Loading Julia. This will take ~30 s.')
-j = Julia(compiled_modules=False)
-from julia import Main
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -29,6 +25,12 @@ class JuliaAnalysis(Analysis):
 
     def __init__(self, *args):
         super().__init__(*args)
+        self.julia = julia.Julia(compiled_modules=False)
+        print(f'Loading Julia. This will take ~30 s.')
+
+        # Load user-defined functions from file
+        self.j_func = self.julia.include('julia_func.jl')  # TODO: Hard-coded
+
         self.run_every_n_frames = 10
 
         self.frame_number = 0
@@ -39,9 +41,7 @@ class JuliaAnalysis(Analysis):
         self.t_per_put = list()
 
     def setup(self, param_file=None):
-        # Import Julia libs
-        Main.eval("""import Statistics: mean
-                     result = zeros(10)""")
+        pass
 
     def run(self):
         with RunManager(self.name, self.runner, self.setup, self.q_sig, self.q_comm) as rm:
@@ -69,15 +69,10 @@ class JuliaAnalysis(Analysis):
             self.frame_number += 1
             if len(self.frame_buffer) > self.run_every_n_frames:
                 self.run_julia_analyses()
-
-        self.t_per_frame.append([time.time(), time.time() - t])
+            self.t_per_frame.append([time.time(), time.time() - t])
 
     def run_julia_analyses(self):
-        Main.x = np.array(self.frame_buffer)
-        Main.eval("""for i in 1:10
-                        result[i] = mean(x[i, :, :])
-                     end""")
-        self.result_ex = Main.result
+        self.result_ex = self.j_func(np.array(self.frame_buffer))
         print(f'{colorama.Fore.GREEN} Julia: mean intensity of frame {self.frame_number} is {self.result_ex[-1]}')
         self.frame_buffer = list()
 
