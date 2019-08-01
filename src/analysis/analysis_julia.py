@@ -27,21 +27,27 @@ class JuliaAnalysis(Analysis):
         super().__init__(*args)
         self.julia = julia.Julia(compiled_modules=False)
         print(f'Loading Julia. This will take ~30 s.')
-
-        # Load user-defined functions from file
-        self.j_func = self.julia.include('julia_func.jl')  # TODO: Hard-coded
+        self.j_func = list()
 
         self.run_every_n_frames = 10
 
+        self.frame = None  # np.ndarray
         self.frame_number = 0
-        self.frame_buffer = list()
         self.result_ex = None  # np.ndarray
 
         self.t_per_frame = list()
         self.t_per_put = list()
 
-    def setup(self, param_file=None):
-        pass
+    def setup(self, julia_file='julia_func.jl'):
+        # Load user-defined functions from file
+        if isinstance(julia_file, str):
+            self.julia.include(julia_file)
+        else:
+            for f in julia_file:
+                self.julia.include(f)
+
+        # Define functions: set conversion to zero-copy PyArray
+        self.j_func.append(self.julia.eval('pyfunction(get_mean, PyArray)'))
 
     def run(self):
         with RunManager(self.name, self.runner, self.setup, self.q_sig, self.q_comm) as rm:
@@ -56,7 +62,7 @@ class JuliaAnalysis(Analysis):
 
         try:
             obj_id = self.q_in.get(timeout=0.0001)  # List
-            self.frame_buffer.append(self.client.getID(obj_id[0][str(self.frame_number)]))  # Expected np.ndarray
+            self.frame = self.client.getID(obj_id[0][str(self.frame_number)])  # Expected np.ndarray
 
         except Empty:
             pass
@@ -67,14 +73,15 @@ class JuliaAnalysis(Analysis):
 
         else:
             self.frame_number += 1
-            if len(self.frame_buffer) > self.run_every_n_frames:
-                self.run_julia_analyses()
+            self.run_julia_analyses()
             self.t_per_frame.append([time.time(), time.time() - t])
 
     def run_julia_analyses(self):
-        self.result_ex = self.j_func(np.array(self.frame_buffer))
-        print(f'{colorama.Fore.GREEN} Julia: mean intensity of frame {self.frame_number} is {self.result_ex[-1]}')
-        self.frame_buffer = list()
+        for f in self.j_func:
+            self.result_ex = f(np.array(self.frame))
+
+        assert np.isclose(np.mean(self.frame), self.result_ex)
+        print(f'{colorama.Fore.GREEN} Julia: mean intensity of frame {self.frame_number} is {self.result_ex}')
 
     def export(self):
         t = time.time()
