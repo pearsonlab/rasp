@@ -2,7 +2,6 @@ import logging
 import time
 from queue import Empty
 
-import colorama
 import julia
 import numpy as np
 
@@ -19,7 +18,7 @@ class JuliaAnalysis(Analysis):
     """
     Class to run analyses in Julia.
 
-    This class puts in q_out the average frame_number intensity every 10 frames.
+    This class puts in q_out the average frame intensity.
 
     """
 
@@ -39,7 +38,16 @@ class JuliaAnalysis(Analysis):
         self.t_per_put = list()
 
     def setup(self, julia_file='julia_func.jl'):
-        # Load user-defined functions from file
+        """
+        Load user-defined functions from file(s).
+
+        Each function has to be wrapped in a Python object using the self.julia.eval command.
+        Anything function that takes in numpy arrays must be wrapped in pyfunction([func], PyArray).
+
+        :param julia_file: path to .jl file(s)
+        :type julia_file: str or list
+        """
+
         if isinstance(julia_file, str):
             self.julia.include(julia_file)
         else:
@@ -81,7 +89,7 @@ class JuliaAnalysis(Analysis):
             self.result_ex = f(np.array(self.frame))
 
         assert np.isclose(np.mean(self.frame), self.result_ex)
-        print(f'{colorama.Fore.GREEN} Julia: mean intensity of frame {self.frame_number} is {self.result_ex}')
+        # print(f'{colorama.Fore.GREEN} Julia: mean intensity of frame {self.frame_number} is {self.result_ex}')
 
     def export(self):
         t = time.time()
