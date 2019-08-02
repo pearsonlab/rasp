@@ -91,9 +91,9 @@ class FileAcquirer(Acquirer):
         if self.done:
             pass #logger.info('Acquirer is done, exiting')
             #return
-        elif(self.frame_num < len(self.data)*300):
+        elif(self.frame_num < len(self.data)*600):
             frame = self.getFrame(self.frame_num % len(self.data))
-            if self.frame_num > 2000 and self.frame_num < 3000:
+            if self.frame_num > 1500 and self.frame_num < 1550:
                 frame = None
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
             self.timestamp.append([time.time(), self.frame_num])
@@ -159,10 +159,10 @@ class TbifAcquirer(FileAcquirer):
 
         if self.done:
             pass 
-        elif(self.frame_num < len(self.data)*5):
+        elif(self.frame_num < len(self.data)*10):
             frame = self.getFrame(self.frame_num)
-            if self.frame_num > 1000 and self.frame_num < 2000:
-                frame = None
+            # if self.frame_num > 1000 and self.frame_num < 2000:
+            #     frame = None
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
             self.timestamp.append([time.time(), self.frame_num])
             try:
@@ -231,12 +231,13 @@ class BehaviorAcquirer(Module):
         ''' Check for input from behavioral control
         '''
         #Faking it for now. TODO: Talk to Max about his format
-        self.curr_stim = random.choice(self.behaviors)
+        if self.n %20 ==0 :
+            self.curr_stim = random.choice(self.behaviors)
         self.onoff = random.choice([0,20])
         self.q_out.put({self.n:[self.curr_stim, self.onoff]})
         #logger.info('Changed stimulus! {}'.format(self.curr_stim))
         #self.q_comm.put()
-        time.sleep(0.5)
+        time.sleep(0.068)
         self.n += 1
 
 if __name__ == '__main__':

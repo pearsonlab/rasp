@@ -7,7 +7,7 @@ modules:
   Acquirer:
     package: acquire.acquire
     class: FileAcquirer
-    filename: data/tbif_ex.h5
+    filename: data/zf1.h5
     framerate: 15
 
   Processor:

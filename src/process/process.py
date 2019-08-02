@@ -63,10 +63,10 @@ class CaimanProcessor(Processor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/tbif_ex.h5'], #Tolias_mesoscope_2.hdf5'],
-                   'fr': 15,
+            params_dict = {'fnames': [cwd+'/data/zf1.h5'], #Tolias_mesoscope_2.hdf5'],
+                   'fr': 3.6,
                    'decay_time': 0.5,
-                   'gSig': (5,5),
+                   'gSig': (3,3),
                    'p': 1,
                    'min_SNR': 1,
                    'rval_thr': 0.9,
@@ -138,7 +138,7 @@ class CaimanProcessor(Processor):
         with RunManager(self.name, self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
             
-        print('Processor broke, avg time per frame: ', np.mean(self.total_times))
+        print('Processor broke, avg time per frame: ', np.mean(self.total_times, axis=0))
         print('Processor got through ', self.frame_number, ' frames')
         np.savetxt('timing/process_frame_time.txt', np.array(self.total_times))
         np.savetxt('timing/process_timestamp.txt', np.array(self.timestamp))
@@ -198,7 +198,7 @@ class CaimanProcessor(Processor):
                 # Proceed at all costs
                 self.dropped_frames.append(self.frame_number)
             except Exception as e:
-                logger.error('Processor unknown error: {}: {} during frame number {}'.format(type(e).__name__, 
+                logger.error('Processor error: {}: {} during frame number {}'.format(type(e).__name__, 
                                                                                             e, self.frame_number))
                 print(traceback.format_exc())
                 self.dropped_frames.append(self.frame_number)
@@ -238,25 +238,46 @@ class CaimanProcessor(Processor):
         t = time.time()
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
-        #b = self.onAc.estimates.Ab[:, :nb] #toarray() ?
         before = self.frame_number-500 if self.frame_number > 500 else 0
         #C = self.onAc.estimates.C_on.get_ordered()
         t2 = time.time()
         if self.onAc.estimates.OASISinstances is not None:
             try:
-                S = np.stack([osi.s[before:self.frame_number] for osi in self.onAc.estimates.OASISinstances])
-            except ValueError:
-                max_len = max([len(osi.s[before:self.frame_number]) for osi in self.onAc.estimates.OASISinstances])
-                S = np.array([np.lib.pad(osi.s[before:self.frame_number], (0, max_len-len(osi.s[before:self.frame_number])), 'constant', constant_values=0) for osi in self.onAc.estimates.OASISinstances])
-            except Exception as e:
-                logger.error('Exception {}: {} during frame number {}'.format(type(e).__name__, e, self.frame_number))
-                print([osi.s.shape for osi in self.onAc.estimates.OASISinstances])
+                if self.dropped_frames and self.dropped_frames[-1] > before: #Need to pad with zeros due to dropped/missing frames
+                    S = np.zeros((self.onAc.estimates.C_on.shape[0], self.frame_number - before)) #should always be 500 or TODO self.onAC.window
+                    print('osi.s shape ', self.onAc.estimates.OASISinstances[0].s.shape)
+                    if before < self.dropped_frames[0]:
+                        tmp = np.stack([osi.s[before:self.dropped_frames[0]] for osi in self.onAc.estimates.OASISinstances])
+                        #print('before', before, 'dropped_frame[0]', self.dropped_frames[0])
+                        #print('tmp.shape', tmp.shape)
+                        S[:tmp.shape[0],:self.dropped_frames[0]-before] = tmp
+                    good_frames = np.array([f for f in range(before,self.frame_number,1) if f not in self.dropped_frames])
+                    if good_frames.shape[0] > 0:
+                        if good_frames[0] < self.onAc.estimates.OASISinstances[0].s.shape[0]: #may not have oasis for these frames yet
+                            tmp2 = np.stack([osi.s[good_frames] for osi in self.onAc.estimates.OASISinstances])
+                        #print('good_frames.shape', good_frames.shape)
+                        #print('good frames min max', good_frames[0], good_frames[1])
+                        #print('tmp2 shape', tmp2.shape)
+                        #print('before, frame number', before, self.frame_number)
+                            S[:tmp2.shape[0], good_frames-before] = tmp2
+                        else: #TODO just for testing
+                            tmp2 = np.stack([osi.s[-good_frames.shape[0]:] for osi in self.onAc.estimates.OASISinstances])
+                            S[:tmp2.shape[0], good_frames-before] = tmp2
+                        # max_len = max([len(osi.s[before:self.frame_number]) for osi in self.onAc.estimates.OASISinstances])
+                        # S = np.array([np.lib.pad(osi.s[before:self.frame_number], (0, max_len-len(osi.s[before:self.frame_number])), 'constant', constant_values=0) for osi in self.onAc.estimates.OASISinstances])
+                else:
+                    S = np.stack([osi.s[before:self.frame_number] for osi in self.onAc.estimates.OASISinstances])    
+            except IndexError:
+                print('Index error!')
+                print('shape good frames ', good_frames.shape)       
+                print('good frames', good_frames)
+                print('len dropped frames ', len(self.dropped_frames))
+                # if tmp2: print('tmp2 shape', tmp2.shape)
+                print(self.frame_number)
+                print(before)         
         else:
-            S = None #self.onAc.estimates.S = np.zeros_like(C)
+            S = np.zeros((self.onAc.estimates.C_on.shape[0], self.frame_number - before))
         t3 = time.time()
-        # f = self.onAc.estimates.C_on[:nb, :self.frame_number]
-        
-        #self.ests = C  # detrend_df_f(A, b, C, f) # Too slow!
 
         image = self.makeImage()
         t4 = time.time()
@@ -265,15 +286,15 @@ class CaimanProcessor(Processor):
         t5 = time.time()
 
         ids = []
-        #ids.append(self.client.put(np.array(C), 'C'+str(self.frame_number)))
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
         ids.append(self.client.put(S, 'S'+str(self.frame_number)))
+        ids.append(self.frame_number)
         t6 = time.time()
         self.q_out.put(ids)
         #self.q_comm.put([self.frame_number])
 
-        self.putAnalysis_time.append([time.time()-t])
+        self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4, t6-t5])
     
     def _updateCoords(self, A, dims):
         '''See if we need to recalculate the coords
@@ -287,7 +308,7 @@ class CaimanProcessor(Processor):
             #Only recalc if we have new components
             # FIXME: Since this is only for viz, only do this every 100 frames
             # TODO: maybe only recalc coords that are new? 
-            print('Recalc coords ', self.counter)
+            #print('Recalc coords ', self.counter)
             self.A = A
             self.coords = get_contours(A, dims)
             self.counter += 1
@@ -359,6 +380,8 @@ class CaimanProcessor(Processor):
             Returns the normalized/etc modified frame
         '''
         t=time.time()
+        if frame is None:
+            raise ObjectNotFoundError
         if np.isnan(np.sum(frame)):
             raise NaNFrameException
         frame = frame.astype(np.float32) #or require float32 from image acquistion

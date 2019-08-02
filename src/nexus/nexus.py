@@ -169,7 +169,7 @@ class Nexus():
             self.modules[classname].addLink(linktype, link)
 
     def createNexus(self, file=None):
-        self._startStore(35000000000) #default size should be system-dependent; this is 35 GB
+        self._startStore(40000000000) #default size should be system-dependent; this is 40 GB
     
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
@@ -540,9 +540,7 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='eva_demo.yaml')
+    nexus.createNexus(file='basic_demo.yaml')
     #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
-    
-    
     

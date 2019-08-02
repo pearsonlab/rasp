@@ -78,11 +78,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.activePlot = 'r'
 
         #polar plotting
-        self.num = 21
-        theta = np.linspace(0, 2*np.pi, self.num-1)
+        self.num = 8
+        theta = np.linspace(0, (315/360)*2*np.pi, self.num)
         theta = np.append(theta,0)
         self.theta = theta
-        radius = np.zeros(self.num)
+        radius = np.zeros(self.num+1)
         self.thresh_r = radius + 1
         x = radius * np.cos(theta)
         y = radius * np.sin(theta)
@@ -182,20 +182,24 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         image = None
         try:
             raw, color = self.visual.getFrames()
-            image = self.visual.plotThreshFrame(self.thresh_r)
+            image = self.visual.plotThreshFrame(self.thresh_r*2)
             if raw is not None:
+                raw = np.rot90(raw,2)
                 if np.unique(raw).size > 1:
                     self.rawplot.setImage(raw, autoHistogramRange=False)
                     self.rawplot.ui.histogram.vb.setLimits(yMin=50)
             if color is not None:
+                color = np.rot90(color,2)
                 self.rawplot_2.setImage(color)
                 self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
             if image is not None:
+                image = np.rot90(image,2)
                 self.rawplot_3.setImage(image)
                 self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
             logger.error('Error in FrontEnd update Video:  {}'.format(e))
+            raise Exception
 
         #print('update Video time ', time.time()-t)
 
@@ -227,23 +231,27 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     self._updateRedCirc()
 
         #TODO: rewrite as set of polar[] and set of tune[]
-        if tune:
+        if tune is not None:
             self.num = tune[0].shape[0]
-            theta = np.linspace(0, 2*np.pi, self.num-1)
+            theta = np.linspace(0, (315/360)*2*np.pi, self.num)
             theta = np.append(theta,0)
             self.theta = theta  
             if(tune[0] is not None):
-                self.radius = np.zeros(self.num)
-                self.radius[:len(tune[0])] = tune[0]
-                self.x = self.radius * np.cos(self.theta)
-                self.y = self.radius * np.sin(self.theta)
+                self.radius = np.zeros(self.num+1)
+                self.radius[:len(tune[0])] = tune[0]#/np.max(tune[0])
+                self.radius[-1] = self.radius[0]
+                #self.radius = np.roll(self.radius,2)
+                self.x = np.clip(self.radius * np.cos(self.theta) * 2, -5, 5)
+                self.y = np.clip(self.radius * np.sin(self.theta) * 2, -5, 5)
                 self.polar2.setData(self.x, self.y, pen=penR)
 
             if(tune[1] is not None):
-                self.radius2 = np.zeros(self.num)
-                self.radius2[:len(tune[1])] = tune[1]
-                self.x2 = self.radius2 * np.cos(self.theta)
-                self.y2 = self.radius2 * np.sin(self.theta)
+                self.radius2 = np.zeros(self.num+1)
+                self.radius2[:len(tune[1])] = tune[1]#/np.max(tune[1])
+                self.radius2[-1] = self.radius2[0]
+                #self.radius2 = np.roll(self.radius2,2)
+                self.x2 = np.clip(self.radius2 * np.cos(self.theta) * 2, -5, 5)
+                self.y2 = np.clip(self.radius2 * np.sin(self.theta) * 2, -5, 5)
                 self.polar1.setData(self.x2, self.y2, pen=penW)
         else:
             logger.error('Visual received None tune')
@@ -265,7 +273,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def sliderMoved(self):
         val = self.slider.value()
         if np.count_nonzero(self.thresh_r) == 0:
-            r = np.full(self.num,val)
+            r = np.full(self.num+1,val)
         else:
             r = self.thresh_r
             r[np.nonzero(r)] = val
@@ -273,17 +281,18 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def slider2Moved(self):
         r1,r2 = self.slider2.range()
-        r = np.full(self.num, self.slider.value())
+        r = np.full(self.num+1, self.slider.value())
         r1 = 4*np.pi*(r1-4)/360
         r2 = 4*np.pi*(r2-4)/360
         t1 = np.argmin(np.abs(np.array(r1)-self.theta))
         t2 = np.argmin(np.abs(np.array(r2)-self.theta))
         r[0:t1] = 0
         r[t2+1:self.num] = 0
+        r[-1] = r[0]
         self.updateThreshGraph(r)
 
     def updateThreshGraph(self, r):
-        self.thresh_r = r 
+        self.thresh_r = r
         x = self.thresh_r * np.cos(self.theta)
         y = self.thresh_r * np.sin(self.theta)
         self.polar3.setData(x, y, pen=pyqtgraph.mkPen(width=2, color='g'))
@@ -312,7 +321,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if confirm == QMessageBox.Yes:
             self.comm.put(['quit'])
-            print('Visual broke, avg time per frame: ', np.mean(self.visual.total_times))
+            print('Visual broke, avg time per frame: ', np.mean(self.visual.total_times, axis=0))
             print('Visual got through ', self.visual.frame_num, ' frames')
             print('GUI avg time ', np.mean(self.total_times))
             np.savetxt('timing/visual_frame_time.txt', np.array(self.visual.total_times))
