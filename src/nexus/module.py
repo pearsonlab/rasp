@@ -1,7 +1,14 @@
-from queue import Empty
+import asyncio
+import logging
 import time
 
-import logging; logger = logging.getLogger(__name__)
+from queue import Empty
+from typing import Awaitable, Callable
+
+from colorama import Fore
+import trio
+
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 class Module():
@@ -22,7 +29,7 @@ class Module():
 
         # start with no explicit data queues.             
         # q_in and q_out are for passing ID information to access data in the store
-        self.q_in = None
+        self.q_in = None # AsyncQueue
         self.q_out = None
 
     def __repr__(self):
@@ -166,21 +173,22 @@ class RunManager():
 
         while True:
             if self.run:
-                try:
-                    self.runMethod() #subfunction for running singly
-                except Exception as e:
-                    logger.error('Module '+self.moduleName+' exception during run: {}'.format(e))
+                # try:
+                self.runMethod() #subfunction for running singly
+                # except Exception as e:
+                #     logger.error('Module '+self.moduleName+' exception during run: {}'.format(e))
             elif self.config:
                 try:
                     self.setup() #subfunction for setting up the module
                     self.q_comm.put([Spike.ready()])
                 except Exception as e:
-                    logger.error('Module '+self.moduleName+' exception during setup: {}'.format(e))  
+                    logger.error('Module '+self.moduleName+' exception during setup: {}'.format(e))
                     raise Exception
                 self.config = False #Run once
-            try: 
+
+            try:
                 signal = self.q_sig.get(timeout=self.timeout)
-                if signal == Spike.run(): 
+                if signal == Spike.run():
                     self.run = True
                     logger.warning('Received run signal, begin running')
                 elif signal == Spike.setup():
@@ -198,8 +206,74 @@ class RunManager():
                 pass #no signal from Nexus
         return None #Status...?
 
-
     def __exit__(self, type, value, traceback):
         logger.info('Ran for '+str(time.time()-self.start)+' seconds')
         logger.warning('Exiting RunManager')
         return None
+
+
+class AsyncRunManager:
+    """
+    Asynchronous run manager. Communicates with nexus core using q_sig and q_comm.
+    Need a nursery object in order to spawn new tasks.
+
+    To start, call [self.start_run_manager] within a nursery scope in the calling module.
+    This creates a connection to [self.q_sig] and [self.q_comm], which are running on separate threads.
+    Afterwards, the run manager listens for signals without blocking.
+
+    """
+    def __init__(self, name, run_method: Callable[[], Awaitable[None]], setup: Callable,
+                 q_sig, q_comm, nursery: trio.Nursery):  # q_sig, q_comm are AsyncQueue.
+        self.run = False
+        self.config = False
+        self.run_method = run_method
+        self.setup = setup
+        self.q_sig = q_sig
+        self.q_comm = q_comm
+        self.module_name = name
+        self.nursery = nursery
+
+        self.start = time.time()
+
+        self.send_from_q_sig, self.recv_from_q_sig = trio.open_memory_channel(0)
+
+    async def start_run_manager(self):
+        self.nursery.start_soon(trio.to_thread.run_sync, self.q_sig.get_trio, self.send_from_q_sig)
+        self.nursery.start_soon(self.get_signal)
+
+    async def get_signal(self):
+        while True:
+            try:
+                signal = await self.recv_from_q_sig.receive()
+            except Empty:
+                pass
+
+            else:
+                if signal == Spike.run() or signal == Spike.resume():
+                    if not self.run:
+                        self.run = True
+                        self.nursery.start_soon(self.run_method, self.nursery)
+                        print('Received run signal, begin running')
+
+                elif signal == Spike.setup():
+                    self.run_setup()
+                elif signal == Spike.quit():
+                    logger.warning('Received quit signal, aborting')
+                    self.exit()
+                    self.nursery.cancel_scope.cancel()
+                    break
+                elif signal == Spike.pause():
+                    logger.warning('Received pause signal, pending...')
+                    self.run = False
+
+    def run_setup(self):
+        try:
+            self.setup()
+            self.q_comm.put([Spike.ready()])
+        except Exception as e:
+            logger.error(f'Module {self.module_name} exception during setup: {e}')
+            raise Exception
+
+    def exit(self, value, traceback):
+        logger.info(f'Ran for {time.time() - self.start} seconds')
+        logger.warning(f'Exiting AsyncRunManager')
