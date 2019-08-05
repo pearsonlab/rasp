@@ -203,3 +203,51 @@ class RunManager():
         logger.info('Ran for '+str(time.time()-self.start)+' seconds')
         logger.warning('Exiting RunManager')
         return None
+
+
+class AsyncRunManager:
+    """
+    Asynchronous run manager. Communicates with nexus core using q_sig and q_comm.
+
+    To be used with [async with].
+.
+    Afterwards, the run manager listens for signals without blocking.
+
+    """
+    def __init__(self, name, run_method: Callable[[], Awaitable[None]], setup,
+                 q_sig, q_comm):  # q_sig, q_comm are AsyncQueue.
+        self.run = False
+        self.config = False
+        self.run_method = run_method
+        self.setup = setup
+        self.q_sig = q_sig
+        self.q_comm = q_comm
+        self.module_name = name
+        self.loop = asyncio.get_event_loop()
+
+        self.start = time.time()
+
+    async def __aenter__(self):
+        while True:
+            signal = await self.q_sig.get_async()
+
+            if signal == Spike.run() or signal == Spike.resume():
+                if not self.run:
+                    self.run = True
+                    asyncio.ensure_future(self.run_method(), loop=self.loop)
+                    print('Received run signal, begin running')
+            elif signal == Spike.setup():
+                self.setup()
+                await self.q_comm.put_async([Spike.ready()])
+            elif signal == Spike.quit():
+                logger.warning('Received quit signal, aborting')
+                self.loop.stop()
+                break
+            elif signal == Spike.pause():
+                logger.warning('Received pause signal, pending...')
+                while self.q_sig.get() != Spike.resume():  # Intentionally blocking
+                    time.sleep(1e-3)
+
+    async def __aexit__(self, value, traceback):
+        logger.info(f'Ran for {time.time() - self.start} seconds')
+        logger.warning(f'Exiting AsyncRunManager')
