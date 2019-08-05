@@ -20,7 +20,6 @@ import functools
 import signal
 from nexus.module import Spike
 from queue import Empty, Full
-import trio
 
 #import nest_asyncio
 #nest_asyncio.apply()
@@ -124,8 +123,8 @@ class Nexus():
         instance.setStore(store.Limbo(module.name))
 
         # Add signal and communication links
-        q_comm: AsyncQueue = Link(module.name+'_comm', module.name, self.name)
-        q_sig: AsyncQueue = Link(module.name+'_sig', self.name, module.name)
+        q_comm = Link(module.name+'_comm', module.name, self.name)
+        q_sig = Link(module.name+'_sig', self.name, module.name)
         self.comm_queues.update({q_comm.name:q_comm})
         self.sig_queues.update({q_sig.name:q_sig})
         instance.setCommLinks(q_comm, q_sig)
@@ -193,12 +192,7 @@ class Nexus():
     def runModule(self, module):
         '''Run the module continually; for in separate process
         '''
-        # try:
         module.run()
-        # except Exception as e:
-        #     if self.limbo.use_hdd:
-        #         self.limbo.lmdb_store.flush()
-        #     raise e
 
     def startNexus(self):
         ''' Puts all modules in separate processes and begins polling
@@ -412,9 +406,8 @@ def Link(name, start, end):
     q = AsyncQueue(m.Queue(maxsize=0), name, start, end)
     return q
 
-
-class AsyncQueue:
-    def __init__(self,q: Queue, name, start, end):
+class AsyncQueue(object):
+    def __init__(self,q, name, start, end):
         self.queue = q
         self.real_executor = None
         self.cancelled_join = False
@@ -444,12 +437,10 @@ class AsyncQueue:
         self_dict['_real_executor'] = None
         return self_dict
 
-    # Parse following attributes to the Queue object.
     def __getattr__(self, name):
         if name in ['qsize', 'empty', 'full', 'put', 'put_nowait',
                     'get', 'get_nowait', 'close']:
             return getattr(self.queue, name)
-
         else:
             raise AttributeError("'%s' object has no attribute '%s'" % 
                                     (self.__class__.__name__, name))
@@ -484,11 +475,6 @@ class AsyncQueue:
         if self._real_executor and not self._cancelled_join:
             self._real_executor.shutdown()
 
-    def get_trio(self, send_to_trio: trio.MemorySendChannel):
-        while True:
-            response = self.get()
-            # print(Fore.YELLOW + f'Get q_sig success! Signal is {response}.' + Fore.RESET)
-            trio.from_thread.run(send_to_trio.send, response)
 
 def MultiLink(name, start, end):
     ''' End is a list
@@ -554,6 +540,9 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='../basic_demo.yaml')
+    nexus.createNexus(file='eva_demo.yaml')
     #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
+    
+    
+    
