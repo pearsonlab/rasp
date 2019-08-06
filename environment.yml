@@ -1,0 +1,42 @@
+channels:
+- conda-forge
+dependencies:
+- python=3.6
+- tensorflow # Must list before keras to preempt default keras backend
+- bokeh
+- cython
+- future
+- h5py
+- ipykernel=4.10
+- ipython
+- ipyparallel
+- jupyter
+- matplotlib
+- mypy
+- nose
+- numpy
+- opencv
+- peakutils
+- pims
+- scipy
+- scikit-image
+- scikit-learn
+- spyder
+- tifffile
+- tqdm
+# rasp
+- pyarrow=0.12.1
+- pyqtgraph
+# Suite2p
+- pip
+- mkl_fft
+- mkl
+- numpy>=1.16
+- numba>=0.43.1
+- pip:
+  - PyQt5
+  - git+https://github.com/pyqtgraph/pyqtgraph
+  - natsort
+  - scanimage-tiff-reader
+  - rastermap==0.1.0
+  - suite2p
