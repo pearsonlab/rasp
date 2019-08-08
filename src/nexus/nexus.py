@@ -97,15 +97,23 @@ class Nexus():
 
             except Exception as e:
                 logger.error('Exception in setting up GUI {}'.format(name)+': {}'.format(e))
+            else:
+                self.assembleModules()
 
+        else:
+            self.assembleModules()
+            self.setup()
+
+        #TODO: error handling for if a user tries to use q_in without defining it
+
+    def assembleModules(self):
         # First set up each class/module
-        for name,module in self.tweak.modules.items():
-            if name not in self.modules.keys(): 
-                #Check for modules being instantiated twice
+        for name, module in self.tweak.modules.items():
+            if name not in self.modules.keys():
+                # Check for modules being instantiated twice
                 self.createModule(name, module)
-
         # Second set up each connection b/t modules
-        for name,link in self.data_queues.items():
+        for name, link in self.data_queues.items():
             self.assignLink(name, link)
 
         #TODO: error handling for if a user tries to use q_in without defining it
@@ -214,7 +222,13 @@ class Nexus():
             loop.add_signal_handler(
                 s, lambda s=s: asyncio.ensure_future(self.stop_polling(s, loop))) #TODO
 
-        loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
+        try:
+            loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
+        except KeyboardInterrupt:
+            logging.info('Shutting down.')
+        finally:
+            loop.close()
+            self.quit()
 
     def startWatcher(self):
         self.watcher = store.Watcher('watcher', store.Limbo('watcher'))
@@ -341,7 +355,9 @@ class Nexus():
                 if all(val==Spike.ready() for val in self.moduleStates.values()):
                     self.allowStart = True      #TODO: replace with q_sig to FE/Visual
                     logger.info('Allowing start')
-            
+                    if not self.tweak.hasGUI:
+                        self.run()
+
     def destroyNexus(self):
         ''' Method that calls the internal method
             to kill the process running the store (plasma server)
@@ -382,8 +398,7 @@ class Nexus():
         '''
         logging.info(f'Received exit signal {signal.name}...')
         
-        tasks = [t for t in asyncio.all_tasks() if t is not
-                asyncio.current_task()]
+        tasks = [t for t in asyncio.Task.all_tasks() if t is not asyncio.Task.current_task()]
 
         [task.cancel() for task in tasks]
 
