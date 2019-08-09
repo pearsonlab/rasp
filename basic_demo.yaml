@@ -5,10 +5,8 @@ modules:
     visual: Visual
 
   Acquirer:
-    package: acquire.acquire
-    class: FileAcquirer
-    filename: data/tbif_ex.h5
-    framerate: 15
+    package: acquire.acquirer_matlab
+    class: AcquirerMATLAB
 
   Processor:
     package: process.process
@@ -17,7 +15,7 @@ modules:
   Visual:
     package: visual.visual
     class: CaimanVisual
-  
+
   Analysis:
     package: analysis.analysis
     class: MeanAnalysis
