@@ -73,7 +73,7 @@ class Nexus():
         # create all data links requested from Tweak config
         self.createConnections()
 
-        if self.tweak.hasGUI:
+        if self.tweak.hasGUI and not self.no_gui:
             # Have to load GUI first (at least with Caiman) #TODO: Fix Caiman instead?
             name = self.tweak.gui.name
             m = self.tweak.gui # m is TweakModule 
@@ -176,7 +176,8 @@ class Nexus():
         else:
             self.modules[classname].addLink(linktype, link)
 
-    def createNexus(self, file=None):
+    def createNexus(self, file=None, no_gui=False):
+        self.no_gui = no_gui
         self._startStore(35000000000) #default size should be system-dependent; this is 35 GB
     
         #connect to store and subscribe to notifications
@@ -291,6 +292,12 @@ class Nexus():
     async def pollQueues(self):
         self.listing = []
         self.moduleStates = dict.fromkeys(self.modules.keys())
+        if self.no_gui:  # Since Visual is not started, it cannot send a ready signal.
+            try:
+                del self.moduleStates['Visual']
+            except:
+                pass
+
         gui_fut = None
         acq_fut = None
         proc_fut = None
@@ -355,7 +362,7 @@ class Nexus():
                 if all(val==Spike.ready() for val in self.moduleStates.values()):
                     self.allowStart = True      #TODO: replace with q_sig to FE/Visual
                     logger.info('Allowing start')
-                    if not self.tweak.hasGUI:
+                    if not self.tweak.hasGUI or self.no_gui:
                         self.run()
 
     def destroyNexus(self):
@@ -555,7 +562,7 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='eva_demo.yaml')
+    nexus.createNexus(file='../basic_demo_old.yaml', no_gui=True)
     #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
     
