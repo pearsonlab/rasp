@@ -22,13 +22,12 @@ class JuliaAnalysis(Analysis):
 
     """
 
-    def __init__(self, *args):
+    def __init__(self, *args, julia_file='julia_func.jl'):
         super().__init__(*args)
-        self.julia = julia.Julia(compiled_modules=False)
-        print(f'Loading Julia. This will take ~30 s.')
-        self.j_func = list()
 
-        self.run_every_n_frames = 10
+        self.julia = None
+        self.julia_file = julia_file
+        self.j_func = list()
 
         self.frame = None  # np.ndarray
         self.frame_number = 0
@@ -37,7 +36,7 @@ class JuliaAnalysis(Analysis):
         self.t_per_frame = list()
         self.t_per_put = list()
 
-    def setup(self, julia_file='julia_func.jl'):
+    def setup(self):
         """
         Load user-defined functions from file(s).
 
@@ -47,11 +46,13 @@ class JuliaAnalysis(Analysis):
         :param julia_file: path to .jl file(s)
         :type julia_file: str or list
         """
+        self.julia = julia.Julia(compiled_modules=False)
+        print(f'Loading Julia. This will take ~30 s.')
 
-        if isinstance(julia_file, str):
-            self.julia.include(julia_file)
+        if isinstance(self.julia_file, str):
+            self.julia.include(self.julia_file)
         else:
-            for f in julia_file:
+            for f in self.julia_file:
                 self.julia.include(f)
 
         # Define functions: set conversion to zero-copy PyArray
@@ -95,7 +96,7 @@ class JuliaAnalysis(Analysis):
         t = time.time()
         obj_ids = [self.client.put(self.result_ex, f'resultJulia{self.frame_number}')]
 
-        # Automatic eneration of variables to export.
+        # Automatic generation of variables to export.
         # export_list = [key for key, value in self.__dict__.items() if key.endswith('_ex')]
         # obj_ids = list()
         # for var in export_list:
