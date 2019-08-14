@@ -1,7 +1,8 @@
 import logging
 import time
+from functools import partial
 
-import julia
+import matlab.engine
 import numpy as np
 
 from .acquire import Acquirer
@@ -14,20 +15,29 @@ logger.setLevel(logging.INFO)
 
 class AcquirerMATLAB(Acquirer):
     """
-    Class to get image array from MATLAB via Julia.
+    Class to get image array from MATLAB.
+
+    This class starts a MATLAB engine and loads the memory-mapped file(s).
+
+    It checks the marker for a new image in MATLAB and transfer that new image into a np.ndarray.
 
     """
-    def __init__(self, *args, filename='../matlab/test.jl', **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.frame_num = 0
-        self.filename = filename
-        self.first = True
-        self.julia = None
         self.total_times = []
+        self.first = True
+
+        self.eng = None
+        self.mlassign = None
 
     def setup(self):
-        self.julia = julia.Julia(compiled_modules=False)
-        self.julia.include(self.filename)
+        self.eng = matlab.engine.start_matlab()
+        self.mlassign = partial(self.eng.eval, nargout=0)  # MATLAB code that does has no return must be run using this.
+        self.mlassign(
+            "img = memmapfile('../matlab/scanbox.mmap', 'Format', {'int16', [440 256], 'data'}, 'Writable', true);")
+        self.mlassign(
+            "header = memmapfile('../matlab/header.mmap', 'Format', 'int16', 'Writable', true);")
 
     def run(self):
         with RunManager(self.name, self.run_acquirer, self.setup, self.q_sig, self.q_comm) as rm:
@@ -40,12 +50,25 @@ class AcquirerMATLAB(Acquirer):
 
     def run_acquirer(self):
         if self.first:
-            self.julia.eval('start')()  # Signals MATLAB to start sending data.
+            self.mlassign("header.Data(2) = 1")  # Start data generation
             self.first = False
 
         t = time.time()
 
-        frame = self.julia.eval('get_frame')()
+        # Block until new image arrives.
+        self.mlassign(
+            """
+            while true
+                if header.Data(1) == 1
+                    break;
+                end
+            end
+            header.Data(1) = 0;
+            """)
+
+        raw = self.eng.eval('img.Data.data')  # matlab.mlarray.int16
+        frame = np.array(raw._data).reshape(raw.size[::-1]).T  # To keep conversion fast
+
         obj_id = self.client.put(frame, 'acq_raw' + str(self.frame_num))
         self.q_out.put([{str(self.frame_num): obj_id}])
         self.frame_num += 1
