@@ -22,8 +22,13 @@ class AcquirerMATLAB(Acquirer):
     It checks the marker for a new image in MATLAB and transfer that new image into a np.ndarray.
 
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, path_mmap='../matlab/scanbox.mmap', path_header='../matlab/header.mmap',
+                 img_dim=None, img_dtype='int16', *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.path_mmap = path_mmap
+        self.path_header = path_header
+        self.img_dim = [440, 256] if img_dim is None else img_dim
+        self.img_dtype = img_dtype
         self.frame_num = 0
         self.total_times = []
         self.first = True
@@ -35,9 +40,9 @@ class AcquirerMATLAB(Acquirer):
         self.eng = matlab.engine.start_matlab()
         self.mlassign = partial(self.eng.eval, nargout=0)  # MATLAB code that does has no return must be run using this.
         self.mlassign(
-            "img = memmapfile('../matlab/scanbox.mmap', 'Format', {'int16', [440 256], 'data'}, 'Writable', true);")
+            f"img = memmapfile('{self.path_mmap}', 'Format', {{'{self.img_dtype}', {self.img_dim}, 'data'}});")
         self.mlassign(
-            "header = memmapfile('../matlab/header.mmap', 'Format', 'int16', 'Writable', true);")
+            f"header = memmapfile('{self.path_header}', 'Format', 'int16', 'Writable', true);")
 
     def run(self):
         with RunManager(self.name, self.run_acquirer, self.setup, self.q_sig, self.q_comm) as rm:
@@ -66,7 +71,7 @@ class AcquirerMATLAB(Acquirer):
             header.Data(1) = 0;
             """)
 
-        raw = self.eng.eval('img.Data.data')  # matlab.mlarray.int16
+        raw = self.eng.eval('img.Data.data;')  # matlab.mlarray.int16
         frame = np.array(raw._data).reshape(raw.size[::-1]).T  # To keep conversion fast
 
         obj_id = self.client.put(frame, 'acq_raw' + str(self.frame_num))
