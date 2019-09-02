@@ -54,7 +54,7 @@ class Limbo(StoreInterface):
     '''
 
     def __init__(self, name='default', store_loc='/tmp/store',
-                 use_hdd=False, lmdb_name=None, obj_id_dict: Manager().dict = None, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
+                 use_hdd=False, lmdb_name=None, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
                  commit_freq=20):
 
         """
@@ -85,10 +85,8 @@ class Limbo(StoreInterface):
         self.flush_immediately = flush_immediately
 
         if use_hdd:
-            assert obj_id_dict is not None
-            self.obj_id_to_key = obj_id_dict
             self.lmdb_store = LMDBStore(name=lmdb_name, max_size=hdd_maxstore, path=hdd_path, flush_immediately=flush_immediately,
-                                        commit_freq=commit_freq, from_limbo=True)
+                                        commit_freq=commit_freq)
 
 
     def reset(self):
@@ -444,11 +442,11 @@ class LMDBStore(StoreInterface):
         """
 
         if isinstance(key, str) or isinstance(key, ObjectID):
-            return self._individual_get(LMDBStore._convert_obj_id_to_bytes(key), include_metadata)
+            return self._get_one(LMDBStore._convert_obj_id_to_bytes(key), include_metadata)
 
-        return self._batch_get(list(map(LMDBStore._convert_obj_id_to_bytes, key)), include_metadata)
+        return self._get_batch(list(map(LMDBStore._convert_obj_id_to_bytes, key)), include_metadata)
 
-    def _individual_get(self, key, include_metadata):
+    def _get_one(self, key, include_metadata):
         with self.lmdb_env.begin() as txn:
             r = txn.get(key)
 
@@ -460,7 +458,7 @@ class LMDBStore(StoreInterface):
         else:
             return pickle.loads(r).obj
 
-    def _batch_get(self, keys, include_metadata):
+    def _get_batch(self, keys, include_metadata):
         with self.lmdb_env.begin() as txn:
             objs = [txn.get(key) for key in keys]
 
@@ -505,6 +503,7 @@ class LMDBStore(StoreInterface):
             self.commit()
             if flush_this_immediately:
                 self.lmdb_env.sync()
+
 
     def commit(self):
         if len(self.lmdb_put_cache) > 0:
@@ -559,6 +558,16 @@ class LMDBData:
     name: str = None
     is_queue: bool = False
 
+    @property
+    def queue(self):
+        # Expected: 'q__Acquirer.q_out__124' -> {'q_out'}
+        if self.is_queue:
+            try:
+                return self.name.split('__')[1].split('.')[1]
+            except IndexError:
+                return 'q_comm'
+        logger.error('Attempt to get queue name from objects not from queue.')
+        return None
 
 class ObjectNotFoundError(Exception):
     pass
@@ -642,3 +651,10 @@ class Watcher():
 #     with open('/media/hawkwings/Ext\ Hard\ Drive/dump/dump'+str(id)+'.pkl', 'wb') as output:
 #         pickle.dump(obj, output)
 #     return id
+
+
+if __name__ == '__main__':
+    test = LMDBStore(path='../output/lmdb_20190901_211021/')
+    keys = test.get_keys()
+    y = [key.decode() for key in keys if key.startswith(b'q__Acquirer.q_out')]
+

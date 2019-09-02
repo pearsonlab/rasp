@@ -127,13 +127,17 @@ class Nexus():
             instance = clss(module.name, **module.options)
 
         # Add link to Limbo store
-        limbo = self.createLimbo(module.name) if self.use_hdd else None
+        limbo = self.createLimbo(module.name)
         instance.setStore(limbo)
 
+        if self.use_hdd:
+            q_comm = Link(module.name + '_comm', module.name, self.name, limbo)
+            q_sig = Link(module.name + '_sig', self.name, module.name, self.createLimbo('default'))
+
         # Add signal and communication links
-        q_comm = Link(module.name+'_comm', module.name, self.name, limbo)
-        default = self.createLimbo('default') if self.use_hdd else None
-        q_sig = Link(module.name+'_sig', self.name, module.name, default)
+        else:
+            q_comm = Link(module.name+'_comm', module.name, self.name, None)
+            q_sig = Link(module.name+'_sig', self.name, module.name, None)
 
         self.comm_queues.update({q_comm.name:q_comm})
         self.sig_queues.update({q_sig.name:q_sig})
@@ -185,8 +189,6 @@ class Nexus():
         # LMDB storage
         self.use_hdd = use_hdd
         if self.use_hdd:
-            m = Manager()
-            self.lmdb_shared_obj_id_dict = m.dict()
             self.lmdb_name = f'lmdb_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
             self.limbo_dict = dict()
     
@@ -214,10 +216,9 @@ class Nexus():
         else:
             if name not in self.limbo_dict:
                 if name == 'default':
-                    self.limbo_dict[name] = store.Limbo(name, use_hdd=True, obj_id_dict=self.lmdb_shared_obj_id_dict,
-                                                        lmdb_name=self.lmdb_name, commit_freq=0)
+                    self.limbo_dict[name] = store.Limbo(name, use_hdd=True, lmdb_name=self.lmdb_name, commit_freq=0)
                 else:
-                    self.limbo_dict[name] = store.Limbo(name, use_hdd=True, obj_id_dict=self.lmdb_shared_obj_id_dict, lmdb_name=self.lmdb_name)
+                    self.limbo_dict[name] = store.Limbo(name, use_hdd=True, lmdb_name=self.lmdb_name)
             return self.limbo_dict[name]
 
     def runModule(self, module):
@@ -618,7 +619,7 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='../basic_demo.yaml')
+    nexus.createNexus(file='../basic_demo.yaml', use_hdd=False)
     #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
     
