@@ -2,7 +2,7 @@ import asyncio
 from queue import Empty
 from typing import Sequence
 import time
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Iterable, Union
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -254,7 +254,7 @@ class AsyncRunManager:
     Afterwards, the run manager listens for signals without blocking.
 
     """
-    def __init__(self, name, run_method: Callable[[], Awaitable[None]], setup,
+    def __init__(self, name, run_method: Union[Callable[[], Awaitable[None]], Iterable], setup,
                  q_sig, q_comm):  # q_sig, q_comm are AsyncQueue.
         self.run = False
         self.config = False
@@ -274,7 +274,10 @@ class AsyncRunManager:
             if signal == Spike.run() or signal == Spike.resume():
                 if not self.run:
                     self.run = True
-                    asyncio.ensure_future(self.run_method(), loop=self.loop)
+                    if isinstance(self.run_method, Iterable):
+                        [asyncio.ensure_future(func, loop=self.loop) for func in self.run_method]
+                    else:
+                        asyncio.ensure_future(self.run_method(), loop=self.loop)
                     print('Received run signal, begin running')
             elif signal == Spike.setup():
                 self.setup()

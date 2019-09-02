@@ -10,6 +10,7 @@ import numpy as np
 from PyQt5 import QtGui, QtWidgets
 import pyarrow.plasma as plasma
 from importlib import import_module
+from queue import Queue
 from nexus import store
 from nexus.tweak import Tweak
 from nexus.module import Spike
@@ -126,11 +127,14 @@ class Nexus():
             instance = clss(module.name, **module.options)
 
         # Add link to Limbo store
-        instance.setStore(store.Limbo(module.name))
+        limbo = self.createLimbo(module.name) if self.use_hdd else None
+        instance.setStore(limbo)
 
         # Add signal and communication links
-        q_comm = Link(module.name+'_comm', module.name, self.name)
-        q_sig = Link(module.name+'_sig', self.name, module.name)
+        q_comm = Link(module.name+'_comm', module.name, self.name, limbo)
+        default = self.createLimbo('default') if self.use_hdd else None
+        q_sig = Link(module.name+'_sig', self.name, module.name, default)
+
         self.comm_queues.update({q_comm.name:q_comm})
         self.sig_queues.update({q_sig.name:q_sig})
         instance.setCommLinks(q_comm, q_sig)
@@ -144,16 +148,17 @@ class Nexus():
         '''
         for source,drain in self.tweak.connections.items():
             name = source.split('.')[0]
+            limbo = self.createLimbo(name) if self.use_hdd else None
             #current assumption is connection goes from q_out to something(s) else
-            if len(drain) > 1: #we need multiasyncqueue 
-                link, endLinks = MultiLink(name+'_multi', source, drain)
+            if len(drain) > 1: #we need multiasyncqueue
+                link, endLinks = MultiLink(name+'_multi', source, drain, limbo)
                 self.data_queues.update({source:link})
                 for i,e in enumerate(endLinks):
                     self.data_queues.update({drain[i]:e})
             else: #single input, single output
                 d = drain[0]
                 d_name = d.split('.')
-                link = Link(name+'_'+d_name[0], source, d)
+                link = Link(name+'_'+d_name[0], source, d, limbo)
                 self.data_queues.update({source:link})
                 self.data_queues.update({d:link})
 
@@ -174,11 +179,19 @@ class Nexus():
         else:
             self.modules[classname].addLink(linktype, link)
 
-    def createNexus(self, file=None):
+    def createNexus(self, file=None, use_hdd=False):
         self._startStore(35000000000) #default size should be system-dependent; this is 35 GB
+
+        # LMDB storage
+        self.use_hdd = use_hdd
+        if self.use_hdd:
+            m = Manager()
+            self.lmdb_shared_obj_id_dict = m.dict()
+            self.lmdb_name = f'lmdb_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+            self.limbo_dict = dict()
     
         #connect to store and subscribe to notifications
-        self.limbo = store.Limbo()
+        self.limbo = self.createLimbo('default')
         self.limbo.subscribe()
 
         self.comm_queues = {}
@@ -194,6 +207,18 @@ class Nexus():
 
         self.flags.update({'quit':False, 'run':False, 'load':False})
         self.allowStart = False
+
+    def createLimbo(self, name):
+        if not self.use_hdd:
+            return store.Limbo(name)
+        else:
+            if name not in self.limbo_dict:
+                if name == 'default':
+                    self.limbo_dict[name] = store.Limbo(name, use_hdd=True, obj_id_dict=self.lmdb_shared_obj_id_dict,
+                                                        lmdb_name=self.lmdb_name, commit_freq=0)
+                else:
+                    self.limbo_dict[name] = store.Limbo(name, use_hdd=True, obj_id_dict=self.lmdb_shared_obj_id_dict, lmdb_name=self.lmdb_name)
+            return self.limbo_dict[name]
 
     def runModule(self, module):
         '''Run the module continually; for in separate process
@@ -223,8 +248,9 @@ class Nexus():
         loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
 
     def startWatcher(self):
-        self.watcher = store.Watcher('watcher', store.Limbo('watcher'))
-        q_sig = Link('watcher_sig', self.name, 'watcher')
+        self.watcher = store.Watcher('watcher', self.createLimbo('watcher'))
+        limbo = self.createLimbo('watcher') if self.use_hdd else None
+        q_sig = Link('watcher_sig', self.name, 'watcher', limbo)
         self.watcher.setLinks(q_sig)
         self.sig_queues.update({q_sig.name:q_sig})
 
@@ -370,7 +396,7 @@ class Nexus():
         getattr(self.tweak.modules[target_module], params_signal['tweak_obj']).update(params_signal['change'])
         logger.info(f"Tweak: {target_module} changed parameter to {params_signal['change']}")
 
-        self.limbo.put(pickle.dumps(self.tweak), 'tweak')
+        self.limbo.put(pickle.dumps(self.tweak), f'tweak_{time.time()}')
         if target_module != signal_origin:
             if isinstance(target_module, str):
                 self.sig_queues[f'{target_module}_sig'].put(params_signal)
@@ -429,7 +455,7 @@ class Nexus():
         logging.info('Shutdown complete.')
     
 
-def Link(name, start, end):
+def Link(name, start, end, limbo):
     ''' Abstract constructor for a queue that Nexus uses for
     inter-process/module signaling and information passing
 
@@ -439,12 +465,12 @@ def Link(name, start, end):
     '''
 
     m = Manager()
-    q = AsyncQueue(m.Queue(maxsize=0), name, start, end)
+    q = AsyncQueue(m.Queue(maxsize=0), name, start, end, limbo)
     return q
 
 class AsyncQueue(object):
-    def __init__(self,q, name, start, end):
-        self.queue = q
+    def __init__(self,q, name, start, end, limbo: store.Limbo):
+        self.queue: Queue = q
         self.real_executor = None
         self.cancelled_join = False
 
@@ -455,6 +481,8 @@ class AsyncQueue(object):
         self.end = end
         self.status = 'pending'
         self.result = None
+        self.limbo = limbo
+        self.num = 0
 
     def getStart(self):
         return self.start
@@ -474,7 +502,7 @@ class AsyncQueue(object):
         return self_dict
 
     def __getattr__(self, name):
-        if name in ['qsize', 'empty', 'full', 'put', 'put_nowait',
+        if name in ['qsize', 'empty', 'full',
                     'get', 'get_nowait', 'close']:
             return getattr(self.queue, name)
         else:
@@ -485,8 +513,17 @@ class AsyncQueue(object):
         #return str(self.__class__) + ": " + str(self.__dict__)
         return 'Link '+self.name #+' From: '+self.start+' To: '+self.end
 
+    def put(self, item):
+        self.log_to_limbo(item)
+        self.queue.put(item)
+
+    def put_nowait(self, item):
+        self.log_to_limbo(item)
+        self.queue.put_nowait(item)
+
     async def put_async(self, item):
         loop = asyncio.get_event_loop()
+        self.log_to_limbo()
         res = await loop.run_in_executor(self._executor, self.put, item)
         return res
 
@@ -511,8 +548,13 @@ class AsyncQueue(object):
         if self._real_executor and not self._cancelled_join:
             self._real_executor.shutdown()
 
+    def log_to_limbo(self, item):
+        if self.limbo is not None:
+            self.limbo.put(item, f'q__{self.start}__{self.num}')
+            self.num += 1
 
-def MultiLink(name, start, end):
+
+def MultiLink(name, start, end, limbo):
     ''' End is a list
 
         Return a MultiAsyncQueue as q (for producer) and list of AsyncQueues as q_out (for consumers)
@@ -521,7 +563,7 @@ def MultiLink(name, start, end):
 
     q_out = []
     for endpoint in end:
-        q = AsyncQueue(m.Queue(maxsize=0), name, start, endpoint)
+        q = AsyncQueue(m.Queue(maxsize=0), name, start, endpoint, limbo=limbo)
         q_out.append(q)
 
     q = MultiAsyncQueue(m.Queue(maxsize=0), q_out, name, start, end)

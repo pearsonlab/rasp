@@ -1,16 +1,22 @@
+import asyncio
 import datetime
 import os
 import pickle
+import signal
 import time
+
+from dataclasses import dataclass, make_dataclass, field
+from multiprocessing import Manager
 from queue import Empty
+from pathlib import Path
 
 import lmdb
 import numpy as np
 import pyarrow as arrow
 import pyarrow.plasma as plasma
-from pyarrow import PlasmaObjectExists
+from pyarrow import PlasmaObjectExists, SerializationCallbackError
 from pyarrow.lib import ArrowIOError
-from pyarrow.plasma import ObjectNotAvailable
+from pyarrow.plasma import ObjectNotAvailable, ObjectID
 from scipy.sparse import csc_matrix
 
 from nexus.module import Spike
@@ -48,7 +54,7 @@ class Limbo(StoreInterface):
     '''
 
     def __init__(self, name='default', store_loc='/tmp/store',
-                 use_hdd=False, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
+                 use_hdd=False, lmdb_name=None, obj_id_dict: Manager().dict = None, hdd_maxstore=1e12, hdd_path='output/', flush_immediately=False,
                  commit_freq=20):
 
         """
@@ -79,7 +85,9 @@ class Limbo(StoreInterface):
         self.flush_immediately = flush_immediately
 
         if use_hdd:
-            self.lmdb_store = LMDBStore(max_size=hdd_maxstore, path=hdd_path, flush_immediately=flush_immediately,
+            assert obj_id_dict is not None
+            self.obj_id_to_key = obj_id_dict
+            self.lmdb_store = LMDBStore(name=lmdb_name, max_size=hdd_maxstore, path=hdd_path, flush_immediately=flush_immediately,
                                         commit_freq=commit_freq, from_limbo=True)
 
 
@@ -154,15 +162,12 @@ class Limbo(StoreInterface):
 
         try:
             # Need to pickle if object is csc_matrix
-            if isinstance(obj, csc_matrix):
-                object_id = self.client.put(pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL))
-            else:
-                object_id = self.client.put(obj)
-
+            object_id = self.client.put(obj)
             self.updateStored(object_name, object_id)
 
-            if self.use_hdd:
-                self.lmdb_store.put(obj, object_name, obj_id=object_id, flush_this_immediately=flush_this_immediately)
+        except SerializationCallbackError:
+            if isinstance(obj, csc_matrix):  # Ignore rest
+                object_id = self.client.put(pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL))
 
         except PlasmaObjectExists:
             logger.error('Object already exists. Meant to call replace?')
@@ -175,6 +180,9 @@ class Limbo(StoreInterface):
 
         except Exception as e:
             logger.error('Could not store object '+object_name+': {} {}'.format(type(e).__name__, e))
+
+        if self.use_hdd:
+            self.lmdb_store.put(obj, object_name, obj_id=object_id, flush_this_immediately=flush_this_immediately)
 
         return object_id
 
@@ -385,7 +393,7 @@ class Limbo(StoreInterface):
 
 class LMDBStore(StoreInterface):
 
-    def __init__(self, path='output/', name=None, max_size=1e12,
+    def __init__(self, path='output/', name=None, load=False, max_size=1e12,
                  flush_immediately=False, commit_freq=20, from_limbo=False):
         """
         Constructor for LMDB store
@@ -401,37 +409,71 @@ class LMDBStore(StoreInterface):
         :param from_limbo: If instantiated from Limbo. Enables object ID functionality.
         """
 
-        if name is None:
-            name = f'/lmdb_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
+        path = Path(path)
+        # Load
+        if load:
+            if not (path / 'data.mdb').exists():
+                raise FileNotFoundError('Invalid LMDB directory.')
+        else:
+            if not path.exists():
+                path.mkdir(parents=True)
+            if name is None:
+                name = f'lmdb_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
+            path = path / name
 
-        if not os.path.exists(path):
-            raise FileNotFoundError('Folder to LMDB must exist. Run $mkdir [path].')
-
-        if os.path.exists(path + name):
-            raise FileExistsError('LMDB of the same name already exists.')
+        # if os.path.exists(path + name):
+        #     raise FileExistsError('LMDB of the same name already exists.')
 
         self.flush_immediately = flush_immediately
-        self.lmdb_env = lmdb.open(path + name, map_size=max_size, sync=flush_immediately)
+        self.lmdb_env = lmdb.open(path.as_posix(), map_size=max_size, sync=flush_immediately)
         self.lmdb_commit_freq = commit_freq
         self.lmdb_obj_id_to_key = {}  # Can be name or key, depending on from_limbo
         self.lmdb_put_cache = {}
         self.from_limbo = from_limbo
+        self.all_obj_name = set()
+        self.n = 0
 
-    def get(self, obj_name_or_id):
+        signal.signal(signal.SIGINT, self.flush)
+
+    def get(self, key, include_metadata=False):
         """
-        Get object from object name (!from_limbo) or ID (from_limbo). Return None if object is not found.
+        Get object from ID (from_limbo). Return None if object is not found.
 
         :param obj_name_or_id:
         :return: object or None if object is not found.
         """
 
+        if isinstance(key, str) or isinstance(key, ObjectID):
+            return self._individual_get(LMDBStore._convert_obj_id_to_bytes(key), include_metadata)
+
+        return self._batch_get(list(map(LMDBStore._convert_obj_id_to_bytes, key)), include_metadata)
+
+    def _individual_get(self, key, include_metadata):
         with self.lmdb_env.begin() as txn:
-            get_key = self.lmdb_obj_id_to_key[obj_name_or_id]
-            r = txn.get(get_key)
-            if r is not None:
-                return pickle.loads(r)
-            else:
-                return None
+            r = txn.get(key)
+
+        if r is None:
+            return None
+
+        if include_metadata:
+            return pickle.loads(r)
+        else:
+            return pickle.loads(r).obj
+
+    def _batch_get(self, keys, include_metadata):
+        with self.lmdb_env.begin() as txn:
+            objs = [txn.get(key) for key in keys]
+
+        if include_metadata:
+            return [pickle.loads(obj) for obj in objs if obj is not None]
+        else:
+            return [pickle.loads(obj).obj for obj in objs if obj is not None]
+
+    def get_keys(self):
+        with self.lmdb_env.begin() as txn:
+            with txn.cursor() as cur:
+                cur.first()
+                return [key for key in cur.iternext(values=False)]
 
     def put(self, obj, obj_name, obj_id=None, flush_this_immediately=False):
         """
@@ -447,24 +489,36 @@ class LMDBStore(StoreInterface):
         :return: None
         """
 
-        put_key: bytes = b''.join([obj_name.encode(), pickle.dumps(time.time())])
+        if obj_name.startswith('q_') or obj_name.startswith('tweak'):
+            self.lmdb_put_cache[obj_name.encode()] = pickle.dumps(LMDBData(obj, time=time.time(), name=obj_name, is_queue=True))
+            # self.lmdb_put_cache[put_key] = pickle.dumps([obj, time.time()], protocol=pickle.HIGHEST_PROTOCOL)
 
-        if self.from_limbo:
-            self.lmdb_obj_id_to_key[obj_id] = put_key
+        elif obj_id is None:
+            self.lmdb_put_cache[obj_name.encode()] = pickle.dumps(LMDBData(obj, time=time.time(), name=obj_name))
+
         else:
-            self.lmdb_obj_id_to_key[obj_name] = put_key
+            self.lmdb_put_cache[obj_id.binary()] = pickle.dumps(LMDBData(obj, time=time.time(), name=obj_name))
+            self.all_obj_name.add(obj_id.binary())
 
-        self.lmdb_put_cache[put_key] = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
-
+        # Write
         if len(self.lmdb_put_cache) > self.lmdb_commit_freq or (self.flush_immediately or flush_this_immediately):
-            with self.lmdb_env.begin(write=True) as txn:
-                for key, value in self.lmdb_put_cache.items():
-                    txn.put(key, value, overwrite=True)
-
-            self.lmdb_put_cache = {}
-
+            self.commit()
             if flush_this_immediately:
                 self.lmdb_env.sync()
+
+    def commit(self):
+        if len(self.lmdb_put_cache) > 0:
+            with self.lmdb_env.begin(write=True) as txn:
+                for key, value in self.lmdb_put_cache.items():
+                    txn.put(key, value, overwrite=False)
+            self.lmdb_put_cache = {}
+
+    def flush(self, signal=None, frame=None):
+        """ Must run before exiting. Flushes buffer to disk. """
+        self.commit()
+        self.lmdb_env.sync()
+        self.lmdb_env.close()
+        exit(0)
 
     def delete(self, obj_id):
         """
@@ -477,28 +531,33 @@ class LMDBStore(StoreInterface):
         """
 
         with self.lmdb_env.begin(write=True) as txn:
-            out = txn.pop(self.lmdb_obj_id_to_key[obj_id])
+            out = txn.pop(LMDBStore._convert_obj_id_to_bytes(obj_id))
         if out is None:
             raise ObjectNotFoundError
-
-    def flush(self):
-        """ Must run before exiting. Flushes buffer to disk. """
-        self.lmdb_env.sync()
-        self.lmdb_env.close()
-        print('Flushed!')
 
     def replace(self): pass
 
     def subscribe(self): pass
+
+    @staticmethod
+    def _convert_obj_id_to_bytes(obj_id):
+        try:
+            return obj_id.binary()
+        except AttributeError:
+            return obj_id
 
 
 def saveObj(obj, name):
     with open('/media/hawkwings/Ext Hard Drive/dump/dump'+str(name)+'.pkl', 'wb') as output:
         pickle.dump(obj, output)
 
-#class LStore(StoreInterface):
-#   ''' Implement data store using LMDB in python. TODO?
-#   '''
+
+@dataclass
+class LMDBData:
+    obj: object
+    time: float
+    name: str = None
+    is_queue: bool = False
 
 
 class ObjectNotFoundError(Exception):

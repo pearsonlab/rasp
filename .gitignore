@@ -116,3 +116,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+*.mdb
+*output*/
+*.xml
+*.ipynb
+*.iml
+*.hdf5
+*.mat
