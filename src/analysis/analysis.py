@@ -84,7 +84,7 @@ class MeanAnalysis(Analysis):
         ''' Take numpy estimates and frame_number
             Create X and Y for plotting
         '''
-        t = time.time()
+        # t = time.time()
         try: 
             sig = self.links['input_stim_queue'].get(timeout=0.0001)
             self.updateStim(sig)
@@ -94,6 +94,7 @@ class MeanAnalysis(Analysis):
         try:
             #TODO: add error handling for if we received some but not all of these
             ids = self.q_in.get(timeout=0.0001)
+            t = time.time()
             self.frame = ids[-1]
             (self.coordDict, self.image, self.S) = self.client.getList(ids[:-1]) #res
             self.C = self.S
@@ -129,13 +130,14 @@ class MeanAnalysis(Analysis):
             
             self.putAnalysis()
             self.timestamp.append([time.time(), self.frame])
+            self.total_times.append(time.time()-t)
         except ObjectNotFoundError:
             logger.error('Estimates unavailable from store, droppping')
         except Empty as e:
             pass
         except Exception as e:
             logger.exception('Error in analysis: {}'.format(e))
-        self.total_times.append([time.time(), time.time()-t])
+        # self.total_times.append(time.time()-t)
 
     def updateStim(self, stim):
         ''' Recevied new signal from some Acquirer to change input stimulus
@@ -187,6 +189,7 @@ class MeanAnalysis(Analysis):
 
     def stimAvg(self):
         ests = self.S #ests = self.C
+        ests_num = ests.shape[1]
         # S = self.S
         t = time.time()
         polarAvg = [np.zeros(ests.shape[0])]*8
@@ -203,16 +206,20 @@ class MeanAnalysis(Analysis):
             for s,l in self.stim.items():
                 if 'on' in l.keys() and 'off' in l.keys():
                     onInd = np.array(l['on'])
+                    onInd = onInd[onInd<ests_num]
                     offInd = np.array(l['off'])
+                    offInd = offInd[offInd<ests_num]
                     try:
                         on = np.mean(ests[:,onInd], axis=1)
                         off = np.mean(ests[:,offInd], axis=1)
                         try:
                             estsAvg[int(s)] = (on / off) - 1
                         except FloatingPointError:
-                            # logger.error('Could not compute on/off')
+                            # print('Could not compute on/off: ', on, off)
                             estsAvg[int(s)] = on
                     except IndexError:
+                        logger.error('Index error ')
+                        print('int s is ', int(s))
                         pass
                 else:
                     estsAvg[int(s)] = np.zeros(ests.shape[0])
@@ -243,18 +250,19 @@ class MeanAnalysis(Analysis):
                 else:
                     estsAvg[int(s)] = np.zeros(ests.shape[0])
         
-        polarAvg[2] = np.mean(np.array(estsAvg)[[9,11,15],:], axis=0)
-        polarAvg[1] = np.array(estsAvg)[10,:]
-        polarAvg[0] = np.mean(np.array(estsAvg)[[3,5,8],:], axis=0)
-        polarAvg[7] = np.array(estsAvg)[12,:]
-        polarAvg[6] = np.mean(np.array(estsAvg)[[13,17,18],:], axis=0)
-        polarAvg[5] = np.array(estsAvg)[14,:]
-        polarAvg[4] = np.array(estsAvg)[4] #np.mean(np.array(estsAvg)[[4,6,7],:], axis=0)
-        polarAvg[3] = np.array(estsAvg)[16,:]
+        estsAvg = np.array(estsAvg)
+        polarAvg[2] = estsAvg[9, :]  #np.mean(estsAvg[[9,11,15],:], axis=0)
+        polarAvg[1] = estsAvg[10, :]
+        polarAvg[0] = estsAvg[3, :]  #np.mean(estsAvg[[3,5,8],:], axis=0)
+        polarAvg[7] = estsAvg[12, :]
+        polarAvg[6] = estsAvg[13, :] #np.mean(estsAvg[[13,17,18],:], axis=0)
+        polarAvg[5] = estsAvg[14, :]
+        polarAvg[4] = estsAvg[4,  :] #np.mean(estsAvg[[4,6,7],:], axis=0)
+        polarAvg[3] = estsAvg[16, :]
         
         self.estsAvg = np.transpose(np.array(polarAvg))
         self.estsAvg = np.where(np.isnan(self.estsAvg), 0, self.estsAvg)
-        self.estsAvg = np.clip(self.estsAvg*4, 0, 4)
+        #self.estsAvg = np.clip(self.estsAvg*4, 0, 4)
         self.stimtime.append(time.time()-t)
 
     def plotColorFrame(self):
@@ -283,11 +291,13 @@ class MeanAnalysis(Analysis):
     def _tuningColor(self, ind, inten):
         if self.estsAvg[ind] is not None or np.sum(self.estsAvg[ind])>0.01:
             try:
-                h = (np.nanargmax(self.estsAvg[ind])*45)/360
-                intensity = 1 - np.mean(inten[0][0])/255.0
-                r, g, b, = colorsys.hls_to_rgb(h, intensity, 1)
-                r, g, b = [x*255.0 for x in (r, g, b)]
-                return (r, g, b) + (intensity*255,)
+                tc = np.nanargmax(self.estsAvg[ind])
+                r, g, b = self.manual_Color(tc)
+                # h = (np.nanargmax(self.estsAvg[ind])*45)/360
+                # intensity = 1 - np.mean(inten[0][0])/255.0
+                # r, g, b, = colorsys.hls_to_rgb(h, intensity, 1)
+                # r, g, b = [x*255.0 for x in (r, g, b)]
+                return (r, g, b) + (255,) #(intensity*255,)
             except ValueError:
                 return (255,255,255,0)
             except Exception:
@@ -295,3 +305,23 @@ class MeanAnalysis(Analysis):
                 print('estsAvg[i] is ', self.estsAvg[ind])
         else:
             return (255,255,255,0)
+
+    def manual_Color(self, x):
+        if x==0:
+            return 240, 122, 5
+        elif x==1:
+            return 181, 240, 5
+        elif x==2:
+            return 5, 240, 5
+        elif x==3:
+            return 5, 240, 181
+        elif x==4:
+            return 5, 122, 240
+        elif x==5:
+            return 64, 5, 240
+        elif x==6:
+            return 240, 5, 240
+        elif x==7:
+            return 240, 5, 64
+        else:
+            logger.error('No idea what color!')    
