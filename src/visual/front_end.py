@@ -15,12 +15,11 @@ from multiprocessing import Process
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from matplotlib import cm
 from queue import Empty
-from nexus.module import Spike
+from nexus.actor import Spike
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-#TODO: Behavioral stimuli/timing as input, dynamic calculation of tuning curves
 #NOTE: GUI only gives comm signals to Nexus, does not receive any. Visual serves that role
 #TODO: Add ability to receive signals like pause updating ...?
 
@@ -52,6 +51,32 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
         self.slider.valueChanged.connect(_call(self.sliderMoved)) #Threshold for magnitude selection
+
+    def update(self):
+        ''' Update visualization while running
+        '''
+        t = time.time()
+        #start looking for data to display
+        self.visual.getData()
+        #logger.info('Did I get something:', self.visual.Cx)
+
+        if self.draw:
+            #plot lines
+            self.updateLines()
+
+            #plot video
+            self.updateVideo()
+
+        #re-update
+        if self.checkBox.isChecked():
+            self.draw = True
+        else:
+            self.draw = False    
+        self.visual.draw = self.draw
+            
+        QtCore.QTimer.singleShot(10, self.update)
+        
+        self.total_times.append(time.time()-t)
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
@@ -148,32 +173,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def _loadTweak(self, file):
         self.comm.put(['load', file])
-
-    def update(self):
-        ''' Update visualization while running
-        '''
-        t = time.time()
-        #start looking for data to display
-        self.visual.getData()
-        #logger.info('Did I get something:', self.visual.Cx)
-
-        if self.draw:
-            #plot lines
-            self.updateLines()
-
-            #plot video
-            self.updateVideo()
-
-        #re-update
-        if self.checkBox.isChecked():
-            self.draw = True
-        else:
-            self.draw = False    
-        self.visual.draw = self.draw
-            
-        QtCore.QTimer.singleShot(10, self.update)
-        
-        self.total_times.append(time.time()-t)
     
     def updateVideo(self):
         ''' TODO: Bug on clicking ROI --> trace and report to pyqtgraph
@@ -355,8 +354,6 @@ class QRangeSlider(QtWidgets.QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        #self._width_offset = kwargs.pop('widthOffset', 18)
-
         self._minimum = 0
         self._maximum = 180
 
@@ -433,10 +430,6 @@ class QRangeSlider(QtWidgets.QWidget):
     def setRange(self, lower, upper):
         for slider in [self._min_slider, self._max_slider]:
             slider.blockSignals(True)
-
-        # self._min_slider.setValue(lower)
-        # self._max_slider.setValue(upper)
-
         self._update_layout()
         
 

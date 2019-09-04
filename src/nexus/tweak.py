@@ -20,7 +20,7 @@ class Tweak():
             # Reading config from other yaml file
             self.configFile = cwd+'/'+configFile
         
-        self.modules = {}
+        self.actors = {}
         self.connections = {}
         
     def createConfig(self):
@@ -30,28 +30,24 @@ class Tweak():
         with open(self.configFile, 'r') as ymlfile:
             cfg = yaml.safe_load(ymlfile)
 
-        for name,module in cfg['modules'].items(): 
+        for name,actor in cfg['actors'].items(): 
             # put import/name info in TweakModule object TODO: make ordered?
-            packagename = module.pop('package')
-            classname = module.pop('class')
-            if len(module)>0:
-                options = module
-            tweakModule = TweakModule(name, packagename, classname, options=module)
+            packagename = actor.pop('package')
+            classname = actor.pop('class')
+            
+            tweakModule = TweakModule(name, packagename, classname, options=actor)
 
             if "GUI" in name:
                 self.hasGUI = True
                 self.gui = tweakModule
             
             else:
-                self.modules.update({name:tweakModule})
+                self.actors.update({name:tweakModule})
         
-        #print('self.modules:  ', self.modules)
-
         for name,conn in cfg['connections'].items():
             #TODO check for correctness  TODO: make more generic (not just q_out)
             self.connections.update({name:conn}) #conn should be a list
         
-        #print('self.connections: ', self.connections)
 
     def addParams(self, type, param):
         ''' Function to add paramter param of type type
@@ -59,7 +55,7 @@ class Tweak():
 
     def saveConfig(self):
         #remake cfg TODO
-        cfg = self.modules
+        cfg = self.actors
         yaml.safe_dump(cfg)
 
 class TweakModule():

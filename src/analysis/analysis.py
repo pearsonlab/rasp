@@ -1,4 +1,4 @@
-from nexus.module import Module, Spike, RunManager
+from nexus.actor import Actor, Spike, RunManager
 from nexus.store import ObjectNotFoundError
 from queue import Empty
 from scipy.sparse import csc_matrix
@@ -11,17 +11,7 @@ import colorsys
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-class Analysis(Module):
-    '''Abstract class for the analysis module
-    Performs additional computations on the extracted
-    neural activity from the processor module
-    '''
-    #def putAnalysis(self):
-    #    # Update the DS with analysis
-    #    raise NotImplementedError
-
-
-class MeanAnalysis(Analysis):
+class MeanAnalysis(Actor):
     def __init__(self, *args):
         super().__init__(*args)
 
@@ -78,7 +68,6 @@ class MeanAnalysis(Analysis):
         np.savetxt('analysis_estsOff.txt', np.array(self.estsOff))
         np.savetxt('analysis_proc_C.txt', np.array(self.C))
         np.savetxt('analysis_spikeAvg.txt', np.array(self.spikeAvg))
-
 
     def runAvg(self):
         ''' Take numpy estimates and frame_number

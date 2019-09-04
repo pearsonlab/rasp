@@ -1,4 +1,4 @@
-modules:
+actors:
   GUI:
     package: visual.visual
     class: DisplayVisual
@@ -7,8 +7,8 @@ modules:
   Acquirer:
     package: acquire.acquire
     class: FileAcquirer
-    filename: data/zf1.h5
-    framerate: 15
+    filename: data/Tolias_mesoscope_2.hdf5
+    framerate: 30
 
   Processor:
     package: process.process

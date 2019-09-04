@@ -11,7 +11,7 @@ import subprocess
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
 from queue import Empty
-from nexus.module import Spike
+from nexus.actor import Spike
 
 import logging; logger=logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -50,15 +50,6 @@ class Limbo(StoreInterface):
         self.store_loc = store_loc
         self.client = self.connectStore(store_loc)
         self.stored = {}
-    
-    def reset(self):
-        ''' Reset client connection
-        '''
-        self.client = self.connectStore(self.store_loc)
-        logger.debug('Reset local connection to store')
-
-    def release(self):
-        self.client.disconnect()
 
     def connectStore(self, store_loc):
         ''' Connect to the store at store_loc
@@ -74,6 +65,69 @@ class Limbo(StoreInterface):
             logger.exception('Cannot connect to store: {0}'.format(e))
             raise Exception
         return self.client
+
+    def put(self, object, object_name):
+        ''' Put a single object referenced by its string name 
+            into the store
+        '''
+        object_id = None
+        try:
+            object_id = self.client.put(object)
+            self.updateStored(object_name, object_id)
+            # saveObj(object, object_id)
+            #logger.debug('object successfully stored: '+object_name)
+        except PlasmaObjectExists:
+            logger.error('Object already exists. Meant to call replace?')
+        except ArrowIOError as e:
+            logger.error('Could not store object '+object_name+': {} {}'.format(type(e).__name__, e))
+            logger.info('Refreshing connection and continuing')
+            self.reset()
+        except Exception as e:
+            logger.error('Could not store object '+object_name+': {} {}'.format(type(e).__name__, e))
+        return object_id
+
+    def get(self, object_name):
+        ''' Get a single object from the store
+            Checks to see if it knows the object first
+            Otherwise throw CannotGetObject to request dict update
+            TODO: update for lists of objects
+        '''
+        #print('trying to get ', object_name)
+        if self.stored.get(object_name) is None:
+            logger.error('Never recorded storing this object: '+object_name)
+            # Don't know anything about this object, treat as problematic
+            raise CannotGetObjectError
+        else:
+            return self._get(object_name)
+    
+    def getID(self, obj_id):
+        ''' Preferred mechanism for getting. TODO: Rename
+        '''
+        res = self.client.get(obj_id,0)
+        if isinstance(res, type):
+            logger.warning('Object {} cannot be found.'.format(obj_id))
+            raise ObjectNotFoundError
+        else:
+            return res
+
+    def getList(self, ids):
+        ''' Get multiple objects from the store
+        '''
+        return self.client.get(ids)
+
+    def get_all(self):
+        ''' Get a listing of all objects in the store
+        '''
+        return self.client.list()
+
+    def reset(self):
+        ''' Reset client connection
+        '''
+        self.client = self.connectStore(self.store_loc)
+        logger.debug('Reset local connection to store')
+
+    def release(self):
+        self.client.disconnect()
 
     def subscribe(self):
         ''' Subscribe to a section? of the ds for singals
@@ -96,77 +150,14 @@ class Limbo(StoreInterface):
             raise Exception
 
         return notification_info
-
+    
     def random_ObjectID(self, number=1):
+        ''' Convenience function if ID needs to be specified first.
+        '''
         ids = []
         for i in range(number):
             ids.append(plasma.ObjectID(np.random.bytes(20)))
         return ids
-
-    def put(self, object, object_name):
-        ''' Put a single object referenced by its string name 
-            into the store
-            Raises PlasmaObjectExists if we are overwriting
-            Unknown error
-        '''
-        object_id = None
-        try:
-            object_id = self.client.put(object)
-            self.updateStored(object_name, object_id)
-            # saveObj(object, object_id)
-            #logger.debug('object successfully stored: '+object_name)
-        except PlasmaObjectExists:
-            logger.error('Object already exists. Meant to call replace?')
-            #raise PlasmaObjectExists
-        except ArrowIOError as e:
-            logger.error('Could not store object '+object_name+': {} {}'.format(type(e).__name__, e))
-            logger.info('Refreshing connection and continuing')
-            self.reset()
-        except Exception as e:
-            logger.error('Could not store object '+object_name+': {} {}'.format(type(e).__name__, e))
-        return object_id
-
-    def _put(self, obj, id):
-        return self.client.put(obj, id)
-    
-    def replace(self, object, object_name):
-        ''' Explicitly replace an object with new data
-            TODO: Combine with put. Default behavior:
-                Accept overwrite, but dump old data to disk and log.
-            Throws AssertionError if replace fails
-        '''
-
-        # Check/confirm we need to replace
-        if object_name in self.stored:
-            logger.debug('replacing '+object_name)
-            #self.saveSubstore(object_name) #TODO
-            old_id = self.stored[object_name]
-            self.delete(object_name)
-          #  newconn = plasma.connect('/tmp/store', '', 0)
-           # object_id = newconn.put(object, old_id)
-           # newconn.disconnect()
-            object_id = self.client.put(object, old_id) #plasma put
-            self.updateStored(object_name, object_id)
-            assert object_id == old_id
-
-        else:
-            logger.error('Not replacing '+object_name)
-            object_id = self.client.put(object) #internal put fcn
-            self.updateStored(object_name, object_id)
-        
-        return object_id
-
-    def putArray(self, data):
-        ''' General put for numpy array objects into the store
-            TODO: add pandas?
-            Unknown errors
-        '''
-        buf = arrow.serialize(data).to_buffer()
-
-
-    def _getArray(self, buf):
-        return arrow.deserialize(buf)
-
 
     def updateStored(self, object_name, object_id):
         ''' Update local dict with info we need locally
@@ -175,33 +166,15 @@ class Limbo(StoreInterface):
         '''
         self.stored.update({object_name:object_id})
 
-
     def getStored(self):
         ''' returns its info about what it has stored
         '''
         return self.stored
     
-    
-    def get(self, object_name):
-        ''' Get a single object from the store
-            Checks to see if it knows the object first
-            Otherwise throw CannotGetObject to request dict update
-            TODO: update for lists of objects
+    def _put(self, obj, id):
+        ''' Internal put
         '''
-        #print('trying to get ', object_name)
-        if self.stored.get(object_name) is None:
-            logger.error('Never recorded storing this object: '+object_name)
-            # Don't know anything about this object, treat as problematic
-            raise CannotGetObjectError
-        else:
-            return self._get(object_name)
-
-
-    def get_all(self):
-        ''' Get a listing of all objects in the store
-        '''
-        return self.client.list()
-
+        return self.client.put(obj, id)    
 
     def _get(self, object_name):
         ''' Get an object from the store using its name
@@ -212,53 +185,40 @@ class Limbo(StoreInterface):
         # Can also use contains() to check
         if isinstance(res, ObjectNotAvailable):
             logger.warning('Object {} cannot be found.'.format(object_name))
-            raise ObjectNotFoundError
-        elif isinstance(res, arrow.lib.Buffer):
-            logger.info('Deserializing first')
-            return self._getArray(res)
+            raise ObjectNotFoundError #TODO: Don't raise?
         else:
             return res
 
-    def getID(self, obj_id):
-        res = self.client.get(obj_id,0)
-        if isinstance(res, type):
-            logger.warning('Object {} cannot be found.'.format(obj_id))
-            raise ObjectNotFoundError
-        else:
-            return res
+    #TODO: Likely remove all this functionality for security.
+    # def deleteName(self, object_name):
+    #     ''' Deletes an object from the store based on name
+    #         assumes we have id from name
+    #         This prevents us from deleting other portions of 
+    #         the store that we don't have access to
+    #     '''
 
-    def getList(self, ids):
-        return self.client.get(ids)
-
-    def deleteName(self, object_name):
-        ''' Deletes an object from the store based on name
-            assumes we have id from name
-            This prevents us from deleting other portions of 
-            the store that we don't have access to
-        '''
-
-        if self.stored.get(object_name) is None:
-            logger.error('Never recorded storing this object: '+object_name)
-            # Don't know anything about this object, treat as problematic
-            raise CannotGetObjectError
-        else:
-            retcode = self._delete(object_name)
-            self.stored.pop(object_name)
+    #     if self.stored.get(object_name) is None:
+    #         logger.error('Never recorded storing this object: '+object_name)
+    #         # Don't know anything about this object, treat as problematic
+    #         raise CannotGetObjectError
+    #     else:
+    #         retcode = self._delete(object_name)
+    #         self.stored.pop(object_name)
             
-    def delete(self, id):
-        try:
-            self.client.delete([id])
-        except Exception as e:
-            logger.error('Couldnt delete: {}'.format(e))
+    # def delete(self, id):
+    #     try:
+    #         self.client.delete([id])
+    #     except Exception as e:
+    #         logger.error('Couldnt delete: {}'.format(e))
     
-    def _delete(self, object_name):
-        ''' Deletes object from store
-        '''
-        tmp_id = self.stored.get(object_name)
+    # def _delete(self, object_name):
+    #     ''' Deletes object from store
+    #     '''
+    #     tmp_id = self.stored.get(object_name)
 
-        new_client = plasma.connect('/tmp/store', '', 0)
-        new_client.delete([tmp_id])
-        new_client.disconnect()
+    #     new_client = plasma.connect('/tmp/store', '', 0)
+    #     new_client.delete([tmp_id])
+    #     new_client.disconnect()
 
     def saveStore(self, fileName='/home/store_dump'):
         ''' Save the entire store to disk

@@ -9,7 +9,7 @@ from PyQt5 import QtGui, QtWidgets
 import pyqtgraph as pg
 from visual.front_end import FrontEnd
 import sys
-from nexus.module import Module, Spike
+from nexus.actor import Actor, Spike
 from queue import Empty
 
 import logging; logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO,
                     handlers=[logging.FileHandler("example1.log"),
                               logging.StreamHandler()])
 
-class DisplayVisual(Module):
+class DisplayVisual(Actor):
 
     def run(self):
         logger.info('Loading FrontEnd')
@@ -38,22 +38,7 @@ class DisplayVisual(Module):
         self.visual = visual
         self.visual.setup()
 
-
-class Visual(Module):
-    '''Abstract lass for displaying data
-    '''
-    def plotEstimates(self):
-        ''' Always need to plot some kind of estimates
-        '''
-        raise NotImplementedError
-
-    def run(self):
-        ''' Currently not running independently
-        TODO: FIXME: implement this? Or leave tied to GUI?
-        '''
-        pass
-
-class CaimanVisual(Visual):
+class CaimanVisual(Actor):
     ''' Class for displaying data from caiman processor
     '''
 
@@ -86,6 +71,11 @@ class CaimanVisual(Visual):
 
         self.total_times = []
         self.timestamp = []
+
+        self.window=500
+
+    def run(self):
+        pass #NOTE: Special case here, tied to GUI
 
     def getData(self):
         t = time.time()
@@ -123,6 +113,11 @@ class CaimanVisual(Visual):
         '''
         if self.tune is not None:
             self.selectedTune = self.tune[0][self.selectedNeuron]
+
+        if self.frame_num > self.window:
+            self.Cx = self.Cx[-self.window:]
+            self.C = self.C[:, -self.window:]
+            self.Cpop = self.Cpop[-self.window:]
         
         return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, [self.selectedTune, self.tune[1]]
 

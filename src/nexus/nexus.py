@@ -18,7 +18,7 @@ import asyncio
 import concurrent
 import functools
 import signal
-from nexus.module import Spike
+from nexus.actor import Spike
 from queue import Empty, Full
 
 #import nest_asyncio
@@ -53,12 +53,54 @@ class Nexus():
     def __str__(self):
         return self.name
     
+    def createNexus(self, file=None):
+        self._startStore(40000000000) #default size should be system-dependent; this is 40 GB
+    
+        #connect to store and subscribe to notifications
+        self.limbo = store.Limbo()
+        self.limbo.subscribe()
+
+        self.comm_queues = {}
+        self.sig_queues = {}
+        self.data_queues = {}
+        self.actors = {}
+        self.flags = {}
+        self.processes = []
+
+        #self.startWatcher()
+
+        self.loadTweak(file=file)
+
+        self.flags.update({'quit':False, 'run':False, 'load':False})
+        self.allowStart = False
+
+    def startNexus(self):
+        ''' Puts all actors in separate processes and begins polling
+            to listen to comm queues
+        '''
+        for name,m in self.actors.items(): #m accesses the specific actor class instance
+            if 'GUI' not in name: #GUI already started
+                p = Process(target=self.runActor, name=name, args=(m,))
+                p.daemon = True
+                self.processes.append(p)
+
+        self.start()
+
+        loop = asyncio.get_event_loop()
+
+        signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+        for s in signals:
+            loop.add_signal_handler(
+                s, lambda s=s: asyncio.ensure_future(self.stop_polling(s, loop))) #TODO
+
+        loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks 
+
     def loadTweak(self, file=None):
         ''' For each connection:
             create a Link with a name (purpose), start, and end
-            Start links to one module's name, end to the other. 
-            Nexus gives start_module the Link as a q_in,
-              and end_module the Link as a q_out
+            Start links to one actor's name, end to the other. 
+            Nexus gives start_actor the Link as a q_in,
+              and end_actor the Link as a q_out
             Nexus maintains dict of name and associated Link. 
             Nexus also has list of Links that it is itself connected to 
               for communication purposes. 
@@ -80,57 +122,57 @@ class Nexus():
             # treat GUI uniquely since user communication comes from here
             try:
                 visualClass = m.options['visual']
-                # need to instantiate this module 
-                visualModule = self.tweak.modules[visualClass]
-                self.createModule(visualClass, visualModule)
+                # need to instantiate this actor 
+                visualActor = self.tweak.actors[visualClass]
+                self.createActor(visualClass, visualActor)
                 # then add links for visual
                 for k,l in {key:self.data_queues[key] for key in self.data_queues.keys() if visualClass in key}.items():
                     self.assignLink(k, l)
 
                 #then give it to our GUI
-                self.createModule(name, m)
-                self.modules[name].setup(visual=self.modules[visualClass])
+                self.createActor(name, m)
+                self.actors[name].setup(visual=self.actors[visualClass])
 
-                self.p_GUI = Process(target=self.modules[name].run, name=name)
+                self.p_GUI = Process(target=self.actors[name].run, name=name)
                 self.p_GUI.daemon = True
                 self.p_GUI.start()
 
             except Exception as e:
                 logger.error('Exception in setting up GUI {}'.format(name)+': {}'.format(e))
 
-        # First set up each class/module
-        for name,module in self.tweak.modules.items():
-            if name not in self.modules.keys(): 
-                #Check for modules being instantiated twice
-                self.createModule(name, module)
+        # First set up each class/actor
+        for name,actor in self.tweak.actors.items():
+            if name not in self.actors.keys(): 
+                #Check for actors being instantiated twice
+                self.createActor(name, actor)
 
-        # Second set up each connection b/t modules
+        # Second set up each connection b/t actors
         for name,link in self.data_queues.items():
             self.assignLink(name, link)
 
         #TODO: error handling for if a user tries to use q_in without defining it
 
-    def createModule(self, name, module):
-        ''' Function to instantiate module, add signal and comm Links,
-            and update self.modules dictionary
+    def createActor(self, name, actor):
+        ''' Function to instantiate actor, add signal and comm Links,
+            and update self.actors dictionary
         '''
         # Instantiate selected class
-        mod = import_module(module.packagename)
-        clss = getattr(mod, module.classname)
-        instance = clss(module.name, **module.options)
+        mod = import_module(actor.packagename)
+        clss = getattr(mod, actor.classname)
+        instance = clss(actor.name, **actor.options)
 
         # Add link to Limbo store
-        instance.setStore(store.Limbo(module.name))
+        instance.setStore(store.Limbo(actor.name))
 
         # Add signal and communication links
-        q_comm = Link(module.name+'_comm', module.name, self.name)
-        q_sig = Link(module.name+'_sig', self.name, module.name)
+        q_comm = Link(actor.name+'_comm', actor.name, self.name)
+        q_sig = Link(actor.name+'_sig', self.name, actor.name)
         self.comm_queues.update({q_comm.name:q_comm})
         self.sig_queues.update({q_sig.name:q_sig})
         instance.setCommLinks(q_comm, q_sig)
 
         # Update information
-        self.modules.update({name:instance})
+        self.actors.update({name:instance})
 
     def createConnections(self):
         ''' Assemble links (multi or other)
@@ -146,75 +188,34 @@ class Nexus():
                     self.data_queues.update({drain[i]:e})
             else: #single input, single output
                 d = drain[0]
-                d_name = d.split('.')
+                d_name = d.split('.') #TODO: check if .anything, if not assume q_in
                 link = Link(name+'_'+d_name[0], source, d)
                 self.data_queues.update({source:link})
                 self.data_queues.update({d:link})
 
     def assignLink(self, name, link):
-        ''' Function to set up Links between modules
+        ''' Function to set up Links between actors
             for data location passing
-            Module must already be instantiated
+            Actor must already be instantiated
 
-            #NOTE: Could use this for reassigning links if modules crash?
+            #NOTE: Could use this for reassigning links if actors crash?
+            #TODO: Adjust to use default q_out and q_in vs being specified
         '''
         #logger.info('Assigning link {}'.format(name))
         classname = name.split('.')[0]
         linktype = name.split('.')[1]
         if linktype == 'q_out':
-            self.modules[classname].setLinkOut(link)
+            self.actors[classname].setLinkOut(link)
         elif linktype == 'q_in':
-            self.modules[classname].setLinkIn(link)
+            self.actors[classname].setLinkIn(link)
         else:
-            self.modules[classname].addLink(linktype, link)
+            self.actors[classname].addLink(linktype, link)
 
-    def createNexus(self, file=None):
-        self._startStore(40000000000) #default size should be system-dependent; this is 40 GB
-    
-        #connect to store and subscribe to notifications
-        self.limbo = store.Limbo()
-        self.limbo.subscribe()
-
-        self.comm_queues = {}
-        self.sig_queues = {}
-        self.data_queues = {}
-        self.modules = {}
-        self.flags = {}
-        self.processes = []
-
-        #self.startWatcher()
-
-        self.loadTweak(file=file) #TODO: filename?
-
-        self.flags.update({'quit':False, 'run':False, 'load':False})
-        self.allowStart = False
-
-    def runModule(self, module):
-        '''Run the module continually; for in separate process
+    def runActor(self, actor):
+        '''Run the actor continually; used for separate processes
+            #TODO: hook into monitoring here? 
         '''
-        module.run()
-
-    def startNexus(self):
-        ''' Puts all modules in separate processes and begins polling
-            to listen to comm queues
-        '''
-        for name,m in self.modules.items(): #m accesses the specific module instance
-            if 'GUI' not in name: #GUI already started
-                p = Process(target=self.runModule, name=name, args=(m,))
-                p.daemon = True
-                self.processes.append(p)
-                #TODO: os.nice() for priority?
-
-        self.start()
-
-        loop = asyncio.get_event_loop()
-
-        signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
-        for s in signals:
-            loop.add_signal_handler(
-                s, lambda s=s: asyncio.ensure_future(self.stop_polling(s, loop))) #TODO
-
-        loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
+        actor.run()
 
     def startWatcher(self):
         self.watcher = store.Watcher('watcher', store.Limbo('watcher'))
@@ -231,7 +232,6 @@ class Nexus():
         self.t = time.time()
         
         for p in self.processes:
-            print(p)
             p.start()
 
     def setup(self):
@@ -251,8 +251,8 @@ class Nexus():
                     #queue full, keep going anyway TODO: add repeat trying as async task
 
     def quit(self):
-        with open('timing/noticiations.txt', 'w') as output:
-            output.write(str(self.listing))
+        # with open('timing/noticiations.txt', 'w') as output:
+        #     output.write(str(self.listing))
         
         logger.warning('Killing child processes')
         
@@ -275,11 +275,8 @@ class Nexus():
         self.destroyNexus()
 
     async def pollQueues(self):
-        self.listing = []
-        self.moduleStates = dict.fromkeys(self.modules.keys())
-        gui_fut = None
-        acq_fut = None
-        proc_fut = None
+        self.listing = [] #TODO: Remove or rewrite
+        self.actorStates = dict.fromkeys(self.actors.keys())
         polling = list(self.comm_queues.values())
         pollingNames = list(self.comm_queues.keys())
         tasks = []
@@ -296,7 +293,7 @@ class Nexus():
                     if 'GUI' in pollingNames[i]:
                         self.processGuiSignal(r, pollingNames[i])
                     else:
-                        self.processModuleSignal(r, pollingNames[i])
+                        self.processActorSignal(r, pollingNames[i])
                     tasks[i] = (asyncio.ensure_future(polling[i].get_async()))
 
             #self.listing.append(self.limbo.notify())
@@ -319,7 +316,7 @@ class Nexus():
                 self.setup()
             elif flag[0] == Spike.ready():
                 logger.info('GUI ready')
-                self.moduleStates[name] = flag[0]
+                self.actorStates[name] = flag[0]
             elif flag[0] == Spike.quit():
                 logger.warning('Quitting the program!')
                 self.flags['quit'] = True
@@ -333,12 +330,12 @@ class Nexus():
         else:
             logger.error('Signal received from Nexus but cannot identify {}'.format(flag))
 
-    def processModuleSignal(self, sig, name):
+    def processActorSignal(self, sig, name):
         if sig is not None:
             logger.info('Received signal '+str(sig[0])+' from '+name)
             if sig[0]==Spike.ready():
-                self.moduleStates[name.split('_')[0]] = sig[0]
-                if all(val==Spike.ready() for val in self.moduleStates.values()):
+                self.actorStates[name.split('_')[0]] = sig[0]
+                if all(val==Spike.ready() for val in self.actorStates.values()):
                     self.allowStart = True      #TODO: replace with q_sig to FE/Visual
                     logger.info('Allowing start')
             
@@ -395,7 +392,7 @@ class Nexus():
 
 def Link(name, start, end):
     ''' Abstract constructor for a queue that Nexus uses for
-    inter-process/module signaling and information passing
+    inter-process/actor signaling and information passing
 
     A Link has an internal queue that can be synchronous (put, get)
     as inherited from multiprocessing.Manager.Queue
@@ -459,12 +456,11 @@ class AsyncQueue(object):
         self.status = 'pending'
         try:
             self.result = await loop.run_in_executor(self._executor, self.get)
-            logger.debug('Link '+self.name+' received input: '+self.result)
             self.status = 'done'
             return self.result
         except Exception as e:
-            pass #TODO
-            #print('except ', e)
+            logger.exception('Error in get_async: {}'.format(e))
+            pass
 
     def cancel_join_thread(self):
         self._cancelled_join = True
@@ -540,7 +536,7 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='basic_demo.yaml')
+    nexus.createNexus(file='eva_demo.yaml')
     #nexus.setupAll()
     nexus.startNexus() #start polling, create processes
     

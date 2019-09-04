@@ -4,19 +4,19 @@ import time
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-class Module():
-    '''Abstract class for a module that Nexus
+class Actor():
+    '''Abstract class for an actor that Nexus
        controls and interacts with.
        Needs to have a store and links for communication
        Also needs at least a setup and run function
     '''
     def __init__(self, name, links={}, **kwargs):
-        ''' Require a name for multiple instances of the same module/class
+        ''' Require a name for multiple instances of the same actor/class
             Create initial empty dict of Links for easier referencing
         '''
         self.name = name
         self.links = links
-        self.done = False #Needed?
+        self.done = False # TODO: obsolete, remove
 
         self.lower_priority = False 
 
@@ -42,7 +42,7 @@ class Module():
 
     def setCommLinks(self, q_comm, q_sig):
         ''' Set explicit communication links to/from Nexus (q_comm, q_sig)
-            q_comm is for messages from this module to Nexus
+            q_comm is for messages from this actor to Nexus
             q_sig is signals from Nexus and must be checked first
         '''
         self.q_comm = q_comm
@@ -77,7 +77,7 @@ class Module():
 
     def setup(self):
         ''' Essenitally the registration process
-            Can also be an initialization for the module
+            Can also be an initialization for the actor
             options is a list of options, can be empty
         '''
         raise NotImplementedError
@@ -94,7 +94,7 @@ class Module():
         '''
 
     def changePriority(self):
-        ''' Try to lower this module's priority
+        ''' Try to lower this process' priority
             Only changes priority if lower_priority is set
             TODO: Only works on unix machines. Add Windows functionality
         '''
@@ -108,7 +108,7 @@ class Module():
 
 class Spike():
     ''' Class containing definition of signals Nexus uses
-        to communicate with its modules
+        to communicate with its actors
         TODO: doc each of these with expected handling behavior
         NOTE: add functionality as class objects..? Any advantage to this?
     '''
@@ -129,7 +129,7 @@ class Spike():
         return 'resume'
 
     @staticmethod
-    def reset(): #TODO
+    def reset(): #TODO: implement in Nexus
         return 'reset'
     
     @staticmethod
@@ -146,7 +146,7 @@ class Spike():
 
 
 class RunManager():
-    ''' TODO: Update logger messages with module's name
+    '''
     TODO: make async version of runmanager
     '''
     def __init__(self, name, runMethod, setup, q_sig, q_comm):
@@ -156,7 +156,7 @@ class RunManager():
         self.setup = setup
         self.q_sig = q_sig
         self.q_comm = q_comm
-        self.moduleName = name
+        self.actorName = name
 
         #TODO make this tunable
         self.timeout = 0.000001
@@ -169,13 +169,13 @@ class RunManager():
                 try:
                     self.runMethod() #subfunction for running singly
                 except Exception as e:
-                    logger.error('Module '+self.moduleName+' exception during run: {}'.format(e))
+                    logger.error('Actor '+self.actorName+' exception during run: {}'.format(e))
             elif self.config:
                 try:
-                    self.setup() #subfunction for setting up the module
+                    self.setup() #subfunction for setting up the actor
                     self.q_comm.put([Spike.ready()])
                 except Exception as e:
-                    logger.error('Module '+self.moduleName+' exception during setup: {}'.format(e))  
+                    logger.error('Actor '+self.actorName+' exception during setup: {}'.format(e))  
                     raise Exception
                 self.config = False #Run once
             try: 

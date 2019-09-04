@@ -4,26 +4,13 @@ import h5py
 import struct
 import numpy as np
 import random
-from nexus.module import Module, Spike, RunManager
+from nexus.actor import Actor, Spike, RunManager
 from queue import Empty
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-
-class Acquirer(Module):
-    '''Abstract class for the image acquirer component
-       Needs to obtain an image from some input (eg, microscope, file)
-       Needs to output frames standardized for processor. Can do some normalization
-       Also saves direct to disk in parallel (?)
-       Will likely change specifications in the future
-    '''
-    #def getFrame(self):
-    #    # provide function for grabbing the next single frame
-    #    raise NotImplementedError
-    # TODO: require module-specific functions or no?
-    
-class FileAcquirer(Acquirer):
+class FileAcquirer(Actor):
     '''Class to import data from files and output
        frames in a buffer, or discrete.
     '''
@@ -42,8 +29,6 @@ class FileAcquirer(Acquirer):
            Open file stream
            #TODO: implement more than h5 files
         '''        
-        #self.lower_priority = True
-
         if os.path.exists(self.filename):
             print('Looking for ', self.filename)
             n, ext = os.path.splitext(self.filename)[:2]
@@ -60,18 +45,11 @@ class FileAcquirer(Acquirer):
         # self.f = h5py.File(save_file, 'w', libver='latest')
         # self.dset = self.f.create_dataset("default", (len(self.data),)) #TODO: need to set maxsize to none?
 
-    def getFrame(self, num):
-        ''' Can be live acquistion from disk (?) #TODO
-            Here just return frame from loaded data
-        '''
-        return self.data[num,:,:]
-
     def run(self):
         ''' Run indefinitely. Calls runAcquirer after checking for singals
         '''
         self.total_times = []
         self.timestamp = []
-        # #self.changePriority() #run once, at start of process
 
         with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
             print(rm)            
@@ -80,7 +58,6 @@ class FileAcquirer(Acquirer):
         print('Acquire got through ', self.frame_num, ' frames')
         np.savetxt('timing/acquire_frame_time.txt', np.array(self.total_times))
         np.savetxt('timing/acquire_timestamp.txt', np.array(self.timestamp))
-
 
     def runAcquirer(self):
         '''While frames exist in location specified during setup,
@@ -93,8 +70,8 @@ class FileAcquirer(Acquirer):
             #return
         elif(self.frame_num < len(self.data)*600):
             frame = self.getFrame(self.frame_num % len(self.data))
-            if self.frame_num > 1500 and self.frame_num < 1550:
-                frame = None
+            # if self.frame_num > 1500 and self.frame_num < 1550:
+            #     frame = None
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
             self.timestamp.append([time.time(), self.frame_num])
             try:
@@ -113,6 +90,12 @@ class FileAcquirer(Acquirer):
             self.q_comm.put(None)
             self.done = True
             #self.f.close()
+    
+    def getFrame(self, num):
+        ''' Can be live acquistion from disk (?) #TODO
+            Here just return frame from loaded data
+        '''
+        return self.data[num,:,:]
 
     def saveFrame(self, frame):
         ''' TODO: this
@@ -147,7 +130,8 @@ class TbifAcquirer(FileAcquirer):
                         tmp = np.reshape(np.asarray(img, dtype='uint16'), (header[2], header[3]), order='F')
                         self.data.append(tmp.transpose())
                     self.data = np.array(self.data)
-
+                    # self.stim = np.array(self.stim)
+                    # np.savetxt('stim_data.txt', self.stim)
                     print('data is ', len(self.data))
             else: 
                 logger.error('Cannot load file, bad extension')
@@ -159,8 +143,10 @@ class TbifAcquirer(FileAcquirer):
 
         if self.done:
             pass 
-        elif(self.frame_num < len(self.data)*10):
+        elif(self.frame_num < len(self.data)*2):
             frame = self.getFrame(self.frame_num)
+            if self.frame_num == len(self.data):
+                print('Done with first set ', self.frame_num)
             # if self.frame_num > 1000 and self.frame_num < 2000:
             #     frame = None
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
@@ -193,8 +179,8 @@ class TbifAcquirer(FileAcquirer):
         return self.data[num,:,:]
 
 
-class BehaviorAcquirer(Module):
-    ''' Module that acquires information of behavioral stimulus
+class BehaviorAcquirer(Actor):
+    ''' Actor that acquires information of behavioral stimulus
         during the experiment
 
         Current assumption is that stimulus is off or on, on has many types,
