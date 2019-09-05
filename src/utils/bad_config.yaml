@@ -1,0 +1,40 @@
+modules:
+  GUI:
+    package: visual.visual
+    class: DisplayVisual
+    visual: Visual
+
+  Acquirer:
+    package: acquire.acquire
+    class: LMDBAcquirer
+    lmdb_path: /Users/chaichontat/Desktop/Lab/New/rasp/src/output/lmdb
+    # filename: /Users/chaichontat/Desktop/Lab/New/rasp/data/Tolias_mesoscope_2.hdf5
+    framerate: 15
+
+  Processor:
+    package: process.process
+    class: CaimanProcessor
+
+  Visual:
+    package: visual.visual
+    class: CaimanVisual
+  
+  Analysis:
+    package: analysis.analysis
+    class: MeanAnalysis
+
+  InputStim:
+    package: acquire.acquire
+    class: BehaviorAcquirer
+
+  Watcherr:
+    package: watch.watch
+    class: Watcher
+
+
+connections:
+  Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue, Watcherr.raw_frame_queue]
+  Processor.q_out: [Analysis.q_in]
+  Analysis.q_out: [Visual.q_in, Acquirer.q_in]
+  InputStim.q_out: [Analysis.input_stim_queue]
+
