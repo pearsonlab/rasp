@@ -56,9 +56,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         self.plots = {'raw': self.rawplot, 'color': self.rawplot_2, 'image': self.rawplot_3}
         self.currentImages = dict.fromkeys(self.plots)
-        self.firstImage = {key: True for key in self.plots.keys()}
-
         self.currentCurves = dict.fromkeys({'Cx', 'C', 'Cpop', 'tune'})
+        self.firstImage = {key: True for key in self.plots.keys()}
+        self.centeredView = None
         self.thresh_r = np.array(0)
 
     def extraSetup(self):
@@ -188,11 +188,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def updateVideo(self):
         ''' TODO: Bug on clicking ROI --> trace and report to pyqtgraph
         '''
-        try:
-            self.currentImages['raw'], self.currentImages['color'] = self.visual.getFrames()
-            self.currentImages['image'] = self.visual.plotThreshFrame(self.thresh_r)
-        except Exception as e:
-            logger.error('Error in FrontEnd update Video:  {}'.format(e))
+        # try:
+        self.currentImages['raw'], self.currentImages['color'] = self.visual.getFrames()
+        self.currentImages['image'] = self.visual.plotThreshFrame(self.thresh_r)
+        # except Exception as e:
+        #     logger.error('Error in FrontEnd update Video:  {}'.format(e))
 
         for name, plot in self.plots.items():
             if self.currentImages[name] is not None:
@@ -200,9 +200,12 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     plot.setImage(self.currentImages[name], autoHistogramRange=False)
                     plot.tVals = None  # Prevent AttrErr upon invocation of ROI in color.
                     self.firstImage[name] = False
+                    if name == 'color':
+                        self.centeredView = plot.getView().getState()
                 else:
-                    view: pyqtgraph.ViewBox = plot.getView()  # Preserve zoom and translation in ViewBox
-                    state = view.getState()
+                    view: pyqtgraph.ViewBox = plot.getView()
+                    if name == 'raw':  # Preserve zoom and translation in ViewBox
+                        state = view.getState()
                     plot.setImage(self.currentImages[name], autoHistogramRange=False)
                     view.setState(state)
 
@@ -273,6 +276,10 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def keyPressEvent(self, e):
         if e.key() == 83:  # s
             self.saveCurrentImages()
+        elif e.key() == 79:  # o
+            self.visual.triggerMask()
+        elif e.key() == 67:  # c: Center all views
+            [plot.getView().setState(self.centeredView) for _, plot in self.plots.items()]
 
     def saveCurrentImages(self):
         """

@@ -447,8 +447,14 @@ class LMDBStore(StoreInterface):
         return self._get_batch(list(map(LMDBStore._convert_obj_id_to_bytes, key)), include_metadata)
 
     def _get_one(self, key, include_metadata):
-        with self.lmdb_env.begin() as txn:
-            r = txn.get(key)
+        while True:
+            try:
+                with self.lmdb_env.begin() as txn:
+                    r = txn.get(key)
+            except lmdb.BadRslotError:
+                pass
+            else:
+                break
 
         if r is None:
             return None
@@ -459,8 +465,15 @@ class LMDBStore(StoreInterface):
             return pickle.loads(r).obj
 
     def _get_batch(self, keys, include_metadata):
-        with self.lmdb_env.begin() as txn:
-            objs = [txn.get(key) for key in keys]
+        while True:
+            try:
+                with self.lmdb_env.begin() as txn:
+                    objs = [txn.get(key) for key in keys]
+            except lmdb.BadRslotError:
+                pass
+            else:
+                break
+
 
         if include_metadata:
             return [pickle.loads(obj) for obj in objs if obj is not None]
@@ -509,7 +522,7 @@ class LMDBStore(StoreInterface):
         if len(self.lmdb_put_cache) > 0:
             with self.lmdb_env.begin(write=True) as txn:
                 for key, value in self.lmdb_put_cache.items():
-                    txn.put(key, value, overwrite=False)
+                    txn.put(key, value, overwrite=True)
             self.lmdb_put_cache = {}
 
     def flush(self, signal=None, frame=None):

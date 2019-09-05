@@ -37,6 +37,7 @@ class Simulator(Module):
 
     def move_to_plasma(self, lmdb_values):
         """ Put objects into current plasma store and update object ID """
+        # TODO Make async to enable queue-based fetch system tp avoid loading everything at once.
         for lmdbdata in lmdb_values:
             try:
                 if len(lmdbdata.obj) == 1 and isinstance(lmdbdata.obj[0], dict):  # Raw frames

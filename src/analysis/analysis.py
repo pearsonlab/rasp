@@ -116,7 +116,7 @@ class MeanAnalysis(Analysis):
             # Compute coloring of neurons for processed frame
             # Also rotate and stack as needed for plotting
             if self.frame % 2 == 0: #TODO: move to viz, but we don't need to compute this 30 times/sec
-                self.color = self.plotColorFrame()
+                self.color, self.colorMask = self.plotColorFrame()
 
             if self.frame >= self.window:
                 window = self.window
@@ -177,6 +177,7 @@ class MeanAnalysis(Analysis):
         ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
         ids.append(self.client.put(self.tune, 'tune'+str(self.frame)))
         ids.append(self.client.put(self.color, 'color'+str(self.frame)))
+        ids.append(self.client.put(self.colorMask, 'colorMask' + str(self.frame)))
         ids.append(self.client.put(self.coordDict, 'analys_coords'+str(self.frame)))
 
         self.q_out.put(ids)
@@ -303,6 +304,8 @@ class MeanAnalysis(Analysis):
         frame = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
         frame[...,3] = 255
 
+        mask = np.copy(frame)
+
         if self.neuron_half_width is not None:
             centers_of_mass = [o['CoM'] for o in self.coordDict]
             for i, CoM in enumerate(centers_of_mass):
@@ -310,12 +313,12 @@ class MeanAnalysis(Analysis):
                 type_, color = self._tuningColor(i)
 
                 if type_ == 'circle':
-                    cv2.circle(frame, tuple(CoM), radius=max(self.neuron_half_width), color=color,
+                    cv2.circle(mask, tuple(CoM), radius=max(self.neuron_half_width), color=color,
                                thickness=1, lineType=cv2.LINE_AA)  # Anti-aliasing
                 else:  # Crosshair
                     x, y = int(CoM[0]), int(CoM[1])
-                    cv2.line(frame, (x-3, y), (x+3, y), color=color, thickness=1, lineType=cv2.LINE_AA)
-                    cv2.line(frame, (x, y-3), (x, y+3), color=color, thickness=1, lineType=cv2.LINE_AA)
+                    cv2.line(mask, (x-3, y), (x+3, y), color=color, thickness=1)
+                    cv2.line(mask, (x, y-3), (x, y+3), color=color, thickness=1)
 
         # if self.coords is not None:
         #     for i,c in enumerate(self.coords): # iterate through neurons
@@ -329,7 +332,7 @@ class MeanAnalysis(Analysis):
         #TODO: user input for rotating frame? See Visual class
 
         self.colortime.append(time.time()-t)
-        return frame
+        return frame, mask
 
     def _tuningColor(self, ind):
         """

@@ -1,6 +1,7 @@
 import os
 import yaml
 
+from dataclasses import dataclass, field
 import logging; logger = logging.getLogger(__name__)
 
 #TODO: Write a save function for Tweak objects output as YAML configFile but using TweakModule objects
@@ -64,22 +65,19 @@ class Tweak():
         yaml.safe_dump(cfg)
 
 
-class TweakModule():
-    def __init__(self, name, packagename, classname, options=None):
-        self.name = name
-        self.packagename = packagename
-        self.classname = classname
-        self.config_from_file = {}
+@dataclass
+class TweakModule:
+    name: str
+    packagename: str
+    classname: str
+    options: dict
+    config_from_file: dict = field(default_factory=dict)
 
-        if 'config_file' in options:  # Module-specific config file
-            config_file = options.pop('config_file')
+    def __post_init__(self):
+        if 'config_file' in self.options:  # Module-specific config file
+            config_file = self.options.pop('config_file')
             with open(config_file) as f:
                 self.config_from_file = yaml.load(f)
-
-        self.options = options
-
-    def __str__(self):
-        return f'{self.name}, {self.options}, {self.config_from_file}'
 
 
 if __name__ == '__main__':
