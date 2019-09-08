@@ -22,6 +22,7 @@ class Tweak():
         
         self.actors = {}
         self.connections = {}
+        self.hasGUI = False
         
     def createConfig(self):
         ''' Read yaml config file and create config for Nexus

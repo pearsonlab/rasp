@@ -20,10 +20,6 @@ import functools
 import signal
 from nexus.actor import Spike
 from queue import Empty, Full
-
-#import nest_asyncio
-#nest_asyncio.apply()
-
 import logging
 from datetime import datetime
 
@@ -277,6 +273,11 @@ class Nexus():
     async def pollQueues(self):
         self.listing = [] #TODO: Remove or rewrite
         self.actorStates = dict.fromkeys(self.actors.keys())
+        if not self.tweak.hasGUI:  # Since Visual is not started, it cannot send a ready signal.
+            try:
+                del self.actorStates['Visual']
+            except:
+                pass
         polling = list(self.comm_queues.values())
         pollingNames = list(self.comm_queues.keys())
         tasks = []
@@ -338,7 +339,11 @@ class Nexus():
                 if all(val==Spike.ready() for val in self.actorStates.values()):
                     self.allowStart = True      #TODO: replace with q_sig to FE/Visual
                     logger.info('Allowing start')
-            
+
+                    #TODO: Maybe have flag for auto-start, else require explict command
+                    # if not self.tweak.hasGUI:
+                    #     self.run()
+
     def destroyNexus(self):
         ''' Method that calls the internal method
             to kill the process running the store (plasma server)
@@ -377,13 +382,14 @@ class Nexus():
     async def stop_polling(self, signal, loop):
         ''' TODO: update asyncio library calls
         '''
-        logging.info(f'Received exit signal {signal.name}...')
+        logging.info('Received exit signal {}'.format(signal.name))
         
-        tasks = [t for t in asyncio.all_tasks() if t is not
-                asyncio.current_task()]
+        tasks = [t for t in asyncio.Task.all_tasks() if t is not 
+                asyncio.Task.current_task()]
 
         [task.cancel() for task in tasks]
 
+        #TODO: Check for hanging behavior
         logging.info('Canceling outstanding tasks')
         await asyncio.gather(*tasks)
         loop.stop()
