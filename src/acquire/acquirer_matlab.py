@@ -1,28 +1,22 @@
 import logging
 import time
 from functools import partial
-
 import matlab.engine
 import numpy as np
-
-from .acquire import Acquirer
-from nexus.module import RunManager
-
+from nexus.actor import Actor, RunManager
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class AcquirerMATLAB(Acquirer):
-    """
+class AcquirerMATLAB(Actor):
+    '''
     Class to get image array from MATLAB.
-
     This class starts a MATLAB engine and loads the memory-mapped file(s).
-
     It checks the marker for a new image in MATLAB and transfer that new image into a np.ndarray.
+    '''
 
-    """
-    def __init__(self, path_mmap='../matlab/scanbox.mmap', path_header='../matlab/header.mmap',
+    def __init__(self, path_mmap='data/matlab/scanbox.mmap', path_header='data/matlab/header.mmap',
                  img_dim=None, img_dtype='int16', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.path_mmap = path_mmap
@@ -50,8 +44,6 @@ class AcquirerMATLAB(Acquirer):
 
         print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
         print('Acquire got through ', self.frame_num, ' frames')
-        np.savetxt('timing/acquire_frame_time.txt', np.array(self.total_times))
-        np.savetxt('timing/acquire_timestamp.txt', np.array(self.timestamp))
 
     def run_acquirer(self):
         if self.first:
