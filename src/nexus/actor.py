@@ -207,17 +207,15 @@ class RunManager():
         return None
 
 
-class AsyncRunManager:
-    """
+class AsyncRunManager():
+    '''
     Asynchronous run manager. Communicates with nexus core using q_sig and q_comm.
-
     To be used with [async with].
-.
     Afterwards, the run manager listens for signals without blocking.
+    q_sig, q_comm are AsyncQueues
+    '''
 
-    """
-    def __init__(self, name, run_method: Callable[[], Awaitable[None]], setup,
-                 q_sig, q_comm):  # q_sig, q_comm are AsyncQueue.
+    def __init__(self, name, run_method, setup, q_sig, q_comm):
         self.run = False
         self.config = False
         self.run_method = run_method
@@ -232,7 +230,6 @@ class AsyncRunManager:
     async def __aenter__(self):
         while True:
             signal = await self.q_sig.get_async()
-
             if signal == Spike.run() or signal == Spike.resume():
                 if not self.run:
                     self.run = True
@@ -247,9 +244,9 @@ class AsyncRunManager:
                 break
             elif signal == Spike.pause():
                 logger.warning('Received pause signal, pending...')
-                while self.q_sig.get() != Spike.resume():  # Intentionally blocking
+                while self.q_sig.get() != Spike.resume():  # Intentionally blocking TODO
                     time.sleep(1e-3)
 
     async def __aexit__(self, value, traceback):
-        logger.info(f'Ran for {time.time() - self.start} seconds')
-        logger.warning(f'Exiting AsyncRunManager')
+        logger.info('Ran for {} seconds'.format(time.time() - self.start))
+        logger.warning('Exiting AsyncRunManager')
