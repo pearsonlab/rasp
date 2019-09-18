@@ -2,7 +2,6 @@ import datetime
 import os
 import pickle
 import time
-import lmdb
 import numpy as np
 import pyarrow as arrow
 import pyarrow.plasma as plasma
@@ -94,7 +93,7 @@ class Limbo(StoreInterface):
         object_id = None
         try:
             # Need to pickle if object is csc_matrix
-            if isinstance(obj, csc_matrix):
+            if isinstance(object, csc_matrix):
                 object_id = self.client.put(pickle.dumps(object, protocol=pickle.HIGHEST_PROTOCOL))
             else:
                 object_id = self.client.put(object)
@@ -288,6 +287,8 @@ class LMDBStore(StoreInterface):
         from_limbo: If instantiated from Limbo. Enables object ID functionality.
         '''
 
+        import lmdb
+
         if name is None:
             name = f'/lmdb_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
 
@@ -307,7 +308,7 @@ class LMDBStore(StoreInterface):
     def get(self, obj_name_or_id):
         ''' Get object from object name (!from_limbo) or ID (from_limbo). 
             Return None if object is not found.
-        ''''
+        '''
 
         with self.lmdb_env.begin() as txn:
             get_key = self.lmdb_obj_id_to_key[obj_name_or_id]
@@ -340,7 +341,7 @@ class LMDBStore(StoreInterface):
 
             self.lmdb_put_cache = {}
 
-            if flush_this_immediately:
+            if save:
                 self.lmdb_env.sync()
 
     def delete(self, obj_id):
