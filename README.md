@@ -1,2 +1,2 @@
-# rasp
-Real-time Analysis and Stimulation Platform
+# improv
+Adaptive Platform for Real-time Analysis and Stimulation of Neural Circuits
