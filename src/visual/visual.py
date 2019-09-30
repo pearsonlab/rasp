@@ -20,11 +20,13 @@ logging.basicConfig(level=logging.INFO,
                               logging.StreamHandler()])
 
 class DisplayVisual(Actor):
+    ''' Class used to run a GUI + Visual as a single Actor 
+    '''
 
     def run(self):
         logger.info('Loading FrontEnd')
         self.app = QtWidgets.QApplication([])
-#        screen_resolution = self.app.desktop().screenGeometry()
+        # screen_resolution = self.app.desktop().screenGeometry()
         self.rasp = FrontEnd(self.visual, self.q_comm)
         self.rasp.show()
         logger.info('GUI ready')
@@ -45,17 +47,12 @@ class CaimanVisual(Actor):
     def __init__(self, *args):
         super().__init__(*args)
 
-        # self.plots = [0,1,2]
         self.com1 = np.zeros(2)
-        self.neurons = []
-        self.estsAvg = []
-        self.frame = 0
         self.selectedNeuron = 0
         self.selectedTune = None
         self.frame_num = 0
 
-        self.flip = False
-        self.flag = False
+        # self.flip = False #TODO
 
     def setup(self):
         ''' Setup 
@@ -79,6 +76,7 @@ class CaimanVisual(Actor):
 
     def getData(self):
         t = time.time()
+        ids = None
         try:
             id = self.links['raw_frame_queue'].get(timeout=0.0001)
             self.raw_frame_number = list(id[0].keys())[0]
@@ -89,20 +87,25 @@ class CaimanVisual(Actor):
             logger.error('Visual: Exception in get data: {}'.format(e))
         try: 
             ids = self.q_in.get(timeout=0.0001)
-            if self.draw:
-                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids)
-                # self.getCurves()
-                # self.getFrames()
+            if ids is not None and ids[0]==1:
+                print('visual: missing frame')
+                self.frame_num += 1
                 self.total_times.append([time.time(), time.time()-t])
-            ##############FIXME frame number!
-            self.frame_num += 1
+                raise Empty
+            self.frame_num = ids[-1]
+            if self.draw:
+                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids[:-1])
+                self.getCurves()
+                self.getFrames()
+                self.total_times.append([time.time(), time.time()-t])
             self.timestamp.append([time.time(), self.frame_num])
         except Empty as e:
-            pass #logger.info('Visual: No data from queue') #no data
+            pass
         except ObjectNotFoundError as e:
             logger.error('Object not found, continuing...')
         except Exception as e:
             logger.error('Visual: Exception in get data: {}'.format(e))
+        # self.total_times.append([time.time(), time.time()-t])
 
     def getCurves(self):
         ''' Return the fluorescence traces and calculated tuning curves
@@ -136,7 +139,6 @@ class CaimanVisual(Actor):
             identifies which neuron is closest to this point
             and updates plotEstimates to use that neuron
         '''
-        #TODO: flip x and y if self.flip = True 
         neurons = [o['neuron_id']-1 for o in self.coords]
         com = np.array([o['CoM'] for o in self.coords])
         #dist = cdist(com, [np.array([y, self.raw.shape[0]-x])])
@@ -158,7 +160,7 @@ class CaimanVisual(Actor):
     def getFirstSelect(self):
         first = None
         if self.coords:
-            com = [o['CoM'] for o in self.coords] #TODO make one line
+            com = [o['CoM'] for o in self.coords]
             #first = [np.array([self.raw.shape[0]-com[0][1], com[0][0]])]
             first = [np.array([self.raw.shape[0]-com[0][0], self.raw.shape[1]-com[0][1]])]
             #first = [com[0]]
@@ -181,7 +183,6 @@ class CaimanVisual(Actor):
             if self.coords is not None:
                 coords = [o['coordinates'] for o in self.coords]
                 for i,c in enumerate(coords):
-                    #c = np.array(c)
                     ind = c[~np.isnan(c).any(axis=1)].astype(int)
                     #rot_ind = np.array([[i[1],self.raw.shape[0]-i[0]] for i in ind])
                     #rot_ind = np.array([[self.raw.shape[0]-i[0],self.raw.shape[1]-i[1]] for i in ind])
@@ -203,24 +204,3 @@ class CaimanVisual(Actor):
             elif np.any(act[np.where(thresh_r[:-1]==0)[0]]>0.5):
                 display = (255,255,255,0)
         return display
-
-#------------  Code below for running idependently 
-
-def runVis():
-    logger.error('trying to run')
-    app = QtWidgets.QApplication([]) #.instance() #(sys.argv)
-    print('type ', type(app))
-    logger.error('trying to run after app')
-    rasp = FrontEnd()
-    rasp.show()
-    app.exec_()
-
-if __name__=="__main__":
-    vis = CaimanVisual('name', 'client')
-    from multiprocessing import Process
-    p = Process(target=runVis)
-    p.start()
-    input("Type any key to quit.")
-    print("Waiting for graph window process to join...")
-    p.join()
-    print("Process joined successfully. C YA !")

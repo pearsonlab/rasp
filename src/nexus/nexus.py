@@ -389,7 +389,7 @@ class Nexus():
 
         [task.cancel() for task in tasks]
 
-        #TODO: Check for hanging behavior
+        #TODO: Fix for hanging behavior
         logging.info('Canceling outstanding tasks')
         await asyncio.gather(*tasks)
         loop.stop()
@@ -542,7 +542,6 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='eva_demo.yaml')
-    #nexus.setupAll()
+    nexus.createNexus(file='basic_demo.yaml')
     nexus.startNexus() #start polling, create processes
     

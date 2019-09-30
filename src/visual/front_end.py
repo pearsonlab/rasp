@@ -1,21 +1,16 @@
-import sys
-import os
 from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtWidgets import QMessageBox, QFileDialog
 from visual import rasp_ui_huge as rasp_ui
 from nexus.store import Limbo
+from nexus.actor import Spike
 import numpy as np
 from math import floor
 import time
 import pyqtgraph
 from pyqtgraph import EllipseROI, PolyLineROI
-from threading import Thread
-from multiprocessing import Process
-from PyQt5.QtWidgets import QMessageBox, QFileDialog
-from matplotlib import cm
 from queue import Empty
-from nexus.actor import Spike
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -76,7 +71,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             
         QtCore.QTimer.singleShot(10, self.update)
         
-        self.total_times.append(time.time()-t)
+        self.total_times.append([self.visual.frame_num, time.time()-t])
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
@@ -177,7 +172,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def updateVideo(self):
         ''' TODO: Bug on clicking ROI --> trace and report to pyqtgraph
         '''
-        #t = time.time()
         image = None
         try:
             raw, color = self.visual.getFrames()
@@ -200,14 +194,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             logger.error('Error in FrontEnd update Video:  {}'.format(e))
             raise Exception
 
-        #print('update Video time ', time.time()-t)
-
     def updateLines(self):
         ''' Helper function to plot the line traces
             of the activity of the selected neurons.
             TODO: separate updates for each plot?
         '''
-        #t = time.time()
         penW=pyqtgraph.mkPen(width=2, color='w')
         penR=pyqtgraph.mkPen(width=2, color='r')
         C = None
@@ -255,8 +246,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         else:
             logger.error('Visual received None tune')
         
-        #print('Full update Lines time ', time.time()-t)
-
     def mouseClick(self, event):
         '''Clicked on raw image to select neurons
         '''
@@ -299,7 +288,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
     def _updateRedCirc(self):
         ''' Circle neuron whose activity is in top (red) graph
             Default is neuron #0 from initialize
-            #TODO: raise error if no neurons found (for all plotting..)
             #TODO: add arg instead of self.selected
         '''
         ROIpen1=pyqtgraph.mkPen(width=1, color='r')
@@ -320,10 +308,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if confirm == QMessageBox.Yes:
             self.comm.put(['quit'])
-            print('Visual broke, avg time per frame: ', np.mean(self.visual.total_times, axis=0))
+            # print('Visual broke, avg time per frame: ', np.mean(self.visual.total_times, axis=0))
             print('Visual got through ', self.visual.frame_num, ' frames')
-            print('GUI avg time ', np.mean(self.total_times))
+            # print('GUI avg time ', np.mean(self.total_times))
             np.savetxt('timing/visual_frame_time.txt', np.array(self.visual.total_times))
+            np.savetxt('timing/gui_frame_time.txt', np.array(self.total_times))
             np.savetxt('timing/visual_timestamp.txt', np.array(self.visual.timestamp))
             event.accept()
         else: event.ignore()
@@ -434,6 +423,7 @@ class QRangeSlider(QtWidgets.QWidget):
         
 
 if __name__=="__main__":
+    import sys
     app = QtGui.QApplication(sys.argv)
     rasp = FrontEnd(None,None)
     rasp.show()

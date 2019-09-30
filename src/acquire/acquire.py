@@ -68,10 +68,10 @@ class FileAcquirer(Actor):
         if self.done:
             pass #logger.info('Acquirer is done, exiting')
             #return
-        elif(self.frame_num < len(self.data)*600):
+        elif(self.frame_num < len(self.data)*3000):
             frame = self.getFrame(self.frame_num % len(self.data))
-            # if self.frame_num > 1500 and self.frame_num < 1550:
-            #     frame = None
+            if self.frame_num > 2000 and self.frame_num < 2800:
+                frame = None
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
             self.timestamp.append([time.time(), self.frame_num])
             try:
@@ -205,7 +205,7 @@ class BehaviorAcquirer(Actor):
             except Exception as e:
                 logger.exception('File cannot be loaded. {0}'.format(e))
         else:
-            self.behaviors = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] #10 sets of input stimuli
+            self.behaviors = [0, 1, 2, 3, 4, 5, 6, 7] #8 sets of input stimuli
 
     def run(self):
         ''' Run continuously, waiting for input
@@ -217,7 +217,7 @@ class BehaviorAcquirer(Actor):
         ''' Check for input from behavioral control
         '''
         #Faking it for now. TODO: Talk to Max about his format
-        if self.n %20 ==0 :
+        if self.n % 100 == 0:
             self.curr_stim = random.choice(self.behaviors)
         self.onoff = random.choice([0,20])
         self.q_out.put({self.n:[self.curr_stim, self.onoff]})
