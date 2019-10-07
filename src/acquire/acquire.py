@@ -4,6 +4,9 @@ import h5py
 import struct
 import numpy as np
 import random
+
+from pathlib import Path
+from skimage.external.tifffile import imread
 from nexus.actor import Actor, Spike, RunManager
 from queue import Empty
 
@@ -226,8 +229,88 @@ class BehaviorAcquirer(Actor):
         time.sleep(0.068)
         self.n += 1
 
+
+class FolderAcquirer(Actor):
+    ''' TODO: Current behavior is looping over all files in a folder.
+    Class to read TIFF files in a specified {path} from disk.
+    Designed for scenarios when new TIFF files are created during the run.
+    Reads only new TIFF files (after Run started) and put on to the Plasma store.
+    If there're multiple files, files are loaded by name.
+    '''
+
+    def __init__(self, *args, folder=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.data = None
+        self.done = False
+        self.flag = False
+        self.path = Path(folder)
+
+        self.frame_num = 0
+        self.files = set()
+
+        if not self.path.exists() or not self.path.is_dir():
+            raise AttributeError(f'Folder {self.path} does not exist.')
+
+    def setup(self):
+        pass
+        # self.imgs = []
+        # files = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
+        # files = sorted(list(files))
+        # for file in files:
+        #     img = self.get_tiff(file)
+        #     self.imgs.append(img)
+        # self.imgs = np.array(self.imgs)
+        # f = h5py.File('data/sample.h5', 'w', libver='latest')
+        # f.create_dataset("default", data=self.imgs)
+        # f.close()
+
+    def run(self):
+        '''Triggered at Run
+           Get list of files in the folder and use that as the baseline.
+        '''
+        self.total_times = []
+        self.timestamp = []
+
+        self.files = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
+
+        with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
+            print(rm)
+
+        print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
+        print('Acquire got through ', self.frame_num, ' frames')
+        np.savetxt('timing/acquire_frame_time.txt', self.total_times)
+        np.savetxt('timing/acquire_timestamp.txt', self.timestamp)
+
+    def runAcquirer(self):
+        ''' Main loop. If there're new files, read and put into store.
+        '''
+        t = time.time()
+        files_current = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
+        # files_new = files_current - self.files
+        files_new = files_current  # TODO Remove before use.
+
+        if len(files_new) == 0:
+            time.sleep(0.01) #TODO: Remove before use
+
+        else:  # New files
+            files_new = sorted(list(files_new))
+            for file in files_new:
+                obj_id = self.client.put(self.get_tiff(file), 'acq_raw' + str(self.frame_num))
+                self.q_out.put([{str(self.frame_num): obj_id}])
+                self.frame_num += 1
+                self.files.add(file)
+                time.sleep(0.05)  # TODO Remove before use.
+
+            self.total_times.append(time.time() - t)
+
+    @staticmethod
+    def get_tiff(file: Path):
+        img = imread(file.as_posix())
+        return img[0, :, :]  #Extract first channel in this image set. #TODO: Likely change this
+
+
 if __name__ == '__main__':
-    FA = TbifAcquirer('FA', filename='data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif')
+    FA = FolderAcquirer('FA', folder='data/duke_exp/4/')
     FA.setup()
-    while True:
-       FA.runAcquirer()
+    # while True:
+    #    FA.runAcquirer()
