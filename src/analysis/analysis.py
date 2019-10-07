@@ -9,6 +9,107 @@ import colorsys
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+class SpontAnalysis(Actor):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+    def setup(self):
+        self.frame = 0
+        self.window = 500 #TODO: make user input, choose scrolling window for Visual
+        self.C = None
+        self.S = None
+        self.Call = None
+        self.Cx = None
+        self.Cpop = None
+        self.coords = None
+        self.color = None
+
+    def run(self):
+        self.total_times = []
+        self.timestamp = []
+
+        with RunManager(self.name, self.fitModel, self.setup, self.q_sig, self.q_comm) as rm:
+            logger.info(rm)
+        
+        print('Analysis broke, avg time per frame: ', np.mean(self.total_times, axis=0))
+        print('Analysis got through ', self.frame, ' frames')
+
+    def fitModel(self):
+        '''
+        '''
+        t = time.time()
+        ids = None
+        try:
+            ids = self.q_in.get(timeout=0.0001)
+            if ids is not None and ids[0]==1:
+                print('analysis: missing frame')
+                self.total_times.append(time.time()-t)
+                self.q_out.put([1])
+                raise Empty
+            self.frame = ids[-1]
+            (self.coordDict, self.image, self.S) = self.client.getList(ids[:-1])
+            self.C = self.S
+            self.coords = [o['coordinates'] for o in self.coordDict]
+            
+            # Compute model fit
+            # Just do overall average activity for now
+            self.fit()
+            
+            # Compute coloring of neurons for processed frame
+            # Also rotate and stack as needed for plotting
+            self.color = self.plotColorFrame()
+
+            if self.frame >= self.window:
+                window = self.window
+            else:
+                window = self.frame
+
+            if self.C.shape[1]>0:
+                self.Cpop = np.nanmean(self.C, axis=0)
+                self.Cx = np.arange(0,self.Cpop.size)+(self.frame-window)
+                self.Call = self.C #already a windowed version #[:,self.frame-window:self.frame]
+            
+            self.putAnalysis()
+            self.timestamp.append([time.time(), self.frame])
+            self.total_times.append(time.time()-t)
+        except ObjectNotFoundError:
+            logger.error('Estimates unavailable from store, droppping')
+        except Empty as e:
+            pass
+        except Exception as e:
+            logger.exception('Error in analysis: {}'.format(e))
+
+    def fit(self):
+        pass
+
+    def putAnalysis(self):
+        ''' Throw things to DS and put IDs in queue for Visual
+        '''
+        ids = []
+        ids.append(self.client.put(self.Cx, 'Cx'+str(self.frame)))
+        ids.append(self.client.put(self.Call, 'Call'+str(self.frame)))
+        ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
+        ids.append(self.client.put(None, 'tune'+str(self.frame)))
+        ids.append(self.client.put(self.color, 'color'+str(self.frame)))
+        ids.append(self.client.put(self.coordDict, 'analys_coords'+str(self.frame)))
+        ids.append(self.frame)
+
+        self.q_out.put(ids)
+
+    def plotColorFrame(self):
+        ''' Computes colored nicer background+components frame
+        '''
+        image = self.image
+        color = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
+        color[...,3] = 255
+            # color = self.color.copy() #TODO: don't stack image each time?
+        if self.coords is not None:
+            for i,c in enumerate(self.coords):
+                #c = np.array(c)
+                ind = c[~np.isnan(c).any(axis=1)].astype(int)
+                cv2.fillConvexPoly(color, ind, (255,255,255,50))
+        return color
+
 class MeanAnalysis(Actor):
     #TODO: Add additional error handling
     def __init__(self, *args):

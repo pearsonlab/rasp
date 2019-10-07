@@ -253,16 +253,18 @@ class FolderAcquirer(Actor):
 
     def setup(self):
         pass
-        # self.imgs = []
-        # files = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
-        # files = sorted(list(files))
-        # for file in files:
-        #     img = self.get_tiff(file)
-        #     self.imgs.append(img)
-        # self.imgs = np.array(self.imgs)
-        # f = h5py.File('data/sample.h5', 'w', libver='latest')
-        # f.create_dataset("default", data=self.imgs)
-        # f.close()
+        
+    def saveImgs(self):
+        self.imgs = []
+        files = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
+        files = sorted(list(files))
+        for file in files:
+            img = self.get_tiff(file)
+            self.imgs.append(img)
+        self.imgs = np.array(self.imgs)
+        f = h5py.File('data/sample.h5', 'w', libver='latest')
+        f.create_dataset("default", data=self.imgs)
+        f.close()
 
     def run(self):
         '''Triggered at Run
@@ -299,7 +301,7 @@ class FolderAcquirer(Actor):
                 self.q_out.put([{str(self.frame_num): obj_id}])
                 self.frame_num += 1
                 self.files.add(file)
-                time.sleep(0.05)  # TODO Remove before use.
+                time.sleep(0.1)  # TODO Remove before use.
 
             self.total_times.append(time.time() - t)
 
@@ -311,6 +313,4 @@ class FolderAcquirer(Actor):
 
 if __name__ == '__main__':
     FA = FolderAcquirer('FA', folder='data/duke_exp/4/')
-    FA.setup()
-    # while True:
-    #    FA.runAcquirer()
+    FA.saveImgs()

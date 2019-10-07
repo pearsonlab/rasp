@@ -116,13 +116,16 @@ class CaimanVisual(Actor):
         '''
         if self.tune is not None:
             self.selectedTune = self.tune[0][self.selectedNeuron]
+            self.tuned = [self.selecetedTune, self.tune[1]]
+        else:
+            self.tuned = None
 
         if self.frame_num > self.window:
             self.Cx = self.Cx[-self.window:]
             self.C = self.C[:, -self.window:]
             self.Cpop = self.Cpop[-self.window:]
         
-        return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, [self.selectedTune, self.tune[1]]
+        return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, self.tuned
 
     def getFrames(self):
         ''' Return the raw and colored frames for display
@@ -147,7 +150,7 @@ class CaimanVisual(Actor):
             selected = neurons[np.argmin(dist)]
             self.selectedNeuron = selected
             print('Red circle at ', com[selected])
-            print('Tuning curve: ', self.tune[0][selected])
+            # print('Tuning curve: ', self.tune[0][selected])
             #self.com1 = [np.array([self.raw.shape[0]-com[selected][1], com[selected][0]])]
             #self.com1 = [com[selected]]
             self.com1 = [np.array([self.raw.shape[0]-com[selected][0], self.raw.shape[1]-com[selected][1]])]
@@ -192,15 +195,18 @@ class CaimanVisual(Actor):
             return None
 
     def _threshNeuron(self, ind, thresh_r):
-        ests = self.tune[0]
-        thresh = np.max(thresh_r)
-        display = (255,255,255,150)
-        act = np.zeros(ests.shape[1])
-        if ests[ind] is not None:
-            intensity = np.max(ests[ind])
-            act[:len(ests[ind])] = ests[ind]
-            if thresh > intensity: 
-                display = (255,255,255,0)
-            elif np.any(act[np.where(thresh_r[:-1]==0)[0]]>0.5):
-                display = (255,255,255,0)
+        if self.tune is not None:
+            ests = self.tune[0]
+            thresh = np.max(thresh_r)
+            display = (255,255,255,150)
+            act = np.zeros(ests.shape[1])
+            if ests[ind] is not None:
+                intensity = np.max(ests[ind])
+                act[:len(ests[ind])] = ests[ind]
+                if thresh > intensity: 
+                    display = (255,255,255,0)
+                elif np.any(act[np.where(thresh_r[:-1]==0)[0]]>0.5):
+                    display = (255,255,255,0)
+        else:
+            display = (255,255,255,0)
         return display
