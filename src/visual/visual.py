@@ -116,7 +116,7 @@ class CaimanVisual(Actor):
         '''
         if self.tune is not None:
             self.selectedTune = self.tune[0][self.selectedNeuron]
-            self.tuned = [self.selecetedTune, self.tune[1]]
+            self.tuned = [self.selectedTune, self.tune[1]]
         else:
             self.tuned = None
 
