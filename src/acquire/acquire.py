@@ -146,7 +146,7 @@ class TbifAcquirer(FileAcquirer):
 
         if self.done:
             pass 
-        elif(self.frame_num < len(self.data)*2):
+        elif(self.frame_num < len(self.data)):
             frame = self.getFrame(self.frame_num)
             if self.frame_num == len(self.data):
                 print('Done with first set ', self.frame_num)
@@ -301,16 +301,19 @@ class FolderAcquirer(Actor):
                 self.q_out.put([{str(self.frame_num): obj_id}])
                 self.frame_num += 1
                 self.files.add(file)
-                time.sleep(0.1)  # TODO Remove before use.
+                # time.sleep(0.1)  # TODO Remove before use.
 
             self.total_times.append(time.time() - t)
 
-    @staticmethod
-    def get_tiff(file: Path):
-        img = imread(file.as_posix())
-        return img[0, :, :]  #Extract first channel in this image set. #TODO: Likely change this
+    def get_tiff(self, file: Path):
+        try:
+            img = imread(file.as_posix())
+        except ValueError as e:
+            img = imread(file.as_posix())
+            logger.error('File '+file.as_posix()+' had value error {}'.format(e))
+        return img #[0,0,0, :, :,0]  #Extract first channel in this image set. #TODO: Likely change this
 
 
 if __name__ == '__main__':
-    FA = FolderAcquirer('FA', folder='data/duke_exp/4/')
+    FA = FolderAcquirer('FA', folder='data/duke_exp/2019/10/07/1')
     FA.saveImgs()
