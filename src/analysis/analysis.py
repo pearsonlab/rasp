@@ -323,15 +323,15 @@ class MeanAnalysis(Actor):
                 else:
                     estsAvg[int(s)] = np.zeros(ests.shape[0])
         
-        polarAvg = np.array(estsAvg)
-        # polarAvg[2] = np.sum(estsAvg[[9,11,15],:], axis=0)
-        # polarAvg[1] = estsAvg[10, :]
-        # polarAvg[0] = np.sum(estsAvg[[3,5,8],:], axis=0)
-        # polarAvg[7] = estsAvg[12, :]
-        # polarAvg[6] = np.sum(estsAvg[[13,17,18],:], axis=0)
-        # polarAvg[5] = estsAvg[14, :]
-        # polarAvg[4] = np.sum(estsAvg[[4,6,7],:], axis=0)
-        # polarAvg[3] = estsAvg[16, :]
+        estsAvg = np.array(estsAvg)
+        polarAvg[2] = np.sum(estsAvg[[9,11,15],:], axis=0)
+        polarAvg[1] = estsAvg[10, :]
+        polarAvg[0] = np.sum(estsAvg[[3,5,8],:], axis=0)
+        polarAvg[7] = estsAvg[12, :]
+        polarAvg[6] = np.sum(estsAvg[[13,17,18],:], axis=0)
+        polarAvg[5] = estsAvg[14, :]
+        polarAvg[4] = np.sum(estsAvg[[4,6,7],:], axis=0)
+        polarAvg[3] = estsAvg[16, :]
         
         self.estsAvg = np.abs(np.transpose(np.array(polarAvg)))
         self.estsAvg = np.where(np.isnan(self.estsAvg), 0, self.estsAvg)
