@@ -34,26 +34,12 @@ class ZMQAcquirer(Actor):
     def setup(self):
         pass
 
-    def saveImgs(self):
-        self.imgs = []
-        files = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
-        files = sorted(list(files))
-        for file in files:
-            img = self.get_tiff(file)
-            self.imgs.append(img)
-        self.imgs = np.array(self.imgs)
-        f = h5py.File('data/sample.h5', 'w', libver='latest')
-        f.create_dataset("default", data=self.imgs)
-        f.close()
-
     def run(self):
         '''Triggered at Run
            Get list of files in the folder and use that as the baseline.
         '''
         self.total_times = []
         self.timestamp = []
-
-        self.files = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
 
         with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
             print(rm)
