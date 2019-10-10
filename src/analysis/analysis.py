@@ -24,6 +24,9 @@ class SpontAnalysis(Actor):
         self.theta = np.concatenate((w,h,b), axis=None).flatten()
         self.p = {'numNeurons': 2, 'hist_dim': 2, 'numSamples': 1, 'dt': 0.1} #TODO: from config file..
 
+        data = np.zeros((2,10))
+        print('-----julia testing1 ------: ' , self.j_ll_grad(self.theta, data, self.p).copy())
+
         print('Done with SpontAnalysis init')
 
     def setup(self):
@@ -39,8 +42,7 @@ class SpontAnalysis(Actor):
 
         print('help')
 
-        data = np.zeros((2,10))
-        print('-----julia testing1 ------: ' , self.j_ll_grad(self.theta, data, self.p))
+        
 
     def run(self):
         self.total_times = []
