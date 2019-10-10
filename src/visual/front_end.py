@@ -75,7 +75,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
-        #self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
+        # self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
         self.slider2.setGeometry(QtCore.QRect(55, 120, 155, 50))
         self.slider2.setObjectName("slider2")
         self.slider2.rangeChanged.connect(_call(self.slider2Moved)) #Threshold for angular selection
@@ -243,8 +243,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 self.x2 = np.clip(self.radius2 * np.cos(self.theta) * 2, -5, 5)
                 self.y2 = np.clip(self.radius2 * np.sin(self.theta) * 2, -5, 5)
                 self.polar1.setData(self.x2, self.y2, pen=penW)
-        else:
-            logger.error('Visual received None tune')
+        # else:
+        #     logger.error('Visual received None tune')
         
     def mouseClick(self, event):
         '''Clicked on raw image to select neurons
