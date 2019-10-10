@@ -2,7 +2,7 @@ from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
-from visual import rasp_ui_large as rasp_ui
+from visual import rasp_ui_huge as rasp_ui
 from nexus.store import Limbo
 from nexus.actor import Spike
 import numpy as np
@@ -75,8 +75,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
     def extraSetup(self):
         self.slider2 = QRangeSlider(self.frame_3)
-        self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
-        # self.slider2.setGeometry(QtCore.QRect(55, 120, 155, 50))
+        # self.slider2.setGeometry(QtCore.QRect(20, 100, 155, 50))
+        self.slider2.setGeometry(QtCore.QRect(55, 120, 155, 50))
         self.slider2.setObjectName("slider2")
         self.slider2.rangeChanged.connect(_call(self.slider2Moved)) #Threshold for angular selection
 
