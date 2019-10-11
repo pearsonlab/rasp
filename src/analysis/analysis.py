@@ -14,9 +14,18 @@ class SpontAnalysis(Actor):
         super().__init__(*args)
         import julia
         julia = julia.Julia(compiled_modules=False)
+        # julia.include("src/julia/julia_func.jl")
+        # self.j_ll_grad = julia.eval('pyfunction(get_mean,PyArray)')
         julia.include('src/julia/sim_GLM.jl')
-        self.j_ll_grad = julia.eval('pyfunction(simGLM.ll_grad,PyArray,PyArray,PyDict)')
+        # self.j_ll_grad = julia.eval('pyfunction(simGLM.ll_grad,PyArray,PyArray,PyDict)')
         self.j_ll = julia.eval('pyfunction(simGLM.ll,PyArray,PyArray,PyDict)')
+
+        # from julia import Main
+        # Main.include("src/julia/sim_GLM.jl")
+
+        # from julia.simGLM import ll, ll_grad
+        # self.j_ll_grad = Main.simGLM.ll_grad
+        # self.j_ll = Main.simGLM.ll
 
         w = np.zeros((2,2)) #guess 2 neurons initially?
         h = np.zeros((2,2)) #dh is 2
@@ -25,7 +34,7 @@ class SpontAnalysis(Actor):
         self.p = {'numNeurons': 2, 'hist_dim': 2, 'numSamples': 1, 'dt': 0.1} #TODO: from config file..
 
         data = np.zeros((2,10))
-        print('-----julia testing1 ------: ' , self.j_ll_grad(self.theta, data, self.p).copy())
+        print('-----julia testing1 ------: ' , self.j_ll(self.theta, data, self.p))
 
         print('Done with SpontAnalysis init')
 
@@ -39,9 +48,6 @@ class SpontAnalysis(Actor):
         self.Cpop = None
         self.coords = None
         self.color = None
-
-        print('help')
-
         
 
     def run(self):
@@ -62,8 +68,6 @@ class SpontAnalysis(Actor):
         t = time.time()
         ids = None
         try:
-            data = np.zeros((2,10))
-            print('-----julia testing3 ------: ' , self.j_ll_grad(self.theta, data, self.p))
             ids = self.q_in.get(timeout=0.0001)
             if ids is not None and ids[0]==1:
                 print('analysis: missing frame')
@@ -106,6 +110,9 @@ class SpontAnalysis(Actor):
     def fit(self):
         '''
         '''
+        data = np.zeros((2,10))
+        print('-----julia testing3 ------: ' , self.j_ll(self.theta, data, self.p))
+        
         if self.p["numNeurons"] < self.S.shape[0]: #check for more neurons
             self.updateTheta()
 
@@ -119,7 +126,7 @@ class SpontAnalysis(Actor):
         # gradStep = self.j_ll_grad(self.theta, y_step, self.p)
         # self.theta -= 1e-5*gradStep
         # self.theta -= 1e-5 * self.j_ll_grad(self.theta, y_step, self.p)
-        print(time.time()-t0, self.j_ll(self.theta, y_step, self.p))
+        # print(time.time()-t0, self.j_ll(self.theta, y_step, self.p))
 
     def updateTheta(self):
         ''' TODO: Currently terribly inefficient growth
