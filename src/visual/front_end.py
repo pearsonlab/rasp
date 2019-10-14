@@ -20,6 +20,15 @@ logger.setLevel(logging.INFO)
 
 class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
+    COLOR = {0: ( 26, 239,  27),
+             1: (230, 230,  94),
+             2: (239, 131,  27),
+             3: (239,  26,  80),
+             4: (193,  31, 194),
+             5: (119,  96, 169),
+             6: ( 79,  26, 240),
+             7: ( 26, 239, 186)}
+
     def __init__(self, visual, comm, parent=None):
         ''' Setup GUI
             Setup and start Nexus controls
@@ -88,6 +97,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.flag = True
 
         self.c1 = self.grplot.plot(clipToView=True)
+        self.c1_stim = [self.grplot.plot(clipToView=True) for _ in range(len(self.COLOR))]
         self.c2 = self.grplot_2.plot()
         grplot = [self.grplot, self.grplot_2]
         for plt in grplot:
@@ -213,6 +223,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         if(C is not None and Cx is not None):
             self.c1.setData(Cx, Cpop, pen=penW)
+            for i, plot in enumerate(self.c1_stim):
+                if len(self.visual.stimStatus[i]) > 0:
+                    plot.setData(self.visual.stimStatus[i], [1.5] * len(self.visual.stimStatus[i]),
+                                 symbol='s', symbolSize=6, antialias=False,
+                                 pen=None, symbolPen=self.COLOR[i], symbolBrush=self.COLOR[i])
             self.c2.setData(Cx, C, pen=penR)
             
             if(self.flag):

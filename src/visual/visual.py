@@ -11,6 +11,7 @@ from visual.front_end import FrontEnd
 import sys
 from nexus.actor import Actor, Spike
 from queue import Empty
+from collections import deque
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -51,6 +52,9 @@ class CaimanVisual(Actor):
         self.selectedNeuron = 0
         self.selectedTune = None
         self.frame_num = 0
+        self.stimStatus = dict()  # TODO: Hard-coded
+        for i in range(8):
+            self.stimStatus[i] = deque()
 
         # self.flip = False #TODO
 
@@ -105,7 +109,19 @@ class CaimanVisual(Actor):
             logger.error('Object not found, continuing...')
         except Exception as e:
             logger.error('Visual: Exception in get data: {}'.format(e))
+
+        self.getStim()
         # self.total_times.append([time.time(), time.time()-t])
+
+    def getStim(self):
+        try:
+            stim: dict = self.links['input_stim_queue'].get(timeout=0.0001)
+        except Empty:
+            return
+        else:
+            direction, onoff = list(stim.values())[0]
+            if onoff != 0 and -1 < direction < 8:
+                self.stimStatus[direction].append(self.frame_num)
 
     def getCurves(self):
         ''' Return the fluorescence traces and calculated tuning curves
