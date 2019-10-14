@@ -4,6 +4,9 @@ import h5py
 import struct
 import numpy as np
 import random
+
+from pathlib import Path
+from skimage.external.tifffile import imread
 from nexus.actor import Actor, Spike, RunManager
 from queue import Empty
 
@@ -143,7 +146,7 @@ class TbifAcquirer(FileAcquirer):
 
         if self.done:
             pass 
-        elif(self.frame_num < len(self.data)*2):
+        elif(self.frame_num < len(self.data)):
             frame = self.getFrame(self.frame_num)
             if self.frame_num == len(self.data):
                 print('Done with first set ', self.frame_num)
@@ -226,8 +229,220 @@ class BehaviorAcquirer(Actor):
         time.sleep(0.068)
         self.n += 1
 
+
+class FolderAcquirer(Actor):
+    ''' TODO: Current behavior is looping over all files in a folder.
+    Class to read TIFF files in a specified {path} from disk.
+    Designed for scenarios when new TIFF files are created during the run.
+    Reads only new TIFF files (after Run started) and put on to the Plasma store.
+    If there're multiple files, files are loaded by name.
+    '''
+
+    def __init__(self, *args, folder=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.data = None
+        self.done = False
+        self.flag = False
+        self.path = Path(folder)
+
+        self.frame_num = 0
+        self.files = set()
+
+        if not self.path.exists() or not self.path.is_dir():
+            raise AttributeError(f'Folder {self.path} does not exist.')
+
+    def setup(self):
+        pass
+        
+    def saveImgs(self):
+        self.imgs = []
+        files = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
+        files = sorted(list(files))
+        for file in files:
+            img = self.get_tiff(file)
+            self.imgs.append(img)
+        self.imgs = np.array(self.imgs)
+        f = h5py.File('data/sample.h5', 'w', libver='latest')
+        f.create_dataset("default", data=self.imgs)
+        f.close()
+
+    def run(self):
+        '''Triggered at Run
+           Get list of files in the folder and use that as the baseline.
+        '''
+        self.total_times = []
+        self.timestamp = []
+
+        self.files = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
+
+        with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
+            print(rm)
+
+        print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
+        print('Acquire got through ', self.frame_num, ' frames')
+        np.savetxt('timing/acquire_frame_time.txt', self.total_times)
+        np.savetxt('timing/acquire_timestamp.txt', self.timestamp)
+
+    def runAcquirer(self):
+        ''' Main loop. If there're new files, read and put into store.
+        '''
+        t = time.time()
+        files_current = {f for f in self.path.iterdir() if f.suffix in ['.tif', '.tiff']}
+        # files_new = files_current - self.files
+        files_new = files_current  # TODO Remove before use.
+
+        if len(files_new) == 0:
+            time.sleep(0.01) #TODO: Remove before use
+
+        else:  # New files
+            files_new = sorted(list(files_new))
+            for file in files_new:
+                obj_id = self.client.put(self.get_tiff(file), 'acq_raw' + str(self.frame_num))
+                self.q_out.put([{str(self.frame_num): obj_id}])
+                self.frame_num += 1
+                self.files.add(file)
+                # time.sleep(0.1)  # TODO Remove before use.
+
+            self.total_times.append(time.time() - t)
+
+    def get_tiff(self, file: Path):
+        try:
+            img = imread(file.as_posix())
+        except ValueError as e:
+            img = imread(file.as_posix())
+            logger.error(
+                'File '+file.as_posix()+' had value error {}'.format(e))
+        return img #[0,0,0, :, :,0]  #Extract first channel in this image set. #TODO: Likely change this
+
+
+import ipaddress
+import logging
+import time
+
+import h5py
+import numpy as np
+import zmq
+import json
+
+from nexus.actor import Actor, RunManager
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+class ZMQAcquirer(Actor):
+
+    def __init__(self, *args, ip=None, port=None, topicfilter=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ip = ip
+        self.port = port
+        self.topicfilter = topicfilter
+        self.frame_num = 0
+
+        # Sanity check
+        # ipaddress.ip_address(self.ip)  # Check if IP is valid.
+        # if not 0 <= port <= 65535:
+        #     raise ValueError(f'Port {self.port} invalid.')
+
+        # self.context = zmq.Context()
+        # self.socket = self.context.socket(zmq.SUB)
+        # self.socket.connect(f"tcp://{self.ip}:{self.port}")
+        # self.socket.setsockopt_string(zmq.SUBSCRIBE, self.topicfilter)
+
+    def setup(self):
+        context = zmq.Context()
+        self.socket = context.socket(zmq.SUB)
+        self.socket.connect("tcp://10.122.170.21:4701")
+        self.socket.connect("tcp://10.122.170.21:4702")
+        self.socket.setsockopt(zmq.SUBSCRIBE, b'')
+
+        self.saveArray = []
+
+    def run(self):
+        '''Triggered at Run
+           Get list of files in the folder and use that as the baseline.
+        '''
+        self.total_times = []
+        self.timestamp = []
+        self.stimmed = []
+
+        with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
+            print(rm)
+
+        self.imgs = np.array(self.saveArray)
+        f = h5py.File('data/sample_stream.h5', 'w', libver='latest')
+        f.create_dataset("default", data=self.imgs)
+        f.close()
+
+        np.savetxt('./stimmed.txt', np.array(self.stimmed))
+
+        print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
+        print('Acquire got through ', self.frame_num, ' frames')
+        np.savetxt('timing/acquire_frame_time.txt', self.total_times)
+        np.savetxt('timing/acquire_timestamp.txt', self.timestamp)
+
+    def runAcquirer(self):
+        ''' Main loop. If there're new files, read and put into store.
+        '''
+        t = time.time()
+        #TODO: use poller instead to prevent blocking, include a timeout
+        try:
+            msg = self.socket.recv(flags=zmq.NOBLOCK)
+            msg_parts = [part.strip() for part in msg.split(b': ', 1)]
+            tag = msg_parts[0].split(b' ')[0]
+
+            if tag == b'stimid':
+                # print('stimulus id: {}'.format(msg_parts[1]))
+                # output example: stimulus id: b'background_stim'
+
+                stim = 0
+
+                if msg_parts[1] == b'grating_left':
+                    stim = 4
+                    print('------left')
+                if msg_parts[1] == b'grating_right':
+                    stim = 3
+                    print('------right')
+                if msg_parts[1] == b'grating_up':
+                    stim = 9
+                    print('------up')
+                if msg_parts[1] == b'grating_down':
+                    stim = 13
+                    print('------down')
+                if msg_parts[1] == b'background_stim':
+                    stim = 0
+                    print('------background')
+
+                self.links['stim_queue'].put({self.frame_num:[stim, 20]}) #TODO: stimID needs to be numbered?
+                self.stimmed.append(np.array([self.frame_num, stim]))
+
+            elif tag == b'frame':
+                t0 = time.time()
+                array = np.array(json.loads(msg_parts[1]))  # assuming the following message structure: 'tag: message'
+                # print('{} messsage length: {}. Element sum: {}; time to process: {}'.format(msg_parts[0], len(msg),
+                                                                                            # array.sum(), time.time() - t0))
+                # output example: b'frame ch0 10:02:01.115 AM 10/11/2019' messsage length: 1049637. Element sum: 48891125; time to process: 0.04192757606506348
+                
+                obj_id = self.client.put(array, 'acq_raw' + str(self.frame_num))
+                self.q_out.put([{str(self.frame_num): obj_id}])
+
+                self.saveArray.append(array)
+
+                self.frame_num += 1
+                self.total_times.append(time.time() - t)
+
+            else:
+                if len(msg) < 100:
+                    print(msg)
+                else:
+                    print('msg length: {}'.format(len(msg)))
+
+        except zmq.Again as e:
+            pass #no messages available
+        except Exception as e:
+            print('error: {}'.format(e))
+
+
 if __name__ == '__main__':
-    FA = TbifAcquirer('FA', filename='data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif')
-    FA.setup()
-    while True:
-       FA.runAcquirer()
+    FA = FolderAcquirer('FA', folder='data/duke_exp/2019/10/07/1')
+    FA.saveImgs()

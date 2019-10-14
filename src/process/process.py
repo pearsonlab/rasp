@@ -95,6 +95,10 @@ class CaimanProcessor(Actor):
                 print(traceback.format_exc())
         else:
             print('No OASIS')
+        self.coords1 = [o['CoM'] for o in self.coords]
+        print(self.coords1[0])
+        print('type ', type(self.coords1[0]))
+        np.savetxt('contours.txt', np.array(self.coords1))
 
     def runProcess(self):
         ''' Run process. Runs once per frame.
@@ -157,17 +161,17 @@ class CaimanProcessor(Actor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_3.hdf5'],
-                   'fr': 15,
+            params_dict = {'fnames': [cwd+'/data/sample_stream.h5'],
+                   'fr': 3.6,
                    'decay_time': 0.5,
                    'gSig': (3,3),
                    'p': 1,
-                   'min_SNR': 1,
-                   'rval_thr': 0.9,
+                   'min_SNR': 0.8,
+                   'rval_thr': 0.8,
                    'ds_factor': 1,
                    'nb': 2,
                    'motion_correct': True,
-                   'init_batch': 100,
+                   'init_batch': 50,
                    'init_method': 'bare',
                    'normalize': True,
                    'sniper_mode': False,
@@ -178,7 +182,7 @@ class CaimanProcessor(Actor):
                    'dist_shape_update': True,
                    'show_movie': False,
                 #    'update_freq': 50,
-                   'minibatch_shape': 100,
+                   'minibatch_shape': 50,
                    'output': 'outputEstimates'}
         self.client.put(params_dict, 'params_dict')
 
@@ -196,8 +200,8 @@ class CaimanProcessor(Actor):
         t = time.time()
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
-        before = self.frame_number-500 if self.frame_number > 500 else 0
-        # C = self.onAc.estimates.C_on[nb:self.onAc.M, before:self.frame_number] #.get_ordered()
+        before = 0#self.frame_number-500 if self.frame_number > 500 else 0
+        C = self.onAc.estimates.C_on[nb:self.onAc.M, before:self.frame_number] #.get_ordered()
         t2 = time.time()
         if self.onAc.estimates.OASISinstances is not None:
             try:
@@ -232,8 +236,8 @@ class CaimanProcessor(Actor):
         t3 = time.time()
 
         image = self.makeImage()
-        # if self.frame_number == 1:
-        #     np.savetxt('image.txt', np.array(image))
+        if self.frame_number == 1:
+            np.savetxt('image.txt', np.array(image))
         t4 = time.time()
         dims = image.shape
         self._updateCoords(A,dims)
@@ -242,7 +246,7 @@ class CaimanProcessor(Actor):
         ids = []
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
-        ids.append(self.client.put(S, 'S'+str(self.frame_number)))
+        ids.append(self.client.put(C, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
         self.q_out.put(ids)
@@ -325,7 +329,7 @@ class CaimanProcessor(Actor):
             self.A = A
             self.coords = get_contours(A, dims)
 
-        elif np.shape(A)[1] > np.shape(self.A)[1] and self.frame_number % 200 == 0: 
+        elif np.shape(A)[1] > np.shape(self.A)[1] and self.frame_number % 50 == 0: 
             #Only recalc if we have new components
             # FIXME: Since this is only for viz, only do this every 100 frames
             # TODO: maybe only recalc coords that are new? 
