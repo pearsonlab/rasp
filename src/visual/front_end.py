@@ -9,8 +9,10 @@ import numpy as np
 from math import floor
 import time
 import pyqtgraph
-from pyqtgraph import EllipseROI, PolyLineROI
+from pyqtgraph import EllipseROI, PolyLineROI, ColorMap
 from queue import Empty
+from matplotlib import cm
+from matplotlib.colors import ListedColormap
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -19,6 +21,15 @@ logger.setLevel(logging.INFO)
 #TODO: Add ability to receive signals like pause updating ...?
 
 class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
+
+    COLOR = {0: ( 26, 239,  27),
+             1: (230, 230,  94),
+             2: (239, 131,  27),
+             3: (239,  26,  80),
+             4: (193,  31, 194),
+             5: (119,  96, 169),
+             6: ( 79,  26, 240),
+             7: ( 26, 239, 186)}
 
     def __init__(self, visual, comm, parent=None):
         ''' Setup GUI
@@ -88,6 +99,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.flag = True
 
         self.c1 = self.grplot.plot(clipToView=True)
+        self.c1_stim = [self.grplot.plot(clipToView=True) for _ in range(len(self.COLOR))]
         self.c2 = self.grplot_2.plot()
         grplot = [self.grplot, self.grplot_2]
         for plt in grplot:
@@ -141,6 +153,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         #self.rawplot.ui.histogram.vb.disableAutoRange()
         self.rawplot.ui.histogram.vb.setLimits(yMin=-0.1, yMax=200) #0-255 needed, saturated here for easy viewing
 
+        if self.visual.showConnectivity:
+            self.rawplot_3.setColorMap(cmapToColormap(cm.inferno))
+
     def _loadParams(self):
         ''' Button event to load parameters from file
             File location determined from user input
@@ -185,10 +200,14 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 color = np.rot90(color,2)
                 self.rawplot_2.setImage(color)
                 self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
-            if image is not None:
-                image = np.rot90(image,2)
-                self.rawplot_3.setImage(image)
-                self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
+
+            if self.visual.showConnectivity:
+                self.rawplot_3.setImage(np.random.random((10, 10)))
+            else:
+                if image is not None:
+                    image = np.rot90(image, 2)
+                    self.rawplot_3.setImage(image)
+                    self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
             logger.error('Error in FrontEnd update Video:  {}'.format(e))
@@ -213,6 +232,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         if(C is not None and Cx is not None):
             self.c1.setData(Cx, Cpop, pen=penW)
+            for i, plot in enumerate(self.c1_stim):
+                if len(self.visual.stimStatus[i]) > 0:
+                    plot.setData(self.visual.stimStatus[i], [1.5] * len(self.visual.stimStatus[i]),
+                                 symbol='s', symbolSize=6, antialias=False,
+                                 pen=None, symbolPen=self.COLOR[i], symbolBrush=self.COLOR[i])
             self.c2.setData(Cx, C, pen=penR)
             
             if(self.flag):
@@ -420,7 +444,15 @@ class QRangeSlider(QtWidgets.QWidget):
         for slider in [self._min_slider, self._max_slider]:
             slider.blockSignals(True)
         self._update_layout()
-        
+
+
+def cmapToColormap(cmap: ListedColormap) -> ColorMap:
+    """ Converts matplotlib cmap to pyqtgraph ColorMap. """
+
+    colordata = (np.array(cmap.colors) * 255).astype(np.uint8)
+    indices = np.linspace(0., 1., len(colordata))
+    return ColorMap(indices, colordata)
+
 
 if __name__=="__main__":
     import sys
