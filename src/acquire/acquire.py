@@ -179,7 +179,7 @@ class TbifAcquirer(FileAcquirer):
         '''
         if num >= len(self.data):
             num = num % len(self.data)
-        return self.data[num,:,:]
+        return self.data[num,30:470,:]
 
 
 class BehaviorAcquirer(Actor):

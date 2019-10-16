@@ -6,7 +6,9 @@ actors:
 
   Acquirer:
     package: acquire.acquire
-    class: ZMQAcquirer
+    class: FileAcquirer
+    filename: data/sample_stream_nice.h5
+    framerate: 3
 
   Processor:
     package: process.process

@@ -150,7 +150,7 @@ class CaimanVisual(Actor):
             selected = neurons[np.argmin(dist)]
             self.selectedNeuron = selected
             print('Red circle at ', com[selected])
-            # print('Tuning curve: ', self.tune[0][selected])
+            print('Tuning curve: ', self.tune[0][selected])
             #self.com1 = [np.array([self.raw.shape[0]-com[selected][1], com[selected][0]])]
             #self.com1 = [com[selected]]
             self.com1 = [np.array([self.raw.shape[0]-com[selected][0], self.raw.shape[1]-com[selected][1]])]
