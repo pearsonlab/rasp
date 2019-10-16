@@ -9,7 +9,7 @@ import numpy as np
 from math import floor
 import time
 import pyqtgraph
-from pyqtgraph import EllipseROI, PolyLineROI, ColorMap
+from pyqtgraph import EllipseROI, PolyLineROI, ColorMap, ROI, LineSegmentROI
 from queue import Empty
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
@@ -22,14 +22,22 @@ logger.setLevel(logging.INFO)
 
 class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
-    COLOR = {0: ( 26, 239,  27),
-             1: (230, 230,  94),
-             2: (239, 131,  27),
-             3: (239,  26,  80),
-             4: (193,  31, 194),
-             5: (119,  96, 169),
-             6: ( 79,  26, 240),
-             7: ( 26, 239, 186)}
+    # COLOR = {0: ( 26, 239,  27),
+    #          1: (230, 230,  94),
+    #          2: (239, 131,  27),
+    #          3: (239,  26,  80),
+    #          4: (193,  31, 194),
+    #          5: (119,  96, 169),
+    #          6: ( 79,  26, 240),
+    #          7: ( 26, 239, 186)}
+    COLOR = {0: ( 240, 122,  5),
+             1: (181, 240,  5),
+             2: (5, 240,  5),
+             3: (5,  240,  181),
+             4: (5,  122, 240),
+             5: (64,  5, 240),
+             6: ( 240,  5, 240),
+             7: ( 240, 5, 64)}
 
     def __init__(self, visual, comm, parent=None):
         ''' Setup GUI
@@ -56,6 +64,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         
 
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
+        self.rawplot_3.getImageItem().mouseClickEvent = self.weightClick #select a neuron by weight
         self.slider.valueChanged.connect(_call(self.sliderMoved)) #Threshold for magnitude selection
 
     def update(self):
@@ -68,10 +77,18 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         if self.draw:
             #plot lines
-            self.updateLines()
+            try:
+                self.updateLines()
+            except Exception:
+                import traceback
+                print('---------------------here' , traceback.format_exc())
 
             #plot video
-            self.updateVideo()
+            try:
+                self.updateVideo()
+            except Exception:
+                import traceback
+                print('---------------------here TWO' , traceback.format_exc())
 
         #re-update
         if self.checkBox.isChecked():
@@ -97,6 +114,11 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         #init line plot
         self.flag = True
+        self.flagW = True
+        self.flagL = True
+        self.last_x = None
+        self.last_y = None
+        self.weightN = None
 
         self.c1 = self.grplot.plot(clipToView=True)
         self.c1_stim = [self.grplot.plot(clipToView=True) for _ in range(len(self.COLOR))]
@@ -153,8 +175,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         #self.rawplot.ui.histogram.vb.disableAutoRange()
         self.rawplot.ui.histogram.vb.setLimits(yMin=-0.1, yMax=200) #0-255 needed, saturated here for easy viewing
 
-        if self.visual.showConnectivity:
-            self.rawplot_3.setColorMap(cmapToColormap(cm.inferno))
+        # if self.visual.showConnectivity:
+        #     self.rawplot_3.setColorMap(cmapToColormap(cm.inferno))
 
     def _loadParams(self):
         ''' Button event to load parameters from file
@@ -189,7 +211,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         '''
         image = None
         try:
-            raw, color = self.visual.getFrames()
+            raw, color, weight = self.visual.getFrames()
             image = self.visual.plotThreshFrame(self.thresh_r*2)
             if raw is not None:
                 raw = np.rot90(raw,2)
@@ -201,12 +223,19 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 self.rawplot_2.setImage(color)
                 self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
-            if self.visual.showConnectivity:
-                self.rawplot_3.setImage(np.random.random((10, 10)))
+            if self.visual.showConnectivity and weight is not None:
+                # weight = np.rot90(weight,1)
+                self.rawplot_3.setImage(weight)
+                colordata = (np.array(cmapToColormap(cm.inferno).color) * 255).astype(np.uint8)
+                cmap = ColorMap(pos=np.linspace(0, 1.0, len(colordata)), color=colordata)
+                # print('cmap shape', cmap.shape)
+                self.rawplot_3.setColorMap(cmap)
+                self.rawplot_3.ui.histogram.vb.setLimits(yMin=-1, yMax=1)
             else:
                 if image is not None:
                     image = np.rot90(image, 2)
                     self.rawplot_3.setImage(image)
+                    self._updateRect
                     self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
@@ -234,7 +263,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.c1.setData(Cx, Cpop, pen=penW)
             for i, plot in enumerate(self.c1_stim):
                 if len(self.visual.stimStatus[i]) > 0:
-                    plot.setData(self.visual.stimStatus[i], [1.5] * len(self.visual.stimStatus[i]),
+                    # print(self.visual.stimStatus[i])
+                    plot.setData(self.visual.stimStatus[i], [10] * len(self.visual.stimStatus[i]),
                                  symbol='s', symbolSize=6, antialias=False,
                                  pen=None, symbolPen=self.COLOR[i], symbolBrush=self.COLOR[i])
             self.c2.setData(Cx, C, pen=penR)
@@ -281,6 +311,106 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         selectedraw[0] = int(mousePoint.x())
         selectedraw[1] = int(mousePoint.y())
         self._updateRedCirc()
+
+    def weightClick(self, event):
+        '''Clicked on weight image to select neurons
+        '''
+        event.accept()
+        mousePoint = event.pos()
+        print('mousepoint: ', int(mousePoint.x()), int(mousePoint.y()))
+        if self.last_x is None:
+            self.last_x = int(mousePoint.x())
+            self.last_y = int(mousePoint.y())
+        pen=pyqtgraph.mkPen(width=2, color='r')
+        pen2=pyqtgraph.mkPen(width=2, color='r')
+
+        loc, lines, strengths = self.visual.selectWeights(int(mousePoint.x()), int(mousePoint.y()))
+
+        if self.flagW:
+            self.rect = ROI(pos = (int(mousePoint.x()), 0), size=(1,10), pen=pen, movable=False)
+            self.rect2 = ROI(pos = (0, int(mousePoint.y())), size=(10,1), pen=pen2, movable=False)
+            self.rawplot_3.getView().addItem(self.rect)
+            self.rawplot_3.getView().addItem(self.rect2)
+
+            pen = pyqtgraph.mkPen(width=1, color='g')
+            self.green_circ = CircleROI(pos = np.array([loc[0][0], loc[0][1]])-5, size=10, movable=False, pen=pen)
+            self.rawplot_2.getView().addItem(self.green_circ)
+            self.lines = []
+            self.pens = []
+            for i in range(9):
+                if strengths[i] > 1e-5:
+                    n = lines[i]
+                    self.pens.append(pyqtgraph.mkPen(width=2, color='g'))
+                    self.lines.append(LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
+                    self.rawplot_2.getView().addItem(self.lines[i])
+                else:
+                    self.pens.append(pyqtgraph.mkPen(width=2, color='g'))
+                    self.lines.append(LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
+                    self.rawplot_2.getView().addItem(self.lines[i])
+
+            self.last_x = int(mousePoint.x())
+            self.last_y = int(mousePoint.y())
+
+            self.flagW = False
+        else:
+            self.rawplot_3.getView().removeItem(self.rect)
+            self.rawplot_3.getView().removeItem(self.rect2)
+
+            self.rawplot_2.getView().removeItem(self.green_circ)
+            for i in range(9):
+                self.rawplot_2.getView().removeItem(self.lines[i])
+
+            print('confirmed removed')
+
+            if self.last_x != int(mousePoint.x()) or self.last_y != int(mousePoint.y()):
+                self.rect = ROI(pos = (int(mousePoint.x()), 0), size=(1,10), pen=pen, movable=False)
+                self.rect2 = ROI(pos = (0, int(mousePoint.y())), size=(10,1), pen=pen2, movable=False)
+                self.rawplot_3.getView().addItem(self.rect)
+                self.rawplot_3.getView().addItem(self.rect2)
+
+                pen = pyqtgraph.mkPen(width=1, color='g')
+                self.green_circ = CircleROI(pos = np.array([loc[0][0], loc[0][1]])-5, size=10, movable=False, pen=pen)
+                self.rawplot_2.getView().addItem(self.green_circ)
+
+                for i in range(9):
+                    n = lines[i]
+                    if strengths[i] > 1e-5:
+                        self.lines[i] = (LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
+                    else:
+                        self.lines[i] = (LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
+                    self.rawplot_2.getView().addItem(self.lines[i])
+                self.last_x = int(mousePoint.x())
+                self.last_y = int(mousePoint.y())
+            else:
+                self.flagW = True
+
+        # if self.flagL:
+        #     pen = pyqtgraph.mkPen(width=1, color='g')
+        #     self.green_circ = CircleROI(pos = np.array([loc[0][0], loc[0][1]])-5, size=10, movable=False, pen=pen)
+        #     self.rawplot_2.getView().addItem(self.green_circ)
+        #     self.lines = []
+        #     self.pens = []
+        #     for i in range(9):
+        #         n = lines[i]
+        #         self.pens.append(pyqtgraph.mkPen(width=2, color='g'))
+        #         self.lines.append(LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
+        #         self.rawplot_2.getView().addItem(self.lines[i])
+        #     self.flagL = False
+        # else:
+        #     self.rawplot_3.getView().removeItem(self.green_circ)
+        #     pen = pyqtgraph.mkPen(width=1, color='g')
+        #     self.green_circ = CircleROI(pos = np.array([loc[0][0], loc[0][1]])-5, size=10, movable=False, pen=pen)
+        #     self.rawplot_2.getView().addItem(self.green_circ)
+        #     for i in range(9):
+        #         n = lines[i]
+        #         self.rawplot_2.getView().removeItem(self.lines[i])
+        #         self.lines[i] = (LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
+        #         self.rawplot_2.getView().addItem(self.lines[i])
+                    
+    # def _updateRect(self):
+    #     # follow selected neuron with rectangles (unless it disappears?)
+    #     if self.weightN is not None:
+
 
     def sliderMoved(self):
         val = self.slider.value()

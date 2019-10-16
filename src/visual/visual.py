@@ -52,7 +52,7 @@ class CaimanVisual(Actor):
         self.selectedNeuron = 0
         self.selectedTune = None
         self.frame_num = 0
-        self.showConnectivity = showConnectivity
+        self.showConnectivity = True #showConnectivity
 
         self.stimStatus = dict()
         for i in range(8):  # TODO: Hard-coded
@@ -69,6 +69,8 @@ class CaimanVisual(Actor):
         self.raw = None
         self.color = None
         self.coords = None
+        self.w = None
+        self.weight = None
 
         self.draw = True
 
@@ -100,9 +102,10 @@ class CaimanVisual(Actor):
                 raise Empty
             self.frame_num = ids[-1]
             if self.draw:
-                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords) = self.client.getList(ids[:-1])
+                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords, stim, self.w) = self.client.getList(ids[:-1])
                 self.getCurves()
                 self.getFrames()
+                self.setStim(stim)
                 self.total_times.append([time.time(), time.time()-t])
             self.timestamp.append([time.time(), self.frame_num])
         except Empty as e:
@@ -112,18 +115,12 @@ class CaimanVisual(Actor):
         except Exception as e:
             logger.error('Visual: Exception in get data: {}'.format(e))
 
-        self.getStim()
         # self.total_times.append([time.time(), time.time()-t])
 
-    def getStim(self):
-        try:
-            stim: dict = self.links['input_stim_queue'].get(timeout=0.0001)
-        except Empty:
-            return
-        else:
-            direction, onoff = list(stim.values())[0]
-            if onoff != 0 and -1 < direction < 8:
-                self.stimStatus[direction].append(self.frame_num)
+    def setStim(self, stim):
+        direction, onoff = stim[1], stim[0]
+        if onoff != 0 and -1 < direction < 8:
+            self.stimStatus[direction].append(self.frame_num)
 
     def getCurves(self):
         ''' Return the fluorescence traces and calculated tuning curves
@@ -153,7 +150,21 @@ class CaimanVisual(Actor):
         if self.color is not None and self.color.shape[0] > self.color.shape[1]:
             self.color = np.rot90(self.color, 1)
 
-        return self.raw, self.color
+        if self.w is not None:
+            self.sortInd = np.mean(np.abs(self.w),axis=0).argsort()
+            # self.sortInd[:10].sort(axis=0)
+            
+            self.sortInd2 = np.mean(np.abs(self.w[self.sortInd]), axis=1).argsort()
+            self.sortInd2[:10].sort(axis=0)
+            # i1 = self.sortInd[:10]
+            self.i2 = self.sortInd2[:10]
+            self.weight = self.w[self.i2[:,None],self.i2]*10
+
+            # strongest = np.mean(self.C,axis=1).argsort()
+            # print('Strongest: ', strongest[:10])
+            # weight = self.w[strongest[:10,None],strongest[:10]]*10
+
+        return self.raw, self.color, self.weight
 
     def selectNeurons(self, x, y):
         ''' x and y are coordinates
@@ -177,6 +188,39 @@ class CaimanVisual(Actor):
             #self.com1 = [np.array([self.raw.shape[0]-com[0][1], com[0][0]])]
             self.com1 = [com[0]]
         return self.com1
+
+    def selectWeights(self, x, y):
+        ''' x, y int
+            lines 4 entry array: selected n_x, other_x, selected n_y, other_y
+        '''
+        # translate back to C order of neurons 
+        nid = self.i2[x]
+        print('selected neuron ', nid)
+
+        # highlight selected neuron
+        com = np.array([o['CoM'] for o in self.coords])
+        loc = [np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[1]-com[nid][1]])]
+
+        # draw lines between it and all other in self.weight
+        lines = np.zeros((9,4))
+        strengths = np.zeros(9)
+        i=0
+        for n in np.nditer(self.i2):
+            print('connected n', n)
+            if n!=nid:
+                if n<com.shape[0]:
+                    ar = np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[0]-com[n][0], self.raw.shape[1]-com[nid][1], self.raw.shape[1]-com[n][1]])
+                    lines[i] = ar
+                    strengths[i] = self.w[nid][n]
+                else:
+                    strengths[i] = 0
+                i+=1
+                
+        print('strengths ', strengths)
+
+        #update self.color...or add as ROIs? currently ROIs
+
+        return loc, lines, strengths
 
     def getFirstSelect(self):
         first = None

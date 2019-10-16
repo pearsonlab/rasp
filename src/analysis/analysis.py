@@ -837,6 +837,7 @@ class ModelAnalysis(Actor):
         self.lastOnOff = None
         self.recentStim = [0]*self.window
         self.currStimID = np.zeros((8, 100000)) #FIXME
+        self.currStim = -10
 
     def run(self):
         self.total_times = []
@@ -1149,7 +1150,10 @@ class ModelAnalysis(Actor):
         elif self.lastOnOff == 0 and curStim == 1: #was off, now on
             self.stimStart[whichStim].append(frame)
             print('Stim ', whichStim, ' started at ', frame)
-            self.currStimID[:, frame] = self.IDstim(int(whichStim))
+            stim = self.IDstim(int(whichStim))
+            if stim > -10:
+                self.currStimID[stim, frame] = 1
+            self.currStim = stim
         else:
             # stim off
             self.currStimID[:, frame] = np.zeros(8)
@@ -1159,23 +1163,23 @@ class ModelAnalysis(Actor):
         self.lastOnOff = curStim
 
     def IDstim(self, s):
-        stim = np.zeros(8)
+        stim = -10
         if s == 3:
-            stim[0] = 1
+            stim = 0
         elif s==10:
-            stim[1] = 1
+            stim = 1
         elif s==9:
-            stim[2] = 1
+            stim = 2
         elif s==16:
-            stim[3] = 1
+            stim = 3
         elif s==4:
-            stim[4] = 1
+            stim = 4
         elif s==14:
-            stim[5] = 1
+            stim = 5
         elif s==13:
-            stim[6] = 1
+            stim = 6
         elif s==12:
-            stim[7] = 1
+            stim = 7
 
         return stim
 
@@ -1184,12 +1188,17 @@ class ModelAnalysis(Actor):
         '''
         t = time.time()
         ids = []
+        stim = [self.lastOnOff, self.currStim]
+        N  = self.p['numNeurons']
+        w = self.theta[:N*N].reshape((N,N))
         ids.append(self.client.put(self.Cx, 'Cx'+str(self.frame)))
         ids.append(self.client.put(self.Call, 'Call'+str(self.frame)))
         ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
         ids.append(self.client.put(self.tune, 'tune'+str(self.frame)))
         ids.append(self.client.put(self.color, 'color'+str(self.frame)))
         ids.append(self.client.put(self.coordDict, 'analys_coords'+str(self.frame)))
+        ids.append(self.client.put(stim, 'stim'+str(self.frame)))
+        ids.append(self.client.put(w, 'w'+str(self.frame)))
         ids.append(self.frame)
 
         self.q_out.put(ids)

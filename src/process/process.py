@@ -329,7 +329,7 @@ class CaimanProcessor(Actor):
             self.A = A
             self.coords = get_contours(A, dims)
 
-        elif np.shape(A)[1] > np.shape(self.A)[1] and self.frame_number % 50 == 0: 
+        elif np.shape(A)[1] > np.shape(self.A)[1]: # and self.frame_number % 50 == 0: 
             #Only recalc if we have new components
             # FIXME: Since this is only for viz, only do this every 100 frames
             # TODO: maybe only recalc coords that are new? 
