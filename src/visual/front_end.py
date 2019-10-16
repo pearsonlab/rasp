@@ -236,7 +236,6 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 if image is not None:
                     image = np.rot90(image, 2)
                     self.rawplot_3.setImage(image)
-                    self._updateRect
                     self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         except Exception as e:
@@ -266,7 +265,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 if len(self.visual.stimStatus[i]) > 0:
                     display = np.array(self.visual.stimStatus[i])
                     display = display[display>np.min(Cx)]
-                    print(display)
+                    # print(display)
                     plot.setData(display, [10] * len(display),
                                  symbol='s', symbolSize=6, antialias=False,
                                  pen=None, symbolPen=self.COLOR[i], symbolBrush=self.COLOR[i])
@@ -285,20 +284,20 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.theta = theta  
             if(tune[0] is not None):
                 self.radius = np.zeros(self.num+1)
-                self.radius[:len(tune[0])] = tune[0]#/np.max(tune[0])
+                self.radius[:len(tune[0])] = tune[0]/np.max(tune[0])
                 self.radius[-1] = self.radius[0]
                 #self.radius = np.roll(self.radius,2)
-                self.x = np.clip(self.radius * np.cos(self.theta) * 2, -5, 5)
-                self.y = np.clip(self.radius * np.sin(self.theta) * 2, -5, 5)
+                self.x = np.clip(self.radius * np.cos(self.theta) * 4, -5, 5)
+                self.y = np.clip(self.radius * np.sin(self.theta) * 4, -5, 5)
                 self.polar2.setData(self.x, self.y, pen=penR)
 
             if(tune[1] is not None):
                 self.radius2 = np.zeros(self.num+1)
-                self.radius2[:len(tune[1])] = tune[1]#/np.max(tune[1])
+                self.radius2[:len(tune[1])] = tune[1]/np.max(tune[1])
                 self.radius2[-1] = self.radius2[0]
                 #self.radius2 = np.roll(self.radius2,2)
-                self.x2 = np.clip(self.radius2 * np.cos(self.theta) * 2, -5, 5)
-                self.y2 = np.clip(self.radius2 * np.sin(self.theta) * 2, -5, 5)
+                self.x2 = np.clip(self.radius2 * np.cos(self.theta) * 4, -5, 5)
+                self.y2 = np.clip(self.radius2 * np.sin(self.theta) * 4, -5, 5)
                 self.polar1.setData(self.x2, self.y2, pen=penW)
         # else:
         #     logger.error('Visual received None tune')

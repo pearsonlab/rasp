@@ -365,6 +365,7 @@ class ZMQAcquirer(Actor):
         self.total_times = []
         self.timestamp = []
         self.stimmed = []
+        self.frametimes = []
 
         with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
             print(rm)
@@ -375,6 +376,7 @@ class ZMQAcquirer(Actor):
         f.close()
 
         np.savetxt('./stimmed.txt', np.array(self.stimmed))
+        np.savetxt('./frametimes.txt', np.array(self.frametimes))
 
         print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
         print('Acquire got through ', self.frame_num, ' frames')
@@ -392,34 +394,40 @@ class ZMQAcquirer(Actor):
             tag = msg_parts[0].split(b' ')[0]
 
             if tag == b'stimid':
-                # print('stimulus id: {}'.format(msg_parts[1]))
+                print('stimulus id: {}'.format(msg_parts[1]))
                 # output example: stimulus id: b'background_stim'
 
                 stim = 0
+                stimonOff = 20
 
-                if msg_parts[1] == b'grating_left':
+                if msg_parts[1] == b'Left':
                     stim = 4
-                    print('------left')
-                if msg_parts[1] == b'grating_right':
+                elif msg_parts[1] == b'Right':
                     stim = 3
-                    print('------right')
-                if msg_parts[1] == b'grating_up':
+                elif msg_parts[1] == b'forward':
                     stim = 9
-                    print('------up')
-                if msg_parts[1] == b'grating_down':
+                elif msg_parts[1] == b'backward':
                     stim = 13
-                    print('------down')
-                if msg_parts[1] == b'background_stim':
-                    stim = 0
-                    print('------background')
+                elif msg_parts[1] == b'background_stim':
+                    stimonOff = 0
+                    print('Stim off')
+                elif msg_parts[1] == b'Left_Backward':
+                    stim = 14
+                elif msg_parts[1] == b'Right_Backward':
+                    stim = 12
+                elif msg_parts[1] == b'Left_Forward':
+                    stim = 16
+                elif msg_parts[1] == b'Right_Forward':
+                    stim = 10
 
-                self.links['stim_queue'].put({self.frame_num:[stim, 20]}) #TODO: stimID needs to be numbered?
-                self.stimmed.append(np.array([self.frame_num, stim]))
+                self.links['stim_queue'].put({self.frame_num:[stim, stimonOff]}) #TODO: stimID needs to be numbered?
+                self.stimmed.append([self.frame_num, stim])
 
             elif tag == b'frame':
                 t0 = time.time()
                 array = np.array(json.loads(msg_parts[1]))  # assuming the following message structure: 'tag: message'
-                # print('{} messsage length: {}. Element sum: {}; time to process: {}'.format(msg_parts[0], len(msg),
+                print('frame ', self.frame_num)
+                # print('{}'.format(msg_parts[0])) # messsage length: {}. Element sum: {}; time to process: {}'.format(msg_parts[0], len(msg),
                                                                                             # array.sum(), time.time() - t0))
                 # output example: b'frame ch0 10:02:01.115 AM 10/11/2019' messsage length: 1049637. Element sum: 48891125; time to process: 0.04192757606506348
                 
@@ -427,6 +435,7 @@ class ZMQAcquirer(Actor):
                 self.q_out.put([{str(self.frame_num): obj_id}])
 
                 self.saveArray.append(array)
+                self.frametimes.append([self.frame_num, time.time()])
 
                 self.frame_num += 1
                 self.total_times.append(time.time() - t)

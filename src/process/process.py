@@ -161,28 +161,28 @@ class CaimanProcessor(Actor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/tbif_ex_crop.h5'],
-                   'fr': 3,
-                   'decay_time': 1.0,
-                   'gSig': (5,5),
+            params_dict = {'fnames': [cwd+'/data/sample_stream_live3.h5'],
+                   'fr': 1.4,
+                   'decay_time': 2.5,
+                   'gSig': (2,2),
                    'p': 1,
-                   'min_SNR': 1.5,
+                   'min_SNR': 0.8,
                    'rval_thr': 0.9,
                    'ds_factor': 1,
                    'nb': 2,
                    'motion_correct': True,
-                   'init_batch': 50,
+                   'init_batch': 100,
                    'init_method': 'bare',
                    'normalize': True,
-                   'sniper_mode': True,
-                   'K': 10,
+                   'sniper_mode': False,
+                   'K': 20,
                    'epochs': 1,
                    'max_shifts_online': np.ceil(10).astype('int'),
                    'pw_rigid': False,
                    'dist_shape_update': True,
                    'show_movie': False,
                 #    'update_freq': 50,
-                   'minibatch_shape': 50,
+                   'minibatch_shape': 100,
                    'output': 'outputEstimates'}
         self.client.put(params_dict, 'params_dict')
 

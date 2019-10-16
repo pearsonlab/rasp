@@ -119,6 +119,8 @@ class CaimanVisual(Actor):
 
     def setStim(self, stim):
         direction, onoff = stim[1], stim[0]
+        # print('dir: ', direction)
+        # print('onoff: ', onoff)
         if onoff != 0 and -1 < direction < 8:
             self.stimStatus[direction].append(self.frame_num)
             print('frame: ', self.frame_num, ' direction: ', direction)
@@ -138,8 +140,8 @@ class CaimanVisual(Actor):
 
         if self.frame_num > self.window:
             self.Cx = self.Cx[-self.window:]
-            self.C = self.C[:, -self.window:]
-            self.Cpop = self.Cpop[-self.window:]
+            self.C = self.C[:, -len(self.Cx):]
+            self.Cpop = self.Cpop[-len(self.Cx):]
         
         return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, self.tuned
 
