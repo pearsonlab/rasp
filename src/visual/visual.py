@@ -121,6 +121,7 @@ class CaimanVisual(Actor):
         direction, onoff = stim[1], stim[0]
         if onoff != 0 and -1 < direction < 8:
             self.stimStatus[direction].append(self.frame_num)
+            print('frame: ', self.frame_num, ' direction: ', direction)
 
     def getCurves(self):
         ''' Return the fluorescence traces and calculated tuning curves
@@ -195,7 +196,7 @@ class CaimanVisual(Actor):
         '''
         # translate back to C order of neurons 
         nid = self.i2[x]
-        print('selected neuron ', nid)
+        # print('selected neuron ', nid)
 
         # highlight selected neuron
         com = np.array([o['CoM'] for o in self.coords])
@@ -206,7 +207,7 @@ class CaimanVisual(Actor):
         strengths = np.zeros(9)
         i=0
         for n in np.nditer(self.i2):
-            print('connected n', n)
+            # print('connected n', n)
             if n!=nid:
                 if n<com.shape[0]:
                     ar = np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[0]-com[n][0], self.raw.shape[1]-com[nid][1], self.raw.shape[1]-com[n][1]])
@@ -216,7 +217,46 @@ class CaimanVisual(Actor):
                     strengths[i] = 0
                 i+=1
                 
-        print('strengths ', strengths)
+        # print('strengths ', strengths)
+
+        #update self.color...or add as ROIs? currently ROIs
+
+        return loc, lines, strengths
+
+    def selectNW(self, x, y):
+        ''' x, y int
+            lines 4 entry array: selected n_x, other_x, selected n_y, other_y
+        '''
+        # translate back to C order of neurons 
+        nid = self.selectedNeuron
+        print('selected neuron ', nid)
+
+        # highlight selected neuron
+        com = np.array([o['CoM'] for o in self.coords])
+        loc = [np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[1]-com[nid][1]])]
+
+        # draw lines between it and 10 strongest connections in self.w
+        sortInd2 = np.mean(np.abs(self.w[nid]), axis=0).argsort()
+        sortInd2[:10].sort(axis=0)
+        # i1 = self.sortInd[:10]
+        i2 = self.sortInd2[:10]
+        # weight = self.w[nid,i2]*10
+
+        lines = np.zeros((9,4))
+        strengths = np.zeros(9)
+        i=0
+        for n in np.nditer(i2):
+            # print('connected n', n)
+            if n!=nid and i<9:
+                if n<com.shape[0]:
+                    ar = np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[0]-com[n][0], self.raw.shape[1]-com[nid][1], self.raw.shape[1]-com[n][1]])
+                    lines[i] = ar
+                    strengths[i] = self.w[nid][n]
+                else:
+                    strengths[i] = 0
+                i+=1
+                
+        # print('strengths ', strengths)
 
         #update self.color...or add as ROIs? currently ROIs
 

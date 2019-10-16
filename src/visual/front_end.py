@@ -119,6 +119,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.last_x = None
         self.last_y = None
         self.weightN = None
+        self.last_n = None
 
         self.c1 = self.grplot.plot(clipToView=True)
         self.c1_stim = [self.grplot.plot(clipToView=True) for _ in range(len(self.COLOR))]
@@ -263,8 +264,10 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.c1.setData(Cx, Cpop, pen=penW)
             for i, plot in enumerate(self.c1_stim):
                 if len(self.visual.stimStatus[i]) > 0:
-                    # print(self.visual.stimStatus[i])
-                    plot.setData(self.visual.stimStatus[i], [10] * len(self.visual.stimStatus[i]),
+                    display = np.array(self.visual.stimStatus[i])
+                    display = display[display>np.min(Cx)]
+                    print(display)
+                    plot.setData(display, [10] * len(display),
                                  symbol='s', symbolSize=6, antialias=False,
                                  pen=None, symbolPen=self.COLOR[i], symbolBrush=self.COLOR[i])
             self.c2.setData(Cx, C, pen=penR)
@@ -312,6 +315,35 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         selectedraw[1] = int(mousePoint.y())
         self._updateRedCirc()
 
+        if self.last_n is None:
+            self.last_n = self.visual.selectedNeuron
+
+        if self.flagW: #nothing drawn yet
+            loc, lines, strengths = self.visual.selectNW(selectedraw[0], selectedraw[1])
+            self.lines = []
+            self.pens = []
+            for i in range(9):
+                n = lines[i]
+                if strengths[i] > 1e-5:
+                    if strengths[i] > 1e-4:
+                        self.pens.append(pyqtgraph.mkPen(width=2, color='g'))
+                    else:
+                        self.pens.append(pyqtgraph.mkPen(width=1, color='g'))
+                    self.lines.append(LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
+                    self.rawplot_2.getView().addItem(self.lines[i])
+                else:
+                    self.pens.append(pyqtgraph.mkPen(width=1, color='g'))
+                    self.lines.append(LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
+                    self.rawplot_2.getView().addItem(self.lines[i])
+
+            self.last_n = self.visual.selectedNeuron
+            self.flagW = False
+        elif self.last_n == self.visual.selectedNeuron:
+            for i in range(9):
+                self.rawplot_2.getView().removeItem(self.lines[i])
+            self.flagW = True
+
+
     def weightClick(self, event):
         '''Clicked on weight image to select neurons
         '''
@@ -326,7 +358,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
         loc, lines, strengths = self.visual.selectWeights(int(mousePoint.x()), int(mousePoint.y()))
 
-        if self.flagW:
+        if self.flagW: # need to draw, currently off
             self.rect = ROI(pos = (int(mousePoint.x()), 0), size=(1,10), pen=pen, movable=False)
             self.rect2 = ROI(pos = (0, int(mousePoint.y())), size=(10,1), pen=pen2, movable=False)
             self.rawplot_3.getView().addItem(self.rect)
@@ -338,13 +370,16 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.lines = []
             self.pens = []
             for i in range(9):
+                n = lines[i]
                 if strengths[i] > 1e-5:
-                    n = lines[i]
-                    self.pens.append(pyqtgraph.mkPen(width=2, color='g'))
+                    if strengths[i] > 1e-4:
+                        self.pens.append(pyqtgraph.mkPen(width=2, color='g'))
+                    else:
+                        self.pens.append(pyqtgraph.mkPen(width=1, color='g'))
                     self.lines.append(LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
                     self.rawplot_2.getView().addItem(self.lines[i])
                 else:
-                    self.pens.append(pyqtgraph.mkPen(width=2, color='g'))
+                    self.pens.append(pyqtgraph.mkPen(width=1, color='g'))
                     self.lines.append(LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
                     self.rawplot_2.getView().addItem(self.lines[i])
 
@@ -375,8 +410,13 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 for i in range(9):
                     n = lines[i]
                     if strengths[i] > 1e-5:
+                        if strengths[i] > 1e-4:
+                            self.pens[i] = (pyqtgraph.mkPen(width=2, color='g'))
+                        else:
+                            self.pens[i] = (pyqtgraph.mkPen(width=1, color='g'))
                         self.lines[i] = (LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
                     else:
+                        self.pens[i] = (pyqtgraph.mkPen(width=1, color='g'))
                         self.lines[i] = (LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
                     self.rawplot_2.getView().addItem(self.lines[i])
                 self.last_x = int(mousePoint.x())
