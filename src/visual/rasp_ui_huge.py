@@ -158,7 +158,7 @@ class Ui_MainWindow(object):
         self.frame_4.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame_4.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame_4.setObjectName("frame_4")
-        self.rawplot_3 = ImageView(self.frame_4)
+        self.rawplot_3 = ImageView(self.frame_4, view=PlotItem())
         self.rawplot_3.setGeometry(QtCore.QRect(10, 10, 531, 537))
         self.rawplot_3.setObjectName("rawplot_3")
         self.frame_5 = QtWidgets.QFrame(self.centralwidget)
@@ -328,7 +328,7 @@ class Ui_MainWindow(object):
         self.menuRASP_Display.setTitle(_translate("MainWindow", "Nexus Display"))
 
 
-from pyqtgraph import ImageView, PlotWidget
+from pyqtgraph import ImageView, PlotWidget, PlotItem
 
 
 if __name__ == "__main__":
