@@ -103,10 +103,9 @@ class CaimanVisual(Actor):
                 raise Empty
             self.frame_num = ids[-1]
             if self.draw:
-                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords, stim, self.w, self.LL) = self.client.getList(ids[:-1])
+                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords, self.allStims, self.w, self.LL) = self.client.getList(ids[:-1])
                 self.getCurves()
                 self.getFrames()
-                self.setStim(stim)
                 self.total_times.append([time.time(), time.time()-t])
             self.timestamp.append([time.time(), self.frame_num])
         except Empty as e:
@@ -119,12 +118,13 @@ class CaimanVisual(Actor):
         # self.total_times.append([time.time(), time.time()-t])
 
     def setStim(self, stim):
-        direction, onoff = stim[1], stim[0]
-        # print('dir: ', direction)
-        # print('onoff: ', onoff)
-        if onoff != 0 and -1 < direction < 8:
-            self.stimStatus[direction].append(self.frame_num)
-            print('frame: ', self.frame_num, ' direction: ', direction)
+        # direction, onoff = stim[1], stim[0]
+        # # print('dir: ', direction)
+        # # print('onoff: ', onoff)
+        # if onoff != 0 and -1 < direction < 8:
+        #     self.stimStatus[direction].append(self.frame_num)
+        #     print('frame: ', self.frame_num, ' direction: ', direction)
+        pass
 
     def getCurves(self):
         ''' Return the fluorescence traces and calculated tuning curves

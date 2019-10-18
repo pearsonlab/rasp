@@ -235,12 +235,16 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.c1.setData(Cx, Cpop, pen=penW)
 
             for i, plot in enumerate(self.c1_stim):
-                if len(self.visual.stimStatus[i]) > 0:
-                    display = np.array(self.visual.stimStatus[i])
-                    display = display[display>np.min(Cx)]
-                    plot.setData(display, [int(np.max(Cpop))+1] * len(display),
-                                 symbol='s', symbolSize=6, antialias=False,
-                                 pen=None, symbolPen=self.COLOR[i], symbolBrush=self.COLOR[i])
+                # print(self.visual.allStims)
+                try:
+                    if len(self.visual.allStims[i]) > 0:
+                        display = np.array(self.visual.allStims[i])
+                        display = display[display>np.min(Cx)]
+                        plot.setData(display, [int(np.max(Cpop))+1] * len(display),
+                                    symbol='s', symbolSize=6, antialias=False,
+                                    pen=None, symbolPen=self.COLOR[i], symbolBrush=self.COLOR[i])
+                except KeyError:
+                    pass
 
             self.c2.setData(Cx, C, pen=penR)
             

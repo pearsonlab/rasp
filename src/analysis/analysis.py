@@ -838,6 +838,7 @@ class ModelAnalysis(Actor):
         self.recentStim = [0]*self.window
         self.currStimID = np.zeros((8, 100000)) #FIXME
         self.currStim = -10
+        self.allStims = {}
 
     def run(self):
         self.total_times = []
@@ -1140,11 +1141,14 @@ class ModelAnalysis(Actor):
     def updateStim_start(self, stim):
         frame = list(stim.keys())[0]
         whichStim = stim[frame][0]
+        stimID = self.IDstim(int(whichStim))
         # print('Got ', frame, whichStim, stim[frame][1])
         if whichStim not in self.stimStart.keys():
             self.stimStart.update({whichStim:[]})
+            self.allStims.update({stimID:[]})
         if abs(stim[frame][1])>1 :
             curStim = 1 #on
+            self.allStims[stimID].append(frame)
         else:
             curStim = 0 #off
         if self.lastOnOff is None:
@@ -1152,10 +1156,9 @@ class ModelAnalysis(Actor):
         elif self.lastOnOff == 0 and curStim == 1: #was off, now on
             self.stimStart[whichStim].append(frame)
             print('Stim ', whichStim, ' started at ', frame)
-            stim = self.IDstim(int(whichStim))
-            if stim > -10:
-                self.currStimID[stim, frame] = 1
-            self.currStim = stim
+            if stimID > -10:
+                self.currStimID[stimID, frame] = 1
+            self.currStim = stimID
         else:
             # stim off
             self.currStimID[:, frame] = np.zeros(8)
@@ -1199,7 +1202,7 @@ class ModelAnalysis(Actor):
         ids.append(self.client.put(self.tune, 'tune'+str(self.frame)))
         ids.append(self.client.put(self.color, 'color'+str(self.frame)))
         ids.append(self.client.put(self.coordDict, 'analys_coords'+str(self.frame)))
-        ids.append(self.client.put(stim, 'stim'+str(self.frame)))
+        ids.append(self.client.put(self.allStims, 'stim'+str(self.frame)))
         ids.append(self.client.put(w, 'w'+str(self.frame)))
         ids.append(self.client.put(np.array(self.LL), 'LL'+str(self.frame)))
         ids.append(self.frame)
