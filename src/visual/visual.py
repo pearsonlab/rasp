@@ -71,6 +71,7 @@ class CaimanVisual(Actor):
         self.coords = None
         self.w = None
         self.weight = None
+        self.LL = None
 
         self.draw = True
 
@@ -102,7 +103,7 @@ class CaimanVisual(Actor):
                 raise Empty
             self.frame_num = ids[-1]
             if self.draw:
-                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords, stim, self.w) = self.client.getList(ids[:-1])
+                (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords, stim, self.w, self.LL) = self.client.getList(ids[:-1])
                 self.getCurves()
                 self.getFrames()
                 self.setStim(stim)
@@ -142,8 +143,9 @@ class CaimanVisual(Actor):
             self.Cx = self.Cx[-self.window:]
             self.C = self.C[:, -len(self.Cx):]
             self.Cpop = self.Cpop[-len(self.Cx):]
+            #self.LL = self.LL[-len(self.Cx):]
         
-        return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, self.tuned
+        return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, self.tuned, self.LL#[:len(self.Cx)]
 
     def getFrames(self):
         ''' Return the raw and colored frames for display

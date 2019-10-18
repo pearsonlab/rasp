@@ -845,6 +845,7 @@ class ModelAnalysis(Actor):
         self.colortime = []
         self.stimtime = []
         self.timestamp = []
+        self.LL = []
 
         with RunManager(self.name, self.runStep, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
@@ -943,7 +944,8 @@ class ModelAnalysis(Actor):
 
         t0 = time.time()
         self.theta -= 1e-5*self.ll_grad(y_step, stim_step)*(self.frame/100)
-        print(time.time()-t0, self.p['numNeurons'], self.ll(y_step, stim_step))
+        self.LL.append(self.ll(y_step, stim_step))
+        print(time.time()-t0, self.p['numNeurons'], self.LL[-1])
 
         # gradStep = self.j_ll_grad(self.theta, y_step, self.p)
         # self.theta -= 1e-5*gradStep
@@ -1199,6 +1201,7 @@ class ModelAnalysis(Actor):
         ids.append(self.client.put(self.coordDict, 'analys_coords'+str(self.frame)))
         ids.append(self.client.put(stim, 'stim'+str(self.frame)))
         ids.append(self.client.put(w, 'w'+str(self.frame)))
+        ids.append(self.client.put(np.array(self.LL), 'LL'+str(self.frame)))
         ids.append(self.frame)
 
         self.q_out.put(ids)

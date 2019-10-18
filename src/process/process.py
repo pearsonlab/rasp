@@ -161,9 +161,9 @@ class CaimanProcessor(Actor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/f2_sample_stream2.h5'],
-                   'fr': 1.4,
-                   'decay_time': 2.5,
+            params_dict = {'fnames': [cwd+'/data/tbif_ex_crop.h5'],
+                   'fr': 3.5,
+                   'decay_time': 0.5,
                    'gSig': (3,3),
                    'p': 1,
                    'min_SNR': 1,
@@ -246,7 +246,7 @@ class CaimanProcessor(Actor):
         ids = []
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
-        ids.append(self.client.put(S, 'S'+str(self.frame_number)))
+        ids.append(self.client.put(C, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
         self.q_out.put(ids)
