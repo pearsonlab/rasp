@@ -1301,6 +1301,15 @@ class ModelAnalysis(Actor):
 
                 # trying summation coloring
                 return self.manual_Color_Sum(self.estsAvg[ind])
+
+                # scale by intensity
+                # tc = np.nanargmax(self.estsAvg[ind])
+                # r, g, b = self.manual_Color(tc)
+                # # h = (np.nanargmax(self.estsAvg[ind])*45)/360
+                # # intensity = 1 - np.mean(inten[0][0])/255.0
+                # # r, g, b, = colorsys.hls_to_rgb(h, intensity, 1)
+                # # r, g, b = [x*255.0 for x in (r, g, b)]
+                # return (r, g, b) + (255,) #(intensity*255,)
                 
             except ValueError:
                 return (255,255,255,0)

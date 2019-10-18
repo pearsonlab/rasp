@@ -205,12 +205,12 @@ class CaimanVisual(Actor):
         loc = [np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[1]-com[nid][1]])]
 
         # draw lines between it and all other in self.weight
-        lines = np.zeros((9,4))
-        strengths = np.zeros(9)
+        lines = np.zeros((18,4))
+        strengths = np.zeros(18)
         i=0
         for n in np.nditer(self.i2):
             # print('connected n', n)
-            if n!=nid:
+            if n!=nid and i<9:
                 if n<com.shape[0]:
                     ar = np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[0]-com[n][0], self.raw.shape[1]-com[nid][1], self.raw.shape[1]-com[n][1]])
                     lines[i] = ar
@@ -218,8 +218,22 @@ class CaimanVisual(Actor):
                 else:
                     strengths[i] = 0
                 i+=1
+
+        sortInd3 = np.abs(self.w[:,nid]).argsort(axis=0)
+        sortInd3[:10].sort(axis=0)
+        i3 = sortInd3[:10]
+        i=9
+        for n in np.nditer(i3):
+            if n!=nid and i<18:
+                if n<com.shape[0]:
+                    ar = np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[0]-com[n][0], self.raw.shape[1]-com[nid][1], self.raw.shape[1]-com[n][1]])
+                    lines[i] = ar
+                    strengths[i] = self.w[n][nid]
+                else:
+                    strengths[i] = 0
+                i+=1
                 
-        # print('strengths ', strengths)
+        print('strengths ', strengths)
 
         #update self.color...or add as ROIs? currently ROIs
 
@@ -240,14 +254,41 @@ class CaimanVisual(Actor):
         # draw lines between it and 10 strongest connections in self.w
         sortInd2 = np.mean(np.abs(self.w[nid]), axis=0).argsort()
         sortInd2[:10].sort(axis=0)
-        # i1 = self.sortInd[:10]
-        i2 = self.sortInd2[:10]
-        # weight = self.w[nid,i2]*10
+        i2 = sortInd2[:10]
 
-        lines = np.zeros((9,4))
-        strengths = np.zeros(9)
+        # sortInd3 = np.mean(np.abs(self.w[:,nid]), axis=0).argsort()
+        # sortInd3[:10].sort(axis=0)
+        # i3 = sortInd3[:10]
+
+        # lines = np.zeros((18,4))
+        # strengths = np.zeros(18)
+        # i=0
+        # for n in np.nditer(i2):
+        #     # print('connected n', n)
+        #     if n!=nid and i<9:
+        #         if n<com.shape[0]:
+        #             ar = np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[0]-com[n][0], self.raw.shape[1]-com[nid][1], self.raw.shape[1]-com[n][1]])
+        #             lines[i] = ar
+        #             strengths[i] = self.w[nid][n]
+        #         else:
+        #             strengths[i] = 0
+        #         i+=1
+        # i=9
+        # for n in np.nditer(i3):
+        #     print('connected n', n)
+        #     if n!=nid and i<18:
+        #         if n<com.shape[0]:
+        #             ar = np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[0]-com[n][0], self.raw.shape[1]-com[nid][1], self.raw.shape[1]-com[n][1]])
+        #             lines[i] = ar
+        #             strengths[i] = self.w[n][nid]
+        #         else:
+        #             strengths[i] = 0
+        #         i+=1
+
+        lines = np.zeros((18,4))
+        strengths = np.zeros(18)
         i=0
-        for n in np.nditer(i2):
+        for n in np.nditer(self.i2):
             # print('connected n', n)
             if n!=nid and i<9:
                 if n<com.shape[0]:
@@ -257,8 +298,22 @@ class CaimanVisual(Actor):
                 else:
                     strengths[i] = 0
                 i+=1
+
+        sortInd3 = np.abs(self.w[:,nid]).argsort(axis=0)
+        sortInd3[:10].sort(axis=0)
+        i3 = sortInd3[:10]
+        i=9
+        for n in np.nditer(i3):
+            if n!=nid and i<18:
+                if n<com.shape[0]:
+                    ar = np.array([self.raw.shape[0]-com[nid][0], self.raw.shape[0]-com[n][0], self.raw.shape[1]-com[nid][1], self.raw.shape[1]-com[n][1]])
+                    lines[i] = ar
+                    strengths[i] = self.w[n,nid]
+                else:
+                    strengths[i] = 0
+                i+=1
                 
-        # print('strengths ', strengths)
+        print('strengths ', strengths)
 
         #update self.color...or add as ROIs? currently ROIs
 

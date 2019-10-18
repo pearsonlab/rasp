@@ -542,5 +542,5 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='exp_oct16_demo.yaml')
+    nexus.createNexus(file='exp_oct16_replay.yaml')
     nexus.startNexus() #start polling, create processes    

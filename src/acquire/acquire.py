@@ -107,6 +107,12 @@ class FileAcquirer(Actor):
         # self.dset[self.frame_num-1] = frame
         # self.f.flush()
 
+class ReplayAcquirer(FileAcquirer):
+    def setup(self):
+        super().__init__(*args, **kwargs)
+
+        # with open(self.filename)
+
 class TbifAcquirer(FileAcquirer):
     def setup(self):
         if os.path.exists(self.filename):
