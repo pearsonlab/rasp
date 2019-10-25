@@ -142,12 +142,13 @@ class Limbo_internalPutGet(StoreDependentTestCase):
 
     def test_put(self):
         id= self.limbo.random_ObjectID(1)
-        self.limbo._put(1, id)
-        self.assertEqual(1, self.limbo.client.get(id))
+        self.limbo._put(1, id[0])
+        self.assertEqual(1, self.limbo.client.get(id[0]))
     
     def test_get(self):
-        
-        self.limbo.updateStored
+        id= self.limbo.put(1, 'one')
+        self.limbo.updateStored('one', id)
+        self.assertEqual(self.limbo._get('one'), 1)
 
     #TODO: write get fail function, same issue as before
     

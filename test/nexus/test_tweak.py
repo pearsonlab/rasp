@@ -1,6 +1,7 @@
 import os
 import yaml
 import io
+import filecmp
 
 import logging; logger = logging.getLogger(__name__)
 from src.nexus.tweak import Tweak 
@@ -14,13 +15,18 @@ class createConf(StoreDependentTestCase):
         super(createConf, self).setUp()
         self.tweak = Tweak()
 
-    def test_conf(self):
+    def test_actor(self):
         self.tweak.createConfig()
         self.assertEqual(self.tweak.actors['Processor'].packagename, 'process.process')
 
     def test_GUI(self):
         self.tweak.createConfig()
         self.assertEqual(self.tweak.gui.packagename, 'visual.visual')
+        self.assertEqual(self.tweak.gui.classname, 'DisplayVisual')
+
+    def test_connections(self):
+        self.tweak.createConfig()
+        self.assertEqual(self.tweak.connections['Acquirer.q_out'], ['Processor.q_in', 'Visual.raw_frame_queue'])
 
     def tearDown(self):
         super(createConf, self).tearDown()
