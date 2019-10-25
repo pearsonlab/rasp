@@ -90,7 +90,7 @@ class Limbo_ReleaseReset(StoreDependentTestCase):
     def test_release(self):
         self.limbo.release()
         self.limbo.put(1, 'one')
-        assertRaises(ArrowIOError)
+        self.assertRaises(ArrowIOError)
     
     def test_reset(self):
         self.limbo.reset()
@@ -140,9 +140,14 @@ class Limbo_internalPutGet(StoreDependentTestCase):
         super(Limbo_internalPutGet, self).setUp()
         self.limbo = Limbo()
 
-    def test_putget(self):
-        id= self.limbo._put(1, 'one')
-        self.assertEqual(1, self.limbo._get('one'))
+    def test_put(self):
+        id= self.limbo.random_ObjectID(1)
+        self.limbo._put(1, id)
+        self.assertEqual(1, self.limbo.client.get(id))
+    
+    def test_get(self):
+        
+        self.limbo.updateStored
 
     #TODO: write get fail function, same issue as before
     
