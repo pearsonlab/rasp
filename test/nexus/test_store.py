@@ -10,7 +10,7 @@ import pyarrow.plasma as plasma
 from pyarrow.lib import ArrowIOError
 
 class Limbo_Connect(StoreDependentTestCase):
-    
+
     def setUp(self):
         super(Limbo_Connect, self).setUp()
         self.limbo = Limbo()
@@ -29,7 +29,7 @@ class Limbo_Connect(StoreDependentTestCase):
         super(Limbo_Connect, self).tearDown()
 
 class Limbo_Get(StoreDependentTestCase):
-    
+
     def setUp(self):
         super(Limbo_Get, self).setUp()
         self.limbo = Limbo()
@@ -48,11 +48,11 @@ class Limbo_GetID(StoreDependentTestCase):
         super(Limbo_GetID, self).setUp()
         self.limbo=Limbo()
 
-    def test_isMatrix(self): #also tests put matrix 
+    def test_isMatrix(self): #also tests put matrix
         mat= csc_matrix((3, 4), dtype=np.int8)
         x= self.limbo.put(mat, 'matrix' ) #returns object_id
         self.assertIsInstance(self.limbo.getID(x), csc_matrix)
-    
+
     #TODO: figure out objectnotfounderror
     #def test_notPut(self):
     #    self.limbo.getID(self.limbo.random_ObjectID(1))
@@ -91,7 +91,7 @@ class Limbo_ReleaseReset(StoreDependentTestCase):
         self.limbo.release()
         self.limbo.put(1, 'one')
         assertRaises(ArrowIOError)
-    
+
     def test_reset(self):
         self.limbo.reset()
         self.limbo.put(1, 'one')
@@ -101,7 +101,7 @@ class Limbo_ReleaseReset(StoreDependentTestCase):
         super(Limbo_ReleaseReset, self).tearDown()
 
 class Limbo_Put(StoreDependentTestCase):
-    
+
     def setUp(self):
         super(Limbo_Put, self).setUp()
         self.limbo = Limbo()
@@ -114,13 +114,13 @@ class Limbo_Put(StoreDependentTestCase):
         id = self.limbo.put(2, 'two')
         id2 = self.limbo.put(2, 'two')
         self.assertRaises(PlasmaObjectExists)
-    
+
     def tearDown(self):
         super(Limbo_Put, self).tearDown()
 
 
 class Limbo_PutGet(StoreDependentTestCase):
-    
+
     def setUp(self):
         super(Limbo_PutGet, self).setUp()
         self.limbo = Limbo()
@@ -130,11 +130,66 @@ class Limbo_PutGet(StoreDependentTestCase):
         id2 = self.limbo.put(2, 'two')
         self.assertEqual(1, self.limbo.get('one'))
         self.assertEqual(id, self.limbo.stored['one'])
-    
+
     def tearDown(self):
         super(Limbo_PutGet, self).tearDown()
 
-#TODO: Write test for notify  and subscribe
-#TODO: Write test for updateStored and getStored
+#TODO @NICOLE: Write test for notify  and subscribe
+
+
+"""class Limbo_Notify(StoreDependentTestCase):
+    def setUp(self):
+        super(Limbo_Notify, self).setUp()
+        self.limbo = Limbo()
+
+    # Add test body here
+    def test_notify(self):
+        # TODO: not unit testable?
+
+
+    def tearDown(self):
+        super(Limbo_Notify, self).tearDown()"""
+
+
+#TODO @NICOLE: Write test for updateStored and getStored
+
+# if calling update with name that doesn't exist in stored yet, should raise error?
+# (as of now it will simply put it in stored?)
+
+class Limbo_UpdateStored(StoreDependentTestCase):
+    def setUp(self):
+        super(Limbo_UpdateStored, self).setUp()
+        self.limbo = Limbo()
+
+    # Accessing self.limbo.stored directly to test getStored separately
+    def test_updateGet(self):
+        self.limbo.put(1, 'one')
+        self.limbo.updateStored('one', 3)
+        self.assertEqual(3,self.limbo.stored['one'])
+
+    # Test to check that updating a value that isn't in store doesn't change store.
+    def test_updateEmpty(self):
+        self.limbo.updateStored('one', 3)
+        self.assertRaises(PlasmaObjectExists)
+
+    def tearDown(self):
+        super(Limbo_UpdateStored, self).tearDown()
+
+class Limbo_GetStored(StoreDependentTestCase):
+    def setUp(self):
+        super(Limbo_GetStored, self).setUp()
+        self.limbo = Limbo()
+
+    def test_getStoredEmpty(self):
+        self.assertFalse(self.limbo.getStored())
+
+    def test_putGetStored(self):
+        self.limbo.put(1, 'one')
+        self.assertEqual(1, self.limbo.getID(self.limbo.getStored()['one'])) # returns ID
+
+    def tearDown(self):
+        super(Limbo_GetStored, self).tearDown()
+
+
 #TODO: Write test for _put and _get
 #TODO: Write test for saveStore, saveTweak, and saveSubstore
