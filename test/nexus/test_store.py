@@ -87,10 +87,10 @@ class Limbo_ReleaseReset(StoreDependentTestCase):
         super(Limbo_ReleaseReset, self).setUp()
         self.limbo=Limbo()
 
-    def test_reset(self):
+    def test_release(self):
         self.limbo.release()
         self.limbo.put(1, 'one')
-        assertRaises(ArrowIOError)
+        self.assertRaises(ArrowIOError)
 
     def test_reset(self):
         self.limbo.reset()
@@ -193,3 +193,49 @@ class Limbo_GetStored(StoreDependentTestCase):
 
 #TODO: Write test for _put and _get
 #TODO: Write test for saveStore, saveTweak, and saveSubstore
+=======
+class Limbo_internalPutGet(StoreDependentTestCase):
+
+    def setUp(self):
+        super(Limbo_internalPutGet, self).setUp()
+        self.limbo = Limbo()
+
+    def test_put(self):
+        id= self.limbo.random_ObjectID(1)
+        self.limbo._put(1, id)
+        self.assertEqual(1, self.limbo.client.get(id))
+
+    def test_get(self):
+
+        self.limbo.updateStored
+
+    #TODO: write get fail function, same issue as before
+
+    def tearDown(self):
+        super(Limbo_internalPutGet, self).tearDown()
+
+class Limbo_saveTweak(StoreDependentTestCase):
+
+    def setUp(self):
+        super(Limbo_saveTweak, self).setUp()
+        self.limbo = Limbo()
+
+    #TODO: figure out file pathway
+    #def test_tweak(self):
+    #    fileName= '/home/tweak_dump'
+    #    id= self.limbo.put(1, 'one')
+    #    id2= self.limbo.put(2, 'two')
+    #    tweak_ids=[id, id2]
+    #    self.limbo.saveTweak(tweak_ids)
+    #    with open(fileName, 'wb') as output:
+    #        assertEquals(pickle.load(output, -1), [1, 2])
+
+    def tearDown(self):
+        super(Limbo_saveTweak, self).tearDown()
+
+
+
+#TODO: Write test for notify  and subscribe: Nicole
+#TODO: Write test for updateStored and getStored: Nicole
+#TODO: Write test for _put and _get: Daniel
+#TODO: Write test for saveStore, saveTweak, and saveSubstore: Daniel
