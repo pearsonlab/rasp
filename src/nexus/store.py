@@ -245,13 +245,13 @@ class Limbo(StoreInterface):
     #     except Exception as e:
     #         logger.error('Couldnt delete: {}'.format(e))
 
-    def saveStore(self, fileName='/home/store_dump'):
+    def saveStore(self, fileName='data/store_dump'):
         ''' Save the entire store to disk
             Uses pickle, should extend to mmap, hd5f, ...
         '''
         raise NotImplementedError
 
-    def saveTweak(self, tweak_ids, fileName='/home/tweak_dump'):
+    def saveTweak(self, tweak_ids, fileName='data/tweak_dump'):
         ''' Save current Tweak object containing parameters
             to run the experiment.
             Tweak is pickleable
@@ -263,7 +263,7 @@ class Limbo(StoreInterface):
         with open(fileName, 'wb') as output:
             pickle.dump(tweak, output, -1)
 
-    def saveSubstore(self, keys, fileName='/home/substore_dump'):
+    def saveSubstore(self, keys, fileName='data/substore_dump'):
         ''' Save portion of store based on keys
             to disk
         '''

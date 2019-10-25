@@ -8,6 +8,8 @@ from scipy.sparse import csc_matrix
 import numpy as np
 import pyarrow.plasma as plasma
 from pyarrow.lib import ArrowIOError
+from nexus.store import ObjectNotFoundError
+import pickle
 
 class Limbo_Connect(StoreDependentTestCase):
 
@@ -21,6 +23,7 @@ class Limbo_Connect(StoreDependentTestCase):
         self.assertIsInstance(self.limbo.client, plasma.PlasmaClient)
 
     #TODO: Figure out how to raise  two exceptions in one block
+    #catching and reraising exceptions- figure out how to check
     #def test_fail(self):
     #    store_loc= 'asdf'
     #    self.assertRaises((ArrowIOError, Exception), self.limbo.connectStore(store_loc))
@@ -54,9 +57,9 @@ class Limbo_GetID(StoreDependentTestCase):
         self.assertIsInstance(self.limbo.getID(x), csc_matrix)
 
     #TODO: figure out objectnotfounderror
-    #def test_notPut(self):
-    #    self.limbo.getID(self.limbo.random_ObjectID(1))
-    #    self.assertRaises(ObjectNotFoundError)
+    def test_notPut(self):
+        self.limbo.getID(self.limbo.random_ObjectID(1))
+        self.assertRaises(ObjectNotFoundError)
 
     def UseHDD(self):
         self.lmdb_store.put(1, 'one')
@@ -221,14 +224,14 @@ class Limbo_saveTweak(StoreDependentTestCase):
         self.limbo = Limbo()
 
     #TODO: figure out file pathway
-    #def test_tweak(self):
-    #    fileName= '/home/tweak_dump'
-    #    id= self.limbo.put(1, 'one')
-    #    id2= self.limbo.put(2, 'two')
-    #    tweak_ids=[id, id2]
-    #    self.limbo.saveTweak(tweak_ids)
-    #    with open(fileName, 'wb') as output:
-    #        assertEquals(pickle.load(output, -1), [1, 2])
+    def test_tweak(self):
+        fileName= 'data/tweak_dump'
+        id= self.limbo.put(1, 'one')
+        id2= self.limbo.put(2, 'two')
+        tweak_ids=[id, id2]
+        self.limbo.saveTweak(tweak_ids)
+        with open(fileName, 'rb') as output:
+            self.assertEqual(pickle.load(output), [1, 2])
 
     def tearDown(self):
         super(Limbo_saveTweak, self).tearDown()
