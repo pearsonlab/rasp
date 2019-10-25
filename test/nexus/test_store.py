@@ -136,7 +136,6 @@ class Limbo_PutGet(StoreDependentTestCase):
 
 #TODO @NICOLE: Write test for notify  and subscribe
 
-
 """class Limbo_Notify(StoreDependentTestCase):
     def setUp(self):
         super(Limbo_Notify, self).setUp()
