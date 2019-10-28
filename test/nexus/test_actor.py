@@ -32,20 +32,24 @@ class Actor_setStore(StoreDependentTestCase):
         super(Actor_setStore, self).tearDown()
 
 
-#setLinks
+# Nicole :
+## setLinks
 
-#setCommLinks
+## setCommLinks
 
-#setLinkIn
+## setLinkIn
 
-#setLinkOut
+## setLinkOut
 
-#addLink
 
-#getLinks
+# Daniel :
+## addLink
 
-#setUp
+## getLinks
 
-#run
+## setUp
+
+## run
+
 
 #changePriority
