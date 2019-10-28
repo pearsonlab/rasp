@@ -21,3 +21,11 @@ class StoreDependentTestCase(TestCase):
 
         self.p.kill()
         
+class ActorDependentTestCase(TestCase):
+    '''
+        Unit test base class for actor tests
+    '''
+
+    def setUp(self):
+
+    def tearDown(self):
