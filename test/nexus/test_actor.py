@@ -21,6 +21,7 @@ import pickle
 
 #setStore
 class Actor_setStore(StoreDependentTestCase):
+
     def setUp(self):
         super(Actor_setStore, self).setUp()
         self.actor = Actor('test')
@@ -37,14 +38,55 @@ class Actor_setStore(StoreDependentTestCase):
 
 
 # Nicole :
-## setLinks
+## setLinks and getLinks
+class Actor_setLinks(StoreDependentTestCase):
 
-## setCommLinks
+    def setUp(self):
+        super(Actor_setLinks, self).setUp()
+        self.actor = Actor('test')
 
-## setLinkIn
+    def test_setLinks(self):
+        links = {'1': 'one'}
+        actor = self.actor
+        actor.setLinks(limbo.client)
+        self.assertEqual(links['1'], actor.getLinks()['1'])
+        self.assertEqual(links, actor.getLinks())
 
-## setLinkOut
+    def tearDown(self):
+        super(Actor_setLinks, self).tearDown()
 
+# setLinkOut and getLinks
+class Actor_setLinkOut(StoreDependentTestCase):
+
+    def setUp(self):
+        super(Actor_setLinkOut, self).setUp()
+        self.actor = Actor('test')
+
+    def test_setLinkOut(self):
+        actor = self.actor
+        q = ['one', 'two', 'three']
+        actor.setLinkOut(q)
+        self.assertEqual(q, actor.getLinks()['q_out'])
+
+
+    def tearDown(self):
+        super(Actor_setLinkOut, self).tearDown()
+
+# setLinkIn and getLinks
+class Actor_setLinkIn(StoreDependentTestCase):
+
+    def setUp(self):
+        super(Actor_setLinkIn, self).setUp()
+        self.actor = Actor('test')
+
+    def test_setLinkIn(self):
+        actor = self.actor
+        q = ['one', 'two', 'three']
+        actor.setLinkIn(q)
+        self.assertEqual(q, actor.getLinks()['q_in'])
+
+    def tearDown(self):
+        super(Actor_setLinkIn, self).tearDown()
 
 # Daniel :
 ## addLink
@@ -56,4 +98,8 @@ class Actor_setStore(StoreDependentTestCase):
 ## run
 
 
-#changePriority
+
+#changePriority -> not unit testable?
+
+
+# Run manager
