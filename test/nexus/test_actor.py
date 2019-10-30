@@ -1,6 +1,6 @@
 
 from unittest import TestCase
-from test.test_utils import StoreDependentTestCase
+from test.test_utils import StoreDependentTestCase, ActorDependentTestCase
 from src.nexus.actor import Actor, RunManager, AsyncRunManager, Spike
 from src.nexus.store import Limbo
 from multiprocessing import Process
@@ -16,7 +16,6 @@ import traceback
 from nexus.store import ObjectNotFoundError
 import pickle
 from queue import Queue
-
 
 #TODO: write actor unittests
 
@@ -37,27 +36,29 @@ class Actor_setStore(StoreDependentTestCase):
     def tearDown(self):
         super(Actor_setStore, self).tearDown()
 
-class RunManager_setup(StoreDependentTestCase):
+class RunManager_setupRun(ActorDependentTestCase):
 
     def setUp(self):
-        super(RunManager_setup, self).setUp()
+        super(RunManager_setupRun, self).setUp()
         self.actor=Actor('test')
         self.isSetUp= False;
-
-    def run_setup(self):
-        self.isSetUp= True
-
-    def runMethod(self):
-        self.assertTrue(self.isSetUp)
+        self.runNum=0
 
     def test_runManager(self):
         q_sig= Queue()
         q_sig.put('setup')
         q_sig.put('run')
+        q_sig.put('pause')
+        q_sig.put('resume')
         q_sig.put('quit')
         q_comm= Queue()
-        self.RunManager= RunManager('test', self.runMethod, self.run_setup, q_sig, q_comm)
+        with RunManager('test', self.runMethod, self.run_setup, q_sig, q_comm) as rm:
+            print(rm)
+        self.assertEqual(self.runNum, 2)
+        self.assertTrue(self.isSetUp)
 
+    def tearDown(self):
+        super(RunManager_setupRun, self).tearDown()
 
 
 # Nicole :
@@ -67,11 +68,12 @@ class Actor_setLinks(StoreDependentTestCase):
     def setUp(self):
         super(Actor_setLinks, self).setUp()
         self.actor = Actor('test')
+        self.limbo=Limbo()
 
     def test_setLinks(self):
         links = {'1': 'one'}
         actor = self.actor
-        actor.setLinks(limbo.client)
+        actor.setLinks(links)
         self.assertEqual(links['1'], actor.getLinks()['1'])
         self.assertEqual(links, actor.getLinks())
 
