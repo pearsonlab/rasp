@@ -20,7 +20,7 @@ from queue import Queue
 #TODO: write actor unittests
 
 #setStore
-class Actor_setStore(StoreDependentTestCase):
+class Actor_setStore(ActorDependentTestCase):
 
     def setUp(self):
         super(Actor_setStore, self).setUp()
@@ -35,6 +35,25 @@ class Actor_setStore(StoreDependentTestCase):
 
     def tearDown(self):
         super(Actor_setStore, self).tearDown()
+
+class Actor_addLink(ActorDependentTestCase):
+
+    def setUp(self):
+        super(Actor_addLink, self).setUp()
+        self.actor=Actor('test')
+
+    def test_addLink(self):
+        links = {'1': 'one', '2': 'two'}
+        self.actor.setLinks(links)
+        newName= '3'
+        newLink= 'three'
+        self.actor.addLink(newName, newLink)
+        links.update({'3': 'three'})
+        self.assertEqual(self.actor.getLinks()['3'], 'three')
+        self.assertEqual(self.actor.getLinks(), links)
+
+    def tearDown(self):
+        super(Actor_addLink, self).tearDown()
 
 class RunManager_setupRun(ActorDependentTestCase):
 
@@ -63,7 +82,7 @@ class RunManager_setupRun(ActorDependentTestCase):
 
 # Nicole :
 ## setLinks and getLinks
-class Actor_setLinks(StoreDependentTestCase):
+class Actor_setLinks(ActorDependentTestCase):
 
     def setUp(self):
         super(Actor_setLinks, self).setUp()
@@ -81,7 +100,7 @@ class Actor_setLinks(StoreDependentTestCase):
         super(Actor_setLinks, self).tearDown()
 
 # setLinkOut and getLinks
-class Actor_setLinkOut(StoreDependentTestCase):
+class Actor_setLinkOut(ActorDependentTestCase):
 
     def setUp(self):
         super(Actor_setLinkOut, self).setUp()
@@ -98,7 +117,7 @@ class Actor_setLinkOut(StoreDependentTestCase):
         super(Actor_setLinkOut, self).tearDown()
 
 # setLinkIn and getLinks
-class Actor_setLinkIn(StoreDependentTestCase):
+class Actor_setLinkIn(ActorDependentTestCase):
 
     def setUp(self):
         super(Actor_setLinkIn, self).setUp()
@@ -113,18 +132,11 @@ class Actor_setLinkIn(StoreDependentTestCase):
     def tearDown(self):
         super(Actor_setLinkIn, self).tearDown()
 
-# Daniel :
-## addLink
-
-## getLinks
 
 ## setUp
 
 ## run
 
-
-
-#changePriority -> not unit testable?
 
 
 # Run manager
