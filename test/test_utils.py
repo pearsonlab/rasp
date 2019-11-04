@@ -21,7 +21,7 @@ class StoreDependentTestCase(TestCase):
         '''
 
         self.p.kill()
-
+   
 class ActorDependentTestCase(TestCase):
 
     def setUp(self):
@@ -41,7 +41,8 @@ class ActorDependentTestCase(TestCase):
 
     async def a_put(self, signal, time):
         await asyncio.sleep(time)
-        self.q_sig.put_async(signal)
+        self.q_sig.put_async(signal) 
+        
 
     def tearDown(self):
         ''' Kill the server
