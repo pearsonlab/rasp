@@ -108,6 +108,36 @@ class AsyncRunManager_setupRun(ActorDependentTestCase):
     def tearDown(self):
         super(AsyncRunManager_setupRun, self).tearDown()
 
+
+class AsyncRunManager_MultiActorTest(ActorDependentTestCase):
+
+    def setUp(self):
+        super(AsyncRunManager_MultiActorTest, self).setUp()
+        self.actor=Actor('test')
+        self.isSetUp= False;
+        q_sig = Queue()
+        self.q_sig = AsyncQueue(q_sig,'test_sig','test_start', 'test_end')
+        q_comm = Queue()
+        self.q_comm = AsyncQueue(q_comm, 'test_comm','test_start', 'test_end')
+        self.runNum=0
+
+    def actor_1(self):
+        self.a_put('resume',0.7)
+        self.a_put('pause',0.5)
+        self.a_put('setup', 0.1)
+
+    def actor_2(self):
+        self.a_put('quit',1)
+        self.a_put('run', 0.3)
+
+    async def test_asyncRunManager(self):
+        await AsyncRunManager('test', self.runMethod, self.run_setup, self.q_sig, self.q_comm)
+        self.assertEqual(self.runNum, 2)
+
+    def tearDown(self):
+        super(AsyncRunManager_MultiActorTest, self).tearDown()
+
+
 class Actor_setLinks(ActorDependentTestCase):
 
     def setUp(self):
