@@ -3,6 +3,7 @@ from unittest import TestCase
 from test.test_utils import StoreDependentTestCase, ActorDependentTestCase
 from src.nexus.actor import Actor, RunManager, AsyncRunManager, Spike
 from src.nexus.store import Limbo
+from src.nexus.nexus import AsyncQueue
 from multiprocessing import Process
 import numpy as np
 from pyarrow.lib import ArrowIOError
@@ -16,6 +17,7 @@ import traceback
 from nexus.store import ObjectNotFoundError
 import pickle
 from queue import Queue
+
 
 #TODO: write actor unittests
 
@@ -140,3 +142,32 @@ class Actor_setLinkIn(ActorDependentTestCase):
 
 
 # Run manager
+
+
+class AsyncRunManager_setupRun(ActorDependentTestCase):
+
+    def setUp(self):
+        super(AsyncRunManager_setupRun, self).setUp()
+        self.actor=Actor('test')
+        self.isSetUp= False;
+        q_sig = Queue()
+        self.q_sig = AsyncQueue(q_sig,'test_sig','test_start', 'test_end')
+        q_comm = Queue()
+        self.q_comm = AsyncQueue(q_comm, 'test_comm','test_start', 'test_end')
+        self.runNum=0
+
+    def load_queue(self):
+        self.a_put("setup", 0.1)
+        self.a_put('setup',0.1)
+        self.a_put('run',0.1)
+        self.a_put('pause',0.1)
+        self.a_put('resume',0.1)
+        self.a_put('quit',0.1)
+
+    async def test_asyncRunManager(self):
+        await AsyncRunManager('test', self.runMethod, self.run_setup, self.q_sig, self.q_comm)
+        self.assertEqual(self.runNum, 2)
+        self.assertTrue(self.isSetUp)
+
+    def tearDown(self):
+        super(AsyncRunManager_setupRun, self).tearDown()
