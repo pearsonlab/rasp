@@ -66,9 +66,9 @@ class RunManager_setupRun(ActorDependentTestCase):
     def test_runManager(self):
         q_sig= Queue()
         q_sig.put('setup')
-        q_sig.put('run')
-        q_sig.put('pause')
-        q_sig.put('resume')
+        q_sig.put('run') #runs after this signal
+        q_sig.put('pause') 
+        q_sig.put('resume') #runs again after this signal
         q_sig.put('quit')
         q_comm= Queue()
         with RunManager('test', self.runMethod, self.run_setup, q_sig, q_comm) as rm:
@@ -80,8 +80,6 @@ class RunManager_setupRun(ActorDependentTestCase):
         super(RunManager_setupRun, self).tearDown()
 
 
-# Nicole :
-## setLinks and getLinks
 class Actor_setLinks(ActorDependentTestCase):
 
     def setUp(self):
@@ -99,7 +97,6 @@ class Actor_setLinks(ActorDependentTestCase):
     def tearDown(self):
         super(Actor_setLinks, self).tearDown()
 
-# setLinkOut and getLinks
 class Actor_setLinkOut(ActorDependentTestCase):
 
     def setUp(self):
@@ -116,7 +113,6 @@ class Actor_setLinkOut(ActorDependentTestCase):
     def tearDown(self):
         super(Actor_setLinkOut, self).tearDown()
 
-# setLinkIn and getLinks
 class Actor_setLinkIn(ActorDependentTestCase):
 
     def setUp(self):
@@ -132,11 +128,3 @@ class Actor_setLinkIn(ActorDependentTestCase):
     def tearDown(self):
         super(Actor_setLinkIn, self).tearDown()
 
-
-## setUp
-
-## run
-
-
-
-# Run manager
