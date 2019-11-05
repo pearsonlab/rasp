@@ -3,7 +3,7 @@ from unittest import TestCase
 from test.test_utils import StoreDependentTestCase, ActorDependentTestCase
 from src.nexus.actor import Actor, RunManager, AsyncRunManager, Spike
 from src.nexus.store import Limbo
-from src.nexus.nexus import AsyncQueue
+from src.nexus.nexus import AsyncQueue, Link
 from multiprocessing import Process
 import numpy as np
 from pyarrow.lib import ArrowIOError
@@ -80,6 +80,23 @@ class RunManager_setupRun(ActorDependentTestCase):
     def tearDown(self):
         super(RunManager_setupRun, self).tearDown()
 
+class RunManager_process(ActorDependentTestCase):
+    def setUp(self):
+        super(RunManager_process, self).setUp()
+        self.actor=Actor('test')
+
+    def test_run(self):
+        self.q_sig= Link('queue', 'self', 'process')
+        self.q_comm=Link('queue', 'process', 'self')
+        self.p=Process(target= self.createprocess, args= (self.q_sig, self.q_comm,))
+        self.p.start()
+        self.q_sig.put('setup')
+        self.assertTrue(self.q_comm.get())
+        self.q_sig.put('quit')
+        self.p.terminate()
+
+    def tearDown(self):
+        super(RunManager_process, self).tearDown()
 #TODO: extend to another 
 
 class AsyncRunManager_setupRun(ActorDependentTestCase):
