@@ -21,7 +21,7 @@ import logging
 from logging import warning
 
 #TODO: write actor unittests
-'''
+#NOTE: Unittests are getting resourcewarning 
 #setStore
 class Actor_setStore(ActorDependentTestCase):
 
@@ -43,10 +43,10 @@ class Actor_addLink(ActorDependentTestCase):
 
     def setUp(self):
         super(Actor_addLink, self).setUp()
-        
+        self.actor=Actor('test')
 
     def test_addLink(self):
-        self.actor=Actor('test')
+        
         links = {'1': 'one', '2': 'two'}
         self.actor.setLinks(links)
         newName= '3'
@@ -82,7 +82,7 @@ class RunManager_setupRun(ActorDependentTestCase):
 
     def tearDown(self):
         super(RunManager_setupRun, self).tearDown()
-'''
+
 class RunManager_process(ActorDependentTestCase):
     def setUp(self):
         super(RunManager_process, self).setUp()
@@ -109,7 +109,7 @@ class RunManager_process(ActorDependentTestCase):
         super(RunManager_process, self).tearDown()
 
 #TODO: extend to another 
-'''
+
 class AsyncRunManager_setupRun(ActorDependentTestCase):
 
     def setUp(self):
@@ -224,4 +224,4 @@ if __name__ == '__main__':
     run.setUp()
     run.test_run()
     run.tearDown()
-
+'''
