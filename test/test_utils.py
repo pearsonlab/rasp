@@ -34,6 +34,12 @@ class ActorDependentTestCase(TestCase):
                               stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
 
+    def tearDown(self):
+        ''' Kill the server
+        '''
+
+        self.p.kill()
+
     def run_setup(self):
         self.isSetUp= True
 
@@ -41,22 +47,15 @@ class ActorDependentTestCase(TestCase):
         self.runNum+=1
 
     def process_setup(self):
-        self.q_comm.put(True)
+        pass
 
     def process_run(self):
         self.q_comm.put('ran')
 
     def createprocess(self, q_sig, q_comm):
-        with RunManager('test', self.runMethod, self.process_setup, q_sig, q_comm) as rm:
+        with RunManager('test', self.process_run, self.process_setup, q_sig, q_comm) as rm:
             print(rm)
         
     async def a_put(self, signal, time):
         await asyncio.sleep(time)
         self.q_sig.put_async(signal)      
-
-
-    def tearDown(self):
-        ''' Kill the server
-        '''
-
-        self.p.kill()

@@ -17,9 +17,11 @@ import traceback
 from nexus.store import ObjectNotFoundError
 import pickle
 from queue import Queue
+import logging
+from logging import warning
 
 #TODO: write actor unittests
-
+'''
 #setStore
 class Actor_setStore(ActorDependentTestCase):
 
@@ -41,9 +43,10 @@ class Actor_addLink(ActorDependentTestCase):
 
     def setUp(self):
         super(Actor_addLink, self).setUp()
-        self.actor=Actor('test')
+        
 
     def test_addLink(self):
+        self.actor=Actor('test')
         links = {'1': 'one', '2': 'two'}
         self.actor.setLinks(links)
         newName= '3'
@@ -79,7 +82,7 @@ class RunManager_setupRun(ActorDependentTestCase):
 
     def tearDown(self):
         super(RunManager_setupRun, self).tearDown()
-
+'''
 class RunManager_process(ActorDependentTestCase):
     def setUp(self):
         super(RunManager_process, self).setUp()
@@ -88,17 +91,25 @@ class RunManager_process(ActorDependentTestCase):
     def test_run(self):
         self.q_sig= Link('queue', 'self', 'process')
         self.q_comm=Link('queue', 'process', 'self')
-        self.p=Process(target= self.createprocess, args= (self.q_sig, self.q_comm,))
-        self.p.start()
+        self.p2=Process(target= self.createprocess, args= (self.q_sig, self.q_comm,))
+        self.p2.start()
         self.q_sig.put('setup')
-        self.assertTrue(self.q_comm.get())
+        self.assertEqual(self.q_comm.get(), ['ready'])
+        self.q_sig.put('run')
+        self.assertEqual(self.q_comm.get(), 'ran')
+        self.q_sig.put('pause')
+        with self.assertLogs() as cm:
+            logging.getLogger().warning('Received pause signal, pending...')
+        self.assertEqual(cm.output, ['WARNING:root:Received pause signal, pending...'])
         self.q_sig.put('quit')
-        self.p.terminate()
+        self.p2.join()
+        self.p2.terminate()
 
     def tearDown(self):
         super(RunManager_process, self).tearDown()
-#TODO: extend to another 
 
+#TODO: extend to another 
+'''
 class AsyncRunManager_setupRun(ActorDependentTestCase):
 
     def setUp(self):
@@ -189,7 +200,6 @@ class Actor_setLinkOut(ActorDependentTestCase):
         actor.setLinkOut(q)
         self.assertEqual(q, actor.getLinks()['q_out'])
 
-
     def tearDown(self):
         super(Actor_setLinkOut, self).tearDown()
 
@@ -207,3 +217,11 @@ class Actor_setLinkIn(ActorDependentTestCase):
 
     def tearDown(self):
         super(Actor_setLinkIn, self).tearDown()
+'''
+
+if __name__ == '__main__':
+    run= RunManager_process()
+    run.setUp()
+    run.test_run()
+    run.tearDown()
+
