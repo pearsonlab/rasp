@@ -98,10 +98,14 @@ class RunManager_process(ActorDependentTestCase):
         self.q_sig.put('run')
         self.assertEqual(self.q_comm.get(), 'ran')
         self.q_sig.put('pause')
+        self.q_sig.put('resume')
+        self.q_sig.put('quit')
         with self.assertLogs() as cm:
             logging.getLogger().warning('Received pause signal, pending...')
-        self.assertEqual(cm.output, ['WARNING:root:Received pause signal, pending...'])
-        self.q_sig.put('quit')
+            logging.getLogger().warning('Received resume signal, resuming')
+            logging.getLogger().warning('Received quit signal, aborting')
+        self.assertEqual(cm.output, ['WARNING:root:Received pause signal, pending...',
+        'WARNING:root:Received resume signal, resuming', 'WARNING:root:Received quit signal, aborting'])
         self.p2.join()
         self.p2.terminate()
 
@@ -217,11 +221,3 @@ class Actor_setLinkIn(ActorDependentTestCase):
 
     def tearDown(self):
         super(Actor_setLinkIn, self).tearDown()
-'''
-
-if __name__ == '__main__':
-    run= RunManager_process()
-    run.setUp()
-    run.test_run()
-    run.tearDown()
-'''
