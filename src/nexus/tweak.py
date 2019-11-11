@@ -65,3 +65,12 @@ class TweakModule():
         self.packagename = packagename
         self.classname = classname
         self.options = options
+
+if __name__ == '__main__':
+
+    tweak = Tweak(configFile='test/no_actor.yaml')
+    tweak.createConfig()
+    for actor in tweak.actors:
+        print(actor)
+    
+    
