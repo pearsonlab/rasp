@@ -21,7 +21,7 @@ import logging
 from logging import warning
 
 #TODO: write actor unittests
-#NOTE: Unittests are getting resourcewarning 
+#NOTE: Unittests are getting resourcewarning
 #setStore
 class Actor_setStore(ActorDependentTestCase):
 
@@ -46,7 +46,7 @@ class Actor_addLink(ActorDependentTestCase):
         self.actor=Actor('test')
 
     def test_addLink(self):
-        
+
         links = {'1': 'one', '2': 'two'}
         self.actor.setLinks(links)
         newName= '3'
@@ -91,7 +91,7 @@ class RunManager_process(ActorDependentTestCase):
     def test_run(self):
         self.q_sig= Link('queue', 'self', 'process')
         self.q_comm=Link('queue', 'process', 'self')
-        self.p2=Process(target= self.createprocess, args= (self.q_sig, self.q_comm,))
+        self.p2 = Process(target= self.createprocess, args= (self.q_sig, self.q_comm,))
         self.p2.start()
         self.q_sig.put('setup')
         self.assertEqual(self.q_comm.get(), ['ready'])
@@ -108,14 +108,50 @@ class RunManager_process(ActorDependentTestCase):
     def tearDown(self):
         super(RunManager_process, self).tearDown()
 
-#TODO: extend to another 
+#TODO: extend to another
+
+
+'''
+Place different actors in separate processes and ensure that run manager is receiving
+signals in the expected order.
+'''
+class AsyncRunManager_MultiProcess(ActorDependentTestCase):
+    def setUp(self):
+        super(AsyncRunManager_MultiProcess, self).setUp()
+
+        self.q_comm = Link('queue', 'process', 'self')
+        self.q_sig = Link('queue', 'self', 'process')
+        self.q_sig.put('setup')
+
+    def actor1(self):
+        self.p1 = Process(target = self.put_signals_1, args = (self.q_sig, self.q_comm))
+        #self.p1.start()
+        #self.q_sig.put('run')
+        #self.q_sig.put('pause')
+        #self.p1.join()
+
+    def actor2(self):
+        self.p2 = Process(target = self.self_signals_2, args = (self.q_sig, self.q_comm))
+        self.p2.start()
+        #self.q_sig.put('quit')
+        #self.q_sig.put('resume')
+        self.p2.join()
+
+    async def test_run(self):
+        with await AsyncRunManager('test', self.runMethod, self.run_setup, self.q_sig, self.q_comm) as rm:
+            print(rm)
+        self.assertEqual(self.runNum, 2)
+
+    def tearDown(self):
+        super(AsyncRunManager_MultiProcess, self).tearDown()
+
 
 class AsyncRunManager_setupRun(ActorDependentTestCase):
 
     def setUp(self):
         super(AsyncRunManager_setupRun, self).setUp()
-        self.actor=Actor('test')
-        self.isSetUp= False;
+        self.actor = Actor('test')
+        self.isSetUp = False;
         q_sig = Queue()
         self.q_sig = AsyncQueue(q_sig,'test_sig','test_start', 'test_end')
         q_comm = Queue()
