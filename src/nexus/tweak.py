@@ -68,9 +68,10 @@ class TweakModule():
 
 if __name__ == '__main__':
 
-    tweak = Tweak(configFile='test/no_actor.yaml')
+    tweak = Tweak(configFile='test/basic_demo')
     tweak.createConfig()
     for actor in tweak.actors:
         print(actor)
     
-    
+    for connection in tweak.connections:
+        print(connection)

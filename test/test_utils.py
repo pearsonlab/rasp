@@ -1,7 +1,7 @@
 from unittest import TestCase
 import subprocess
 import asyncio
-from nexus.actor import RunManager
+from nexus.actor import RunManager, AsyncRunManager
 
 class StoreDependentTestCase(TestCase):
     ''' Unit test base class that starts the Limbo plasma server
@@ -54,6 +54,10 @@ class ActorDependentTestCase(TestCase):
 
     def createprocess(self, q_sig, q_comm):
         with RunManager('test', self.process_run, self.process_setup, q_sig, q_comm) as rm:
+            print(rm)
+    
+    def createAsyncProcess(self, q_sig, q_comm):
+        with AsyncRunManager('test', self.process_run, self.process_setup, q_sig, q_comm) as rm:
             print(rm)
         
     async def a_put(self, signal, time):

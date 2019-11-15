@@ -52,7 +52,7 @@ class FailCreateConf(StoreDependentTestCase):
     def noactors(self):
         cwd = os.getcwd()
         self.tweak.createConfig(configFile= 'test/no_actor.yaml')
-        self.assertRaises(KeyError)
+        self.assertRaises(AttributeError)
 
     def tearDown(self):
         super(FailCreateConf)

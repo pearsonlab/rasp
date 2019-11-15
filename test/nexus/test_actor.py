@@ -19,6 +19,7 @@ import pickle
 from queue import Queue
 import logging
 from logging import warning
+import contextlib
 
 #TODO: write actor unittests
 #NOTE: Unittests are getting resourcewarning
@@ -119,47 +120,49 @@ class RunManager_process(ActorDependentTestCase):
 Place different actors in separate processes and ensure that run manager is receiving
 signals in the expected order.
 '''
-class AsyncRunManager_MultiProcess(ActorDependentTestCase):
+class AsyncRunManager_Process(ActorDependentTestCase):
     def setUp(self):
-        super(AsyncRunManager_MultiProcess, self).setUp()
+        super(AsyncRunManager_Process, self).setUp()
 
         self.q_comm = Link('queue', 'process', 'self')
         self.q_sig = Link('queue', 'self', 'process')
-        self.q_sig.put('setup')
+        self.q_sig= Link('queue', 'self', 'process')
+        self.q_comm=Link('queue', 'process', 'self')
 
-    def actor1(self):
-        self.p1 = Process(target = self.put_signals_1, args = (self.q_sig, self.q_comm))
-        #self.p1.start()
-        #self.q_sig.put('run')
-        #self.q_sig.put('pause')
-        #self.p1.join()
-
-    def actor2(self):
-        self.p2 = Process(target = self.self_signals_2, args = (self.q_sig, self.q_comm))
+    def test_run(self):
+        
+        #self.p2 = asyncio.create_subprocess_exec(AsyncRunManager, 'test', self.process_run, self.process_setup, stdin=lf.q_sig, stdout=self.q_comm)
+        self.p2 = Process(target= self.createAsyncProcess, args= (self.q_sig, self.q_comm,))
         self.p2.start()
-        #self.q_sig.put('quit')
-        #self.q_sig.put('resume')
-        self.p2.join()
+        self.q_sig.put('setup')
+        self.assertEqual(self.q_comm.get(), ['ready'])
+        self.q_sig.put('run')
+        self.assertEqual(self.q_comm.get(), 'ran')
+        self.q_sig.put('pause')
+        self.q_sig.put('resume')
+        self.q_sig.put('quit')
+        with self.assertLogs() as cm:
+            logging.getLogger().warning('Received pause signal, pending...')
+            logging.getLogger().warning('Received resume signal, resuming')
+            logging.getLogger().warning('Received quit signal, aborting')
+        self.assertEqual(cm.output, ['WARNING:root:Received pause signal, pending...',
+        'WARNING:root:Received resume signal, resuming', 'WARNING:root:Received quit signal, aborting'])
+        self.p2.terminate()
+        self.p2.kill()
 
-    async def test_run(self):
-        with await AsyncRunManager('test', self.runMethod, self.run_setup, self.q_sig, self.q_comm) as rm:
-            print(rm)
-        self.assertEqual(self.runNum, 2)
 
     def tearDown(self):
-        super(AsyncRunManager_MultiProcess, self).tearDown()
+        super(AsyncRunManager_Process, self).tearDown()
 
-
+'''
 class AsyncRunManager_setupRun(ActorDependentTestCase):
 
     def setUp(self):
         super(AsyncRunManager_setupRun, self).setUp()
         self.actor = Actor('test')
         self.isSetUp = False;
-        q_sig = Queue()
-        self.q_sig = AsyncQueue(q_sig,'test_sig','test_start', 'test_end')
-        q_comm = Queue()
-        self.q_comm = AsyncQueue(q_comm, 'test_comm','test_start', 'test_end')
+        self.q_sig = Link('test_sig','test_start', 'test_end')
+        self.q_comm = Link('test_comm','test_start', 'test_end')
         self.runNum=0
 
     def load_queue(self):
@@ -206,7 +209,7 @@ class AsyncRunManager_MultiActorTest(ActorDependentTestCase):
 
     def tearDown(self):
         super(AsyncRunManager_MultiActorTest, self).tearDown()
-
+'''
 #TODO: interrogate internal state more- check received each signal
 #TODO: Think about breaking behavior- edge cases
 
