@@ -56,8 +56,8 @@ class ActorDependentTestCase(TestCase):
         with RunManager('test', self.process_run, self.process_setup, q_sig, q_comm) as rm:
             print(rm)
     
-    def createAsyncProcess(self, q_sig, q_comm):
-        with AsyncRunManager('test', self.process_run, self.process_setup, q_sig, q_comm) as rm:
+    async def createAsyncProcess(self, q_sig, q_comm):
+        async with AsyncRunManager('test', self.process_run, self.process_setup, q_sig, q_comm) as rm:
             print(rm)
         
     async def a_put(self, signal, time):

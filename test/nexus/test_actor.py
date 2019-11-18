@@ -20,6 +20,8 @@ from queue import Queue
 import logging
 from logging import warning
 import contextlib
+import logging; logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 #TODO: write actor unittests
 #NOTE: Unittests are getting resourcewarning
@@ -94,6 +96,7 @@ class RunManager_process(ActorDependentTestCase):
         self.q_comm=Link('queue', 'process', 'self')
         self.p2 = Process(target= self.createprocess, args= (self.q_sig, self.q_comm,))
         self.p2.start()
+        logger.warning('Entered')
         self.q_sig.put('setup')
         self.assertEqual(self.q_comm.get(), ['ready'])
         self.q_sig.put('run')
