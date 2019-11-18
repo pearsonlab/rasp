@@ -2,6 +2,7 @@ import os
 import yaml
 import io
 from inspect import signature
+from importlib import import_module
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -53,13 +54,14 @@ class Tweak():
             except ImportError:
                 logger.error('Error: Classname not valid within package')
 
-
-            #sig= signature(eval(classname))
+            mod = import_module(packagename)
+            clss = getattr(mod, classname)
+            sig= signature(clss)
             tweakModule = TweakModule(name, packagename, classname, options=actor)
-            #try:
-            #    sig.bind(tweakModule.options)
-            #except TypeError as e:
-            #    logger.error('Error: Invalid arguments passed')
+            try:
+                sig.bind(tweakModule.options)
+            except TypeError as e:
+                logger.error('Error: Invalid arguments passed')
 
             if "GUI" in name:
                 self.hasGUI = True

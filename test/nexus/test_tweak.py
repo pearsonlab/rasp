@@ -42,23 +42,25 @@ class FailCreateConf(StoreDependentTestCase):
 
     def setUp(self):
         super(FailCreateConf, self).setUp()
-        self.tweak = Tweak()
+        self.tweak1 = Tweak(configFile= 'test/configs/repeated_actors.yaml')
+        self.tweak2 = Tweak(configFile= 'test/configs/no_actor.yaml')
+        self.tweak3 = Tweak(configFile= 'test/configs/repeated_actors')
 
     def MissingPackageorClass(self):
         cwd = os.getcwd()
-        self.tweak.createConfig(configFile= 'test/config/repeated_actors.yaml')
-        self.assertEqual(self.tweak.configFile, cwd+ 'test/config/MissingPackage.yaml')
+        self.tweak1.createConfig()
+        self.assertEqual(self.tweak.configFile, cwd+ 'test/configs/MissingPackage.yaml')
         self.assertRaises(KeyError)
         #TODO: create repeated actor error
 
     def noactors(self):
         cwd = os.getcwd()
-        self.tweak.createConfig(configFile= 'test/config/no_actor.yaml')
+        self.tweak2.createConfig()
         self.assertRaises(AttributeError)
 
     def repeatedActor(self):
         cwd  = os.getcwd()
-        self.tweak.createConfig(configFile= 'test/config/repeated_actors')
+        self.tweak3.createConfig()
         self.assertRaises(RepeatedActorError)
 
     def tearDown(self):
@@ -69,16 +71,17 @@ class testPackageClass(StoreDependentTestCase):
 
     def setUp(self):
         super(testPackageClass, self).setUp()
-        self.tweak = Tweak()
+        self.tweak1 = Tweak(configFile= 'test/configs/bad_package.yaml')
+        self.tweak2= Tweak(configFile= 'test/configs/bad_class.yaml')
 
     def badpackage(self):
         cwd = os.getcwd()
-        self.tweak.createConfig(configFile= 'test/config/bad_package.yaml')
+        self.tweak1.createConfig()
         self.assertRaises(ModuleNotFoundError)
 
     def badclass(self):
         cwd = os.getcwd()
-        self.tweak.createConfig(configFile= 'test/config/bad_class.yaml')
+        self.tweak2.createConfig()
         self.assertRaises(ImportError)
 
     def tearDown(self):
@@ -88,9 +91,11 @@ class testArgs(StoreDependentTestCase):
 
     def setUp(self):
         super(testArgs, self).setUp()
-        self.tweak= Tweak()
-
-    
+        self.tweak= Tweak(configFile= 'test/configs/bad_args.yaml')
+    def testArgs(self):
+        cwd = os.getcwd()
+        self.tweak.createConfig()
+        self.assertRaises(TypeError)
 
     def tearDown(self):
         super(testArgs)
