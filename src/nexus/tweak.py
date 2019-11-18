@@ -6,6 +6,9 @@ import logging; logger = logging.getLogger(__name__)
 
 #TODO: Write a save function for Tweak objects output as YAML configFile but using TweakModule objects
 
+class RepeatedActorError(Exception):
+    pass
+
 class Tweak():
     ''' Handles configuration and logs of configs for
         the entire server/processing pipeline.
@@ -33,9 +36,22 @@ class Tweak():
 
         for name,actor in cfg['actors'].items(): 
             # put import/name info in TweakModule object TODO: make ordered?
+
+            if name in self.actors.keys():
+                raise RepeatedActorError
+
             packagename = actor.pop('package')
             classname = actor.pop('class')
             
+            try:
+                __import__(packagename, fromlist=[classname])
+
+            except ModuleNotFoundError:
+                logger.error('Error: Packagename not valid')
+
+            except ImportError:
+                logger.error('Error: Classname not valid within package')
+
             tweakModule = TweakModule(name, packagename, classname, options=actor)
 
             if "GUI" in name:

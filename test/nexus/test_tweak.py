@@ -8,6 +8,7 @@ from src.nexus.tweak import Tweak
 from src.nexus.tweak import TweakModule
 from unittest import TestCase
 from test.test_utils import StoreDependentTestCase
+from src.nexus.tweak import RepeatedActorError
 import visual.visual
 import acquire.acquire
 import process.process
@@ -54,6 +55,11 @@ class FailCreateConf(StoreDependentTestCase):
         self.tweak.createConfig(configFile= 'test/config/no_actor.yaml')
         self.assertRaises(AttributeError)
 
+    def repeatedActor(self):
+        cwd  = os.getcwd()
+        self.tweak.createConfig(configFile= 'test/config/repeated_actors')
+        self.assertRaises(RepeatedActorError)
+
     def tearDown(self):
         super(FailCreateConf)
 
@@ -64,7 +70,15 @@ class testPackageClass(StoreDependentTestCase):
         super(testPackageClass, self).setUp()
         self.tweak = Tweak()
 
-    
+    def badpackage(self):
+        cwd = os.getcwd()
+        self.tweak.createConfig(configFile= 'test/config/bad_package.yaml')
+        self.assertRaises(ModuleNotFoundError)
+
+    def badclass(self):
+        cwd = os.getcwd()
+        self.tweak.createConfig(configFile= 'test/config/bad_class.yaml')
+        self.assertRaises(ImportError)
 
     def tearDown(self):
         super(testPackageClass)
