@@ -1,6 +1,7 @@
 import os
 import yaml
 import io
+from inspect import signature
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -52,7 +53,13 @@ class Tweak():
             except ImportError:
                 logger.error('Error: Classname not valid within package')
 
+
+            #sig= signature(eval(classname))
             tweakModule = TweakModule(name, packagename, classname, options=actor)
+            #try:
+            #    sig.bind(tweakModule.options)
+            #except TypeError as e:
+            #    logger.error('Error: Invalid arguments passed')
 
             if "GUI" in name:
                 self.hasGUI = True
@@ -60,7 +67,7 @@ class Tweak():
             
             else:
                 self.actors.update({name:tweakModule})
-        
+                
         for name,conn in cfg['connections'].items():
             #TODO check for correctness  TODO: make more generic (not just q_out)
             self.connections.update({name:conn}) #conn should be a list
@@ -81,3 +88,9 @@ class TweakModule():
         self.packagename = packagename
         self.classname = classname
         self.options = options
+
+if __name__ == '__main__':
+
+    tweak= Tweak()
+    tweak.createConfig()
+    print(tweak.actors)

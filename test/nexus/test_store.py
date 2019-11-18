@@ -47,18 +47,3 @@ class Limbo_PutGet(StoreDependentTestCase):
         super(Limbo_PutGet, self).tearDown()
 
 
-class Limbo_Delete(StoreDependentTestCase):
-    
-    def setUp(self):
-        super(Limbo_Delete, self).setUp()
-        self.limbo = Limbo()
-
-    def test_deleteOne(self):
-        id = self.limbo.put(1, 'one')
-        id2 = self.limbo.put(2, 'two')
-        self.limbo.delete('one')
-        self.assertEqual(1, len(self.limbo.client.list()))
-    
-    def tearDown(self):
-        super(Limbo_Delete, self).tearDown()
-

@@ -13,6 +13,7 @@ import visual.visual
 import acquire.acquire
 import process.process
 import analysis.analysis
+from inspect import signature
 
 class createConfBasic(StoreDependentTestCase):
 
@@ -82,5 +83,16 @@ class testPackageClass(StoreDependentTestCase):
 
     def tearDown(self):
         super(testPackageClass)
+
+class testArgs(StoreDependentTestCase):
+
+    def setUp(self):
+        super(testArgs, self).setUp()
+        self.tweak= Tweak()
+
+    
+
+    def tearDown(self):
+        super(testArgs)
 
 #TODO: create config but with different config files
