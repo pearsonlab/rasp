@@ -56,7 +56,6 @@ class Limbo_GetID(StoreDependentTestCase):
         x= self.limbo.put(mat, 'matrix' ) #returns object_id
         self.assertIsInstance(self.limbo.getID(x), csc_matrix)
 
-    #TODO: figure out objectnotfounderror
     def test_notPut(self):
         self.limbo.getID(self.limbo.random_ObjectID(1))
         self.assertRaises(ObjectNotFoundError)
@@ -137,26 +136,7 @@ class Limbo_PutGet(StoreDependentTestCase):
     def tearDown(self):
         super(Limbo_PutGet, self).tearDown()
 
-#TODO @NICOLE: Write test for notify  and subscribe
 
-"""class Limbo_Notify(StoreDependentTestCase):
-    def setUp(self):
-        super(Limbo_Notify, self).setUp()
-        self.limbo = Limbo()
-
-    # Add test body here
-    def test_notify(self):
-        # TODO: not unit testable?
-
-
-    def tearDown(self):
-        super(Limbo_Notify, self).tearDown()"""
-
-
-#TODO @NICOLE: Write test for updateStored and getStored
-
-# if calling update with name that doesn't exist in stored yet, should raise error?
-# (as of now it will simply put it in stored?)
 
 class Limbo_UpdateStored(StoreDependentTestCase):
     def setUp(self):
@@ -193,9 +173,6 @@ class Limbo_GetStored(StoreDependentTestCase):
         super(Limbo_GetStored, self).tearDown()
 
 
-#TODO: Write test for _put and _get
-#TODO: Write test for saveStore, saveTweak, and saveSubstore
-
 class Limbo_internalPutGet(StoreDependentTestCase):
 
     def setUp(self):
@@ -223,7 +200,6 @@ class Limbo_saveTweak(StoreDependentTestCase):
         super(Limbo_saveTweak, self).setUp()
         self.limbo = Limbo()
 
-    #TODO: figure out file pathway
     def test_tweak(self):
         fileName= 'data/tweak_dump'
         id= self.limbo.put(1, 'one')
