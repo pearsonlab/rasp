@@ -83,11 +83,11 @@ class Limbo(StoreInterface):
             logger.info('Successfully connected to store')
         except Exception as e:
             logger.exception('Cannot connect to store: {0}'.format(e))
-            raise Exception
+            raise CannotConnectToStoreError()
         return self.client
 
     def put(self, object, object_name, save=False):
-        ''' Put a single object referenced by its string name 
+        ''' Put a single object referenced by its string name
             into the store
         '''
         object_id = None
@@ -124,7 +124,7 @@ class Limbo(StoreInterface):
             raise CannotGetObjectError
         else:
             return self._get(object_name)
-    
+
     def getID(self, obj_id, hdd_only=False):
         ''' Preferred mechanism for getting. TODO: Rename
         '''
@@ -169,7 +169,7 @@ class Limbo(StoreInterface):
         ''' Subscribe to a section? of the ds for singals
             Throws unknown errors
         '''
-        try: 
+        try:
             self.client.subscribe()
         except Exception as e:
             logger.error('Unknown error: {}'.format(e))
@@ -204,11 +204,11 @@ class Limbo(StoreInterface):
         ''' returns its info about what it has stored
         '''
         return self.stored
-    
+
     def _put(self, obj, id):
         ''' Internal put
         '''
-        return self.client.put(obj, id)    
+        return self.client.put(obj, id)
 
     def _get(self, object_name):
         ''' Get an object from the store using its name
@@ -227,7 +227,7 @@ class Limbo(StoreInterface):
     # def deleteName(self, object_name):
     #     ''' Deletes an object from the store based on name
     #         assumes we have id from name
-    #         This prevents us from deleting other portions of 
+    #         This prevents us from deleting other portions of
     #         the store that we don't have access to
     #     '''
 
@@ -238,7 +238,7 @@ class Limbo(StoreInterface):
     #     else:
     #         retcode = self._delete(object_name)
     #         self.stored.pop(object_name)
-            
+
     # def delete(self, id):
     #     try:
     #         self.client.delete([id])
@@ -306,7 +306,7 @@ class LMDBStore(StoreInterface):
         self.from_limbo = from_limbo
 
     def get(self, obj_name_or_id):
-        ''' Get object from object name (!from_limbo) or ID (from_limbo). 
+        ''' Get object from object name (!from_limbo) or ID (from_limbo).
             Return None if object is not found.
         '''
 
@@ -353,7 +353,7 @@ class LMDBStore(StoreInterface):
             raise ObjectNotFoundError
 
     def flush(self):
-        ''' Must run before exiting. 
+        ''' Must run before exiting.
             Flushes buffer to disk.
         '''
         self.lmdb_env.sync()
@@ -371,11 +371,23 @@ def saveObj(obj, name):
 
 
 class ObjectNotFoundError(Exception):
-    pass
+
+    def __init__(self):
+        self.name = 'ObjectNotFoundError'
 
 
 class CannotGetObjectError(Exception):
-    pass
+
+    def __init__(self):
+        self.name = 'CannotGetObjectError'
+
+
+class CannotConnectToStoreError(Exception):
+    '''Raised when failing to connect to store.
+    '''
+    def __init__(self):
+        self.name = 'CannotConnectToStoreError'
+        self.message = 'Cannot connect to store'
 
 class Watcher():
     ''' Monitors the store as separate process
@@ -400,10 +412,10 @@ class Watcher():
                     self.checkStore2()
                 except Exception as e:
                     logger.error('Watcher exception during run: {}'.format(e))
-                    #break 
-            try: 
+                    #break
+            try:
                 signal = self.q_sig.get(timeout=0.005)
-                if signal == Spike.run(): 
+                if signal == Spike.run():
                     self.flag = True
                     logger.warning('Received run signal, begin running')
                 elif signal == Spike.quit():
