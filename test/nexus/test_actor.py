@@ -132,10 +132,10 @@ class AsyncRunManager_Process(ActorDependentTestCase):
         self.q_sig= Link('queue', 'self', 'process')
         self.q_comm=Link('queue', 'process', 'self')
 
-    def test_run(self):
-        
+    async def test_run(self):
+
         #self.p2 = asyncio.create_subprocess_exec(AsyncRunManager, 'test', self.process_run, self.process_setup, stdin=lf.q_sig, stdout=self.q_comm)
-        self.p2 = Process(target= self.createAsyncProcess, args= (self.q_sig, self.q_comm,))
+        self.p2 = await Process(target=  self.createAsyncProcess, args= (self.q_sig, self.q_comm,))
         self.p2.start()
         self.q_sig.put('setup')
         self.assertEqual(self.q_comm.get(), ['ready'])
