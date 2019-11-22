@@ -10,9 +10,9 @@ import pyarrow.plasma as plasma
 from pyarrow.lib import ArrowIOError
 from nexus.store import ObjectNotFoundError
 from nexus.store import CannotGetObjectError
+from nexus.store import CannotConnectToStoreError
 import pickle
 
-#TODO: assertRaises doesn't work to check for custom Exceptions
 
 class Limbo_Connect(StoreDependentTestCase):
 
@@ -25,10 +25,15 @@ class Limbo_Connect(StoreDependentTestCase):
         self.limbo.connectStore(store_loc)
         self.assertIsInstance(self.limbo.client, plasma.PlasmaClient)
 
-    def test_fail(self):
+    def test_failToConnect(self):
         store_loc= 'asdf'
-        with self.assertRaises((ArrowIOError, Exception)):
+
+        # Handle exception thrown
+        with self.assertRaises(Exception) as cm:
             self.limbo.connectStore(store_loc)
+
+        # Check that the exception thrown is a CannotConnectToStoreError
+        self.assertEqual(cm.exception.name, 'CannotConnectToStoreError')
 
     def tearDown(self):
         super(Limbo_Connect, self).tearDown()
@@ -135,8 +140,13 @@ class Limbo_PutGet(StoreDependentTestCase):
         self.assertEqual(id, self.limbo.stored['one'])
 
     def test_get_nonexistent(self):
-        with self.assertRaises((CannotGetObjectError, Exception)):
+
+        # Handle exception thrown
+        with self.assertRaises(Exception) as cm:
             self.limbo.get('three')
+
+        # Check that the exception thrown is a CannotGetObjectError
+        self.assertEqual(cm.exception.name, 'CannotGetObjectError')
 
     def tearDown(self):
         super(Limbo_PutGet, self).tearDown()
@@ -204,11 +214,16 @@ class Limbo_internalPutGet(StoreDependentTestCase):
         self.assertEqual(self.limbo._get('one'), 1)
 
     def test__getNonexistent(self):
-        #with self.assertRaises(ObjectNotFoundError): self.limbo._get('three')
-        self.assertRaises(Exception, self.limbo._get, 'three' )
+
+        # Handle exception thrown
+        with self.assertRaises(Exception) as cm:
+            self.limbo._get('three')
+
+        # Check that the exception thrown is a ObjectNotFoundError
+        self.assertEqual(cm.exception.name, 'ObjectNotFoundError')
 
 
-    #TODO: write get fail function, same issue as before
+
 
     def tearDown(self):
         super(Limbo_internalPutGet, self).tearDown()

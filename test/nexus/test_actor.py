@@ -123,8 +123,6 @@ class testAsync (ActorDependentTestCase):
     def setUp(self):
         super(testAsync, self).setUp()
         self.runlist=[]
-
-    def test(self):
         asyncio.run(self.main())
         self.assertEqual([1, 1, 1, 2, 2, 2], self.runlist)
 
@@ -144,7 +142,6 @@ class testAsync (ActorDependentTestCase):
 Place different actors in separate processes and ensure that run manager is receiving
 signals in the expected order.
 '''
-'''
 class AsyncRunManager_Process(ActorDependentTestCase):
     def setUp(self):
         super(AsyncRunManager_Process, self).setUp()
@@ -152,11 +149,12 @@ class AsyncRunManager_Process(ActorDependentTestCase):
         self.q_sig= Link('queue', 'self', 'process')
         self.q_comm=Link('queue', 'process', 'self')
 
-    def test_run(self):
+    async def test_run(self):
 
-        event_loop=asyncio.new_event_loop()
-        asyncio.set_event_loop(event_loop)
-        asyncio.run(self.runProcess(self.q_sig, self.q_comm))
+        #self.p2 = asyncio.create_subprocess_exec(AsyncRunManager, 'test', self.process_run, self.process_setup, stdin=lf.q_sig, stdout=self.q_comm)
+        self.p2 = await Process(target=  self.createAsyncProcess, args= (self.q_sig, self.q_comm,))
+        self.p2.start()
+        self.q_sig.put('setup')
         self.assertEqual(self.q_comm.get(), ['ready'])
         self.assertEqual(self.q_comm.get(), 'ran')
         with self.assertLogs() as cm:
@@ -225,7 +223,7 @@ class AsyncRunManager_MultiActorTest(ActorDependentTestCase):
 
     def tearDown(self):
         super(AsyncRunManager_MultiActorTest, self).tearDown()
-'''
+
 #TODO: interrogate internal state more- check received each signal
 #TODO: Think about breaking behavior- edge cases
 
