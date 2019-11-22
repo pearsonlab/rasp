@@ -127,6 +127,7 @@ class testAsync (ActorDependentTestCase):
         self.assertEqual([1, 1, 1, 2, 2, 2], self.runlist)
 
     def testSepareteProcess(self):
+        self.runlist=[]
         event_loop=asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
         loop= asyncio.get_event_loop()
@@ -136,8 +137,6 @@ class testAsync (ActorDependentTestCase):
     def tearDown(self):
         super(testAsync, self).tearDown()
         
-
-
 '''
 Place different actors in separate processes and ensure that run manager is receiving
 signals in the expected order.
