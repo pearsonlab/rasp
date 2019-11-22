@@ -1,0 +1,14 @@
+actors:
+  
+  Acquirer:
+    package: aqueir.aqueir
+    class: FileAcquirer
+    filename: data/Tolias_mesoscope_2.hdf5
+    framerate: 30
+
+
+connections:
+  Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue]
+  Processor.q_out: [Analysis.q_in]
+  Analysis.q_out: [Visual.q_in]
+  InputStim.q_out: [Analysis.input_stim_queue]
