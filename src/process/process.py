@@ -166,7 +166,7 @@ class CaimanProcessor(Actor):
                    'decay_time': 0.5,
                    'gSig': (3,3),
                    'p': 1,
-                   'min_SNR': 1,
+                   'min_SNR': 0.8,
                    'rval_thr': 0.9,
                    'ds_factor': 1,
                    'nb': 2,

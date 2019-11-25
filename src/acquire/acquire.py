@@ -107,12 +107,6 @@ class FileAcquirer(Actor):
         # self.dset[self.frame_num-1] = frame
         # self.f.flush()
 
-class ReplayAcquirer(FileAcquirer):
-    def setup(self):
-        super().__init__(*args, **kwargs)
-
-        # with open(self.filename)
-
 class TbifAcquirer(FileAcquirer):
     def setup(self):
         if os.path.exists(self.filename):
@@ -187,7 +181,6 @@ class TbifAcquirer(FileAcquirer):
             num = num % len(self.data)
         return self.data[num,30:470,:]
 
-
 class BehaviorAcquirer(Actor):
     ''' Actor that acquires information of behavioral stimulus
         during the experiment
@@ -234,7 +227,6 @@ class BehaviorAcquirer(Actor):
         #self.q_comm.put()
         time.sleep(0.068)
         self.n += 1
-
 
 class FolderAcquirer(Actor):
     ''' TODO: Current behavior is looping over all files in a folder.
@@ -320,21 +312,9 @@ class FolderAcquirer(Actor):
                 'File '+file.as_posix()+' had value error {}'.format(e))
         return img #[0,0,0, :, :,0]  #Extract first channel in this image set. #TODO: Likely change this
 
-
 import ipaddress
-import logging
-import time
-
-import h5py
-import numpy as np
 import zmq
 import json
-
-from nexus.actor import Actor, RunManager
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
 
 class ZMQAcquirer(Actor):
 
@@ -366,7 +346,6 @@ class ZMQAcquirer(Actor):
 
     def run(self):
         '''Triggered at Run
-           Get list of files in the folder and use that as the baseline.
         '''
         self.total_times = []
         self.timestamp = []
@@ -444,7 +423,7 @@ class ZMQAcquirer(Actor):
                 self.frametimes.append([self.frame_num, time.time()])
 
                 self.frame_num += 1
-                self.total_times.append(time.time() - t)
+                self.total_times.append(time.time() - t0)
 
             else:
                 if len(msg) < 100:
@@ -457,7 +436,61 @@ class ZMQAcquirer(Actor):
         except Exception as e:
             print('error: {}'.format(e))
 
+class ReplayAcquirer(FileAcquirer):
+    def setup(self):
+        super().__init__(*args, **kwargs)
+        self.frame_num = 0
 
-if __name__ == '__main__':
-    FA = FolderAcquirer('FA', folder='data/duke_exp/2019/10/07/1')
-    FA.saveImgs()
+    def run(self):
+        '''Triggered at Run
+        '''
+        self.total_times = []
+        self.timestamp = []
+
+        with RunManager(self.name, self.runAcquirer, self.setup, self.q_sig, self.q_comm) as rm:
+            print(rm)
+
+        print('Acquire broke, avg time per frame: ', np.mean(self.total_times))
+        print('Acquire got through ', self.frame_num, ' frames')
+        np.savetxt('timing/acquire_frame_time.txt', self.total_times)
+        np.savetxt('timing/acquire_timestamp.txt', self.timestamp)
+
+    def runAcquirer(self):
+        t = time.time()
+
+        if self.done:
+            pass 
+        elif(self.frame_num < len(self.data)):
+            frame = self.getFrame(self.frame_num)
+            if self.frame_num == len(self.data):
+                print('Done with first set ', self.frame_num)
+            # if self.frame_num > 1000 and self.frame_num < 2000:
+            #     frame = None
+            id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
+            self.timestamp.append([time.time(), self.frame_num])
+            try:
+                self.q_out.put([{str(self.frame_num):id}])
+                self.links['stim_queue'].put({self.frame_num:self.stim[self.frame_num % len(self.stim)]})
+                #logger.info('Current stim: {}'.format(self.stim[self.frame_num]))
+                self.frame_num += 1
+                self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?     
+            except Exception as e:
+                logger.error('Acquirer general exception: {}'.format(e))
+
+            time.sleep(self.framerate) #pretend framerate
+
+        else:
+            logger.error('Done with all available frames: {0}'.format(self.frame_num))
+            self.data = None
+            self.q_comm.put(None)
+            self.done = True
+
+        self.total_times.append(time.time()-t)
+
+    def getFrame(self, num):
+        '''
+            Here just return frame from loaded data
+        '''
+        if num >= len(self.data):
+            num = num % len(self.data)
+        return self.data[num,:,:]
