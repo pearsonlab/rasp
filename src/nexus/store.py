@@ -83,7 +83,7 @@ class Limbo(StoreInterface):
             logger.info('Successfully connected to store')
         except Exception as e:
             logger.exception('Cannot connect to store: {0}'.format(e))
-            raise CannotConnectToStoreError()
+            raise CannotConnectToStoreError(store_loc)
         return self.client
 
     def put(self, object, object_name, save=False):
@@ -121,7 +121,7 @@ class Limbo(StoreInterface):
         if self.stored.get(object_name) is None:
             logger.error('Never recorded storing this object: '+object_name)
             # Don't know anything about this object, treat as problematic
-            raise CannotGetObjectError
+            raise CannotGetObjectError(query = object_name)
         else:
             return self._get(object_name)
 
@@ -133,7 +133,7 @@ class Limbo(StoreInterface):
             res = self.client.get(obj_id,0)
             if isinstance(res, type):
                 logger.warning('Object {} cannot be found.'.format(obj_id))
-                raise ObjectNotFoundError
+                raise ObjectNotFoundError(obj_id_or_name = obj_id)
             # Deal with pickled objects.
             elif isinstance(res, bytes): #TODO don't use generic bytes
                 return pickle.loads(res)
@@ -219,7 +219,7 @@ class Limbo(StoreInterface):
         # Can also use contains() to check
         if isinstance(res, ObjectNotAvailable):
             logger.warning('Object {} cannot be found.'.format(object_name))
-            raise ObjectNotFoundError #TODO: Don't raise?
+            raise ObjectNotFoundError(obj_id_or_name = object_name) #TODO: Don't raise?
         else:
             return res
 
@@ -350,7 +350,7 @@ class LMDBStore(StoreInterface):
         with self.lmdb_env.begin(write=True) as txn:
             out = txn.pop(self.lmdb_obj_id_to_key[obj_id])
         if out is None:
-            raise ObjectNotFoundError
+            raise ObjectNotFoundError(obj_id_or_name = obj_id)
 
     def flush(self):
         ''' Must run before exiting.
@@ -372,22 +372,45 @@ def saveObj(obj, name):
 
 class ObjectNotFoundError(Exception):
 
-    def __init__(self):
-        self.name = 'ObjectNotFoundError'
+    def __init__(self, obj_id_or_name):
 
+        super().__init__()
+
+        self.name = 'ObjectNotFoundError'
+        self.obj_id_or_name = obj_id_or_name
+
+        # TODO: self.message does not properly receive obj_id_or_name
+        self.message = 'Cannnot find object with ID/name "{}"'.format(obj_id_or_name)
+
+    def __str__(self):
+        return self.message
 
 class CannotGetObjectError(Exception):
 
-    def __init__(self):
-        self.name = 'CannotGetObjectError'
+    def __init__(self, query):
 
+        super().__init__()
+
+        self.name = 'CannotGetObjectError'
+        self.query = query
+        self.message = 'Cannot get object {}'.format(self.query)
+
+    def __str__(self):
+        return self.message
 
 class CannotConnectToStoreError(Exception):
     '''Raised when failing to connect to store.
     '''
-    def __init__(self):
+    def __init__(self, store_loc):
+
+        super().__init__()
+
         self.name = 'CannotConnectToStoreError'
-        self.message = 'Cannot connect to store'
+
+        self.message = 'Cannot connect to store at {}'.format(str(store_loc))
+
+    def __str__(self):
+        return self.message
 
 class Watcher():
     ''' Monitors the store as separate process

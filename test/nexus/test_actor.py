@@ -135,7 +135,7 @@ class AsyncRunManager_Process(ActorDependentTestCase):
     async def test_run(self):
 
         #self.p2 = asyncio.create_subprocess_exec(AsyncRunManager, 'test', self.process_run, self.process_setup, stdin=lf.q_sig, stdout=self.q_comm)
-        self.p2 = await Process(target=  self.createAsyncProcess, args= (self.q_sig, self.q_comm,))
+        self.p2 = await Process(target= self.createAsyncProcess, args= (self.q_sig, self.q_comm,))
         self.p2.start()
         self.q_sig.put('setup')
         self.assertEqual(self.q_comm.get(), ['ready'])
@@ -157,7 +157,7 @@ class AsyncRunManager_Process(ActorDependentTestCase):
     def tearDown(self):
         super(AsyncRunManager_Process, self).tearDown()
 
-'''
+
 class AsyncRunManager_setupRun(ActorDependentTestCase):
 
     def setUp(self):
@@ -212,7 +212,7 @@ class AsyncRunManager_MultiActorTest(ActorDependentTestCase):
 
     def tearDown(self):
         super(AsyncRunManager_MultiActorTest, self).tearDown()
-'''
+
 #TODO: interrogate internal state more- check received each signal
 #TODO: Think about breaking behavior- edge cases
 

@@ -22,7 +22,7 @@ class StoreDependentTestCase(TestCase):
         '''
 
         self.p.kill()
-   
+
 class ActorDependentTestCase(TestCase):
 
     def setUp(self):
@@ -55,11 +55,11 @@ class ActorDependentTestCase(TestCase):
     def createprocess(self, q_sig, q_comm):
         with RunManager('test', self.process_run, self.process_setup, q_sig, q_comm) as rm:
             print(rm)
-    
+
     async def createAsyncProcess(self, q_sig, q_comm):
         async with AsyncRunManager('test', self.process_run, self.process_setup, q_sig, q_comm) as rm:
             print(rm)
-        
+
     async def a_put(self, signal, time):
         await asyncio.sleep(time)
-        self.q_sig.put_async(signal)      
+        self.q_sig.put_async(signal)

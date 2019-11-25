@@ -221,6 +221,7 @@ class Limbo_internalPutGet(StoreDependentTestCase):
 
         # Check that the exception thrown is a ObjectNotFoundError
         self.assertEqual(cm.exception.name, 'ObjectNotFoundError')
+        self.assertEqual(cm.exception.message, 'Cannnot find object with ID/name "three"')
 
 
 
