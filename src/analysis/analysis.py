@@ -97,7 +97,7 @@ class SpontAnalysis(Actor):
 
             if self.C.shape[1]>0:
                 self.Cpop = np.nanmean(self.C, axis=0)
-                self.Cx = np.arange(0,self.Cpop.size)+(self.frame-window)
+                self.Cx = np.arange(0,self.Cpop.shape[0])+(self.frame-window)
                 self.Call = self.C #already a windowed version #[:,self.frame-window:self.frame]
             
             self.putAnalysis()
@@ -906,12 +906,13 @@ class ModelAnalysis(Actor):
 
             if self.frame >= self.window:
                 window = self.window
+                self.Cx = np.arange(self.frame-window,self.frame)
             else:
                 window = self.frame
+                self.Cx = np.arange(0,self.frame)
 
             if self.C.shape[1]>0:
                 self.Cpop = np.nanmean(self.C, axis=0)
-                self.Cx = np.arange(0,self.Cpop.size)+(self.frame-window)
                 self.Call = self.C #already a windowed version #[:,self.frame-window:self.frame]
             
             self.putAnalysis()
@@ -944,9 +945,9 @@ class ModelAnalysis(Actor):
         y_step = np.where(np.isnan(y_step), 0, y_step) #Why are there nans here anyway?? #TODO
 
         t0 = time.time()
-        self.theta -= 1e-5*self.ll_grad(y_step, stim_step)*(self.frame/100)
+        self.theta -= 1e-5*self.ll_grad(y_step, stim_step)#*(self.frame/100)
         self.LL.append(self.ll(y_step, stim_step))
-        print(time.time()-t0, self.p['numNeurons'], self.LL[-1])
+        # print(time.time()-t0, self.p['numNeurons'], self.LL[-1])
 
         # gradStep = self.j_ll_grad(self.theta, y_step, self.p)
         # self.theta -= 1e-5*gradStep
@@ -1089,7 +1090,7 @@ class ModelAnalysis(Actor):
         k = self.theta[N*(N+dh+1):].reshape((N, ds))
 
         # data length in time
-        t = y.shape[1] 
+        t = y.shape[1]
 
         expo = np.zeros(N)
         for i in np.arange(0,N): # step through neurons

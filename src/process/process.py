@@ -161,12 +161,12 @@ class CaimanProcessor(Actor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/tbif_ex_crop.h5'],
-                   'fr': 3.5,
-                   'decay_time': 0.5,
+            params_dict = {'fnames': [cwd+'/data/sample_stream.h5'],
+                   'fr': 1.4,
+                   'decay_time': 2.5,
                    'gSig': (3,3),
                    'p': 1,
-                   'min_SNR': 1,
+                   'min_SNR': 0.8,
                    'rval_thr': 0.9,
                    'ds_factor': 1,
                    'nb': 2,

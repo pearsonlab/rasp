@@ -104,8 +104,8 @@ class CaimanVisual(Actor):
             self.frame_num = ids[-1]
             if self.draw:
                 (self.Cx, self.C, self.Cpop, self.tune, self.color, self.coords, self.allStims, self.w, self.LL) = self.client.getList(ids[:-1])
-                self.getCurves()
-                self.getFrames()
+                # self.getCurves()
+                # self.getFrames()
                 self.total_times.append([time.time(), time.time()-t])
             self.timestamp.append([time.time(), self.frame_num])
         except Empty as e:
@@ -140,7 +140,7 @@ class CaimanVisual(Actor):
             self.tuned = None
 
         if self.frame_num > self.window:
-            self.Cx = self.Cx[-self.window:]
+            # self.Cx = self.Cx[-self.window:]
             self.C = self.C[:, -len(self.Cx):]
             self.Cpop = self.Cpop[-len(self.Cx):]
             #self.LL = self.LL[-len(self.Cx):]
@@ -183,6 +183,7 @@ class CaimanVisual(Actor):
         if np.min(dist) < 50:
             selected = neurons[np.argmin(dist)]
             self.selectedNeuron = selected
+            print('neuron is ', self.selectedNeuron)
             print('Red circle at ', com[selected])
             print('Tuning curve: ', self.tune[0][selected])
             #self.com1 = [np.array([self.raw.shape[0]-com[selected][1], com[selected][0]])]

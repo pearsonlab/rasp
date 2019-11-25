@@ -261,8 +261,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             theta = np.linspace(0, (315/360)*2*np.pi, self.num)
             theta = np.append(theta,0)
             self.theta = theta  
-            polar = [self.polar1, self.polar2]
-            pens = [penW, penR]
+            polar = [self.polar2, self.polar1]
+            pens = [penR, penW]
             for i,t in enumerate(tune):
                 if(t is not None):
                     radius = np.zeros(self.num+1)
@@ -271,6 +271,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     x = np.clip(radius * np.cos(self.theta) * 4, -5, 5)
                     y = np.clip(radius * np.sin(self.theta) * 4, -5, 5)
                     polar[i].setData(x, y, pen=pens[i])
+        # else:
+        #     print('tune is none')
         
     def mouseClick(self, event):
         '''Clicked on processed image to select neurons
@@ -284,35 +286,35 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         selectedraw[1] = int(mousePoint.y())
         self._updateRedCirc()
 
-        if self.last_n is None:
-            self.last_n = self.visual.selectedNeuron
+        # if self.last_n is None:
+        #     self.last_n = self.visual.selectedNeuron
 
-        if self.flagW: #nothing drawn yet
-            loc, lines, strengths = self.visual.selectNW(selectedraw[0], selectedraw[1])
-            # print('clicked lines ', lines)
-            self.lines = []
-            self.pens = []
-            colors =['g']*9 + ['r']*9
-            for i in range(18):
-                n = lines[i]
-                if strengths[i] > 1e-6:
-                    if strengths[i] > 1e-4:
-                        self.pens.append(pyqtgraph.mkPen(width=2, color=colors[i]))
-                    else:
-                        self.pens.append(pyqtgraph.mkPen(width=1, color=colors[i]))
-                    self.lines.append(LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
-                    self.rawplot_2.getView().addItem(self.lines[i])
-                else:
-                    self.pens.append(pyqtgraph.mkPen(width=1, color=colors[i]))
-                    self.lines.append(LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
-                    self.rawplot_2.getView().addItem(self.lines[i])
+        # if self.flagW: #nothing drawn yet
+        #     loc, lines, strengths = self.visual.selectNW(selectedraw[0], selectedraw[1])
+        #     # print('clicked lines ', lines)
+        #     self.lines = []
+        #     self.pens = []
+        #     colors =['g']*9 + ['r']*9
+        #     for i in range(18):
+        #         n = lines[i]
+        #         if strengths[i] > 1e-6:
+        #             if strengths[i] > 1e-4:
+        #                 self.pens.append(pyqtgraph.mkPen(width=2, color=colors[i]))
+        #             else:
+        #                 self.pens.append(pyqtgraph.mkPen(width=1, color=colors[i]))
+        #             self.lines.append(LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
+        #             self.rawplot_2.getView().addItem(self.lines[i])
+        #         else:
+        #             self.pens.append(pyqtgraph.mkPen(width=1, color=colors[i]))
+        #             self.lines.append(LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
+        #             self.rawplot_2.getView().addItem(self.lines[i])
 
-            self.last_n = self.visual.selectedNeuron
-            self.flagW = False
-        elif self.last_n == self.visual.selectedNeuron:
-            for i in range(18):
-                self.rawplot_2.getView().removeItem(self.lines[i])
-            self.flagW = True
+        #     self.last_n = self.visual.selectedNeuron
+        #     self.flagW = False
+        # elif self.last_n == self.visual.selectedNeuron:
+        #     for i in range(18):
+        #         self.rawplot_2.getView().removeItem(self.lines[i])
+        #     self.flagW = True
 
 
     def weightClick(self, event):
