@@ -217,12 +217,10 @@ class Limbo_internalPutGet(StoreDependentTestCase):
 
         # Handle exception thrown
         with self.assertRaises(Exception) as cm:
-            self.limbo._get('three')
-
         # Check that the exception thrown is a ObjectNotFoundError
-        self.assertEqual(cm.exception.name, 'ObjectNotFoundError')
-
-
+            self.limbo._get('three')
+            self.assertEqual(cm.exception.name, 'ObjectNotFoundError')
+            self.assertEqual(cm.exception.message, 'Cannnot find object with ID/name "three"')
 
 
     def tearDown(self):

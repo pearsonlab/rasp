@@ -226,7 +226,6 @@ class AsyncRunManager():
         self.q_comm = q_comm
         self.module_name = name
         self.loop = asyncio.get_event_loop()
-
         self.start = time.time()
 
     async def __aenter__(self):

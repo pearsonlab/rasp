@@ -42,10 +42,10 @@ class CaimanProcessor(Actor):
 
         self.loadParams(param_file=self.param_file)
         self.params = self.client.get('params_dict')
-        
+
         # MUST include inital set of frames
         # TODO: Institute check here as requirement to Nexus
-        
+
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)
         self.frame_number = 0 #self.params['init_batch']
@@ -68,7 +68,7 @@ class CaimanProcessor(Actor):
 
         with RunManager(self.name, self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
-            
+
         print('Processor broke, avg time per frame: ', np.mean(self.total_times, axis=0))
         print('Processor got through ', self.frame_number, ' frames')
         np.savetxt('timing/process_frame_time.txt', np.array(self.total_times))
@@ -108,12 +108,12 @@ class CaimanProcessor(Actor):
         '''
         #TODO: Error handling for if these parameters don't work
             #should implement in Tweak (?) or getting too complicated for users..
-        
+
         #proc_params = self.client.get('params_dict')
         output = self.params['output']
         init = self.params['init_batch']
         frame = self._checkFrames()
-        
+
         if frame is not None:
             t = time.time()
             self.done = False
@@ -134,7 +134,7 @@ class CaimanProcessor(Actor):
                 # Proceed at all costs
                 self.dropped_frames.append(self.frame_number)
             except Exception as e:
-                logger.error('Processor error: {}: {} during frame number {}'.format(type(e).__name__, 
+                logger.error('Processor error: {}: {} during frame number {}'.format(type(e).__name__,
                                                                                             e, self.frame_number))
                 print(traceback.format_exc())
                 self.dropped_frames.append(self.frame_number)
@@ -142,7 +142,7 @@ class CaimanProcessor(Actor):
             self.total_times.append(time.time()-t)
         else:
             pass
-            
+
     def loadParams(self, param_file=None):
         ''' Load parameters from file or 'defaults' into store
             TODO: accept user input from GUI
@@ -222,15 +222,15 @@ class CaimanProcessor(Actor):
                 #         # max_len = max([len(osi.s[before:self.frame_number]) for osi in self.onAc.estimates.OASISinstances])
                 #         # S = np.array([np.lib.pad(osi.s[before:self.frame_number], (0, max_len-len(osi.s[before:self.frame_number])), 'constant', constant_values=0) for osi in self.onAc.estimates.OASISinstances])
                 # else:
-                S = np.stack([osi.s[before:self.frame_number] for osi in self.onAc.estimates.OASISinstances])    
+                S = np.stack([osi.s[before:self.frame_number] for osi in self.onAc.estimates.OASISinstances])
             except IndexError:
                 print('Index error!')
-                # print('shape good frames ', good_frames.shape)       
+                # print('shape good frames ', good_frames.shape)
                 # print('good frames', good_frames)
                 print('len dropped frames ', len(self.dropped_frames))
                 # if tmp2: print('tmp2 shape', tmp2.shape)
                 print(self.frame_number)
-                print(before)         
+                print(before)
         else:
             S = np.zeros((self.onAc.estimates.C_on.shape[0], self.frame_number - before))
         t3 = time.time()
@@ -253,7 +253,7 @@ class CaimanProcessor(Actor):
         #self.q_comm.put([self.frame_number])
 
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4, t6-t5])
-    
+
 
     def _checkFrames(self):
         ''' Check to see if we have frames for processing
@@ -292,7 +292,7 @@ class CaimanProcessor(Actor):
             except Exception as e:
                 logger.error('Unknown exception {0}'.format(e))
                 raise Exception
-            
+
             if self.onAc.params.get('motion', 'pw_rigid'):
                 frame_cor, shift, _, xy_grid = tile_and_correct(frame, templ, self.onAc.params.motion['strides'], self.onAc.params.motion['overlaps'],
                                                                             self.onAc.params.motion['max_shifts'], newoverlaps=None, newstrides=None, upsample_factor_grid=4,
@@ -329,10 +329,10 @@ class CaimanProcessor(Actor):
             self.A = A
             self.coords = get_contours(A, dims)
 
-        elif np.shape(A)[1] > np.shape(self.A)[1]: # and self.frame_number % 50 == 0: 
+        elif np.shape(A)[1] > np.shape(self.A)[1]: # and self.frame_number % 50 == 0:
             #Only recalc if we have new components
             # FIXME: Since this is only for viz, only do this every 100 frames
-            # TODO: maybe only recalc coords that are new? 
+            # TODO: maybe only recalc coords that are new?
             self.A = A
             self.coords = get_contours(A, dims)
             self.counter += 1
@@ -362,11 +362,3 @@ class CaimanProcessor(Actor):
 
 class NaNFrameException(Exception):
     pass
-
-
-
-
-
-
-
-

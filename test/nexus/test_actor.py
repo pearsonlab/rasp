@@ -118,24 +118,24 @@ class RunManager_process(ActorDependentTestCase):
 
 #TODO: extend to another
 
-class testAsync (ActorDependentTestCase):
+#class testAsync(ActorDependentTestCase):
 
-    def setUp(self):
-        super(testAsync, self).setUp()
-        self.runlist=[]
-        asyncio.run(self.main())
-        self.assertEqual([1, 1, 1, 2, 2, 2], self.runlist)
+#    def setUp(self):
+#        super(testAsync, self).setUp()
+#        self.runlist=[]
+#        asyncio.run(self.main())
+#        self.assertEqual([1, 1, 1, 2, 2, 2], self.runlist)
 
-    def testSepareteProcess(self):
-        self.runlist=[]
-        event_loop=asyncio.new_event_loop()
-        asyncio.set_event_loop(event_loop)
-        loop= asyncio.get_event_loop()
-        loop.run_until_complete(self.main())
-        self.assertEqual([1, 1, 1, 2, 2, 2], self.runlist)
+#   def testSepareteProcess(self):
+#        self.runlist=[]
+#        event_loop=asyncio.new_event_loop()
+#        asyncio.set_event_loop(event_loop)
+#        loop= asyncio.get_event_loop()
+#        loop.run_until_complete(self.main())
+#        self.assertEqual([1, 1, 1, 2, 2, 2], self.runlist)
 
-    def tearDown(self):
-        super(testAsync, self).tearDown()
+#    def tearDown(self):
+#        super(testAsync, self).tearDown()
         
 '''
 Place different actors in separate processes and ensure that run manager is receiving
@@ -151,7 +151,7 @@ class AsyncRunManager_Process(ActorDependentTestCase):
     async def test_run(self):
 
         #self.p2 = asyncio.create_subprocess_exec(AsyncRunManager, 'test', self.process_run, self.process_setup, stdin=lf.q_sig, stdout=self.q_comm)
-        self.p2 = await Process(target=  self.createAsyncProcess, args= (self.q_sig, self.q_comm,))
+        self.p2 = await Process(target= self.createAsyncProcess, args= (self.q_sig, self.q_comm,))
         self.p2.start()
         self.q_sig.put('setup')
         self.assertEqual(self.q_comm.get(), ['ready'])
