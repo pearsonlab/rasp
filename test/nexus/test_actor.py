@@ -118,7 +118,25 @@ class RunManager_process(ActorDependentTestCase):
 
 #TODO: extend to another
 
+class testAsync (ActorDependentTestCase):
 
+    def setUp(self):
+        super(testAsync, self).setUp()
+        self.runlist=[]
+        asyncio.run(self.main())
+        self.assertEqual([1, 1, 1, 2, 2, 2], self.runlist)
+
+    def testSepareteProcess(self):
+        self.runlist=[]
+        event_loop=asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        loop= asyncio.get_event_loop()
+        loop.run_until_complete(self.main())
+        self.assertEqual([1, 1, 1, 2, 2, 2], self.runlist)
+
+    def tearDown(self):
+        super(testAsync, self).tearDown()
+        
 '''
 Place different actors in separate processes and ensure that run manager is receiving
 signals in the expected order.
@@ -127,8 +145,6 @@ class AsyncRunManager_Process(ActorDependentTestCase):
     def setUp(self):
         super(AsyncRunManager_Process, self).setUp()
 
-        self.q_comm = Link('queue', 'process', 'self')
-        self.q_sig = Link('queue', 'self', 'process')
         self.q_sig= Link('queue', 'self', 'process')
         self.q_comm=Link('queue', 'process', 'self')
 
@@ -139,20 +155,14 @@ class AsyncRunManager_Process(ActorDependentTestCase):
         self.p2.start()
         self.q_sig.put('setup')
         self.assertEqual(self.q_comm.get(), ['ready'])
-        self.q_sig.put('run')
         self.assertEqual(self.q_comm.get(), 'ran')
-        self.q_sig.put('pause')
-        self.q_sig.put('resume')
-        self.q_sig.put('quit')
         with self.assertLogs() as cm:
             logging.getLogger().warning('Received pause signal, pending...')
             logging.getLogger().warning('Received resume signal, resuming')
             logging.getLogger().warning('Received quit signal, aborting')
         self.assertEqual(cm.output, ['WARNING:root:Received pause signal, pending...',
         'WARNING:root:Received resume signal, resuming', 'WARNING:root:Received quit signal, aborting'])
-        self.p2.terminate()
-        self.p2.kill()
-
+    
 
     def tearDown(self):
         super(AsyncRunManager_Process, self).tearDown()
