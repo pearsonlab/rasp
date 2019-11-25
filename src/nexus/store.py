@@ -217,6 +217,7 @@ class Limbo(StoreInterface):
         '''
         res = self.getID(self.stored.get(object_name))
         # Can also use contains() to check
+        logger.warning('{}'.format(object_name))
         if isinstance(res, ObjectNotAvailable):
             logger.warning('Object {} cannot be found.'.format(object_name))
             raise ObjectNotFoundError(obj_id_or_name = object_name) #TODO: Don't raise?
