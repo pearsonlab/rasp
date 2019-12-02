@@ -243,3 +243,19 @@ class Limbo_saveTweak(StoreDependentTestCase):
 
     def tearDown(self):
         super(Limbo_saveTweak, self).tearDown()
+
+
+# Test out CSC matrix format after updating to arrow 0.14.0
+class Limbo_sparseMatrix(StoreDependentTestCase):
+
+    def setUp(self):
+        super(Limbo_sparseMatrix, self).setUp()
+        self.limbo = Limbo()
+
+    def test_tweak(self):
+        csc = csc_matrix((3, 4), dtype=np.int8)
+        self.limbo.put(csc, "csc")
+        self.assertTrue(np.allclose(self.limbo.get("csc").toarray(), csc.toarray()))
+
+    def tearDown(self):
+        super(Limbo_sparseMatrix, self).tearDown()
