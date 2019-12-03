@@ -246,7 +246,6 @@ class Limbo_saveTweak(StoreDependentTestCase):
 
 
 # Test out CSC matrix format after updating to arrow 0.14.0
-# Note: must update arrow or this will (probably) fail
 class Limbo_sparseMatrix(StoreDependentTestCase):
 
     def setUp(self):
