@@ -246,7 +246,7 @@ class CaimanProcessor(Actor):
         ids = []
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
-        ids.append(self.client.put(C, 'S'+str(self.frame_number)))
+        ids.append(self.client.put(S, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
         self.q_out.put(ids)

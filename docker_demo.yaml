@@ -20,7 +20,7 @@ actors:
   
   Analysis:
     package: analysis.analysis
-    class: MeanAnalysis
+    class: ModelAnalysis
 
   InputStim:
     package: acquire.acquire
