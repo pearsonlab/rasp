@@ -56,6 +56,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
         self.rawplot_3.getImageItem().mouseClickEvent = self.weightClick #select a neuron by weight
 
+        self.update()  # Auto-start
+
     def update(self):
         ''' Update visualization while running
         '''

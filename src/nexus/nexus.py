@@ -307,6 +307,10 @@ class Nexus():
         '''
         name = name.split('_')[0]
         logger.info('Received signal from GUI: '+flag[0])
+
+        logger.info('Running setup')
+        self.setup()  # Auto-setup
+
         if flag[0]:
             if flag[0] == Spike.run():
                 logger.info('Begin run!')
@@ -339,6 +343,8 @@ class Nexus():
                 if all(val==Spike.ready() for val in self.actorStates.values()):
                     self.allowStart = True      #TODO: replace with q_sig to FE/Visual
                     logger.info('Allowing start')
+
+                    self.run()  # Auto-start w/ GUI
 
                     #TODO: Maybe have flag for auto-start, else require explict command
                     # if not self.tweak.hasGUI:
