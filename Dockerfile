@@ -14,7 +14,7 @@ RUN ["/bin/bash", "-c", "cd opt && git clone https://github.com/flatironinstitut
 RUN ["/bin/zsh", "-c", "source ~/.zshrc && cd opt/CaImAn/ && pip install -e . && python caimanmanager.py install --inplace"]
 
 # improv
-RUN ["/bin/zsh", "-c", "source ~/.zshrc && cd opt && git clone https://github.com/pearsonlab/improv && cd improv && git checkout docker && conda install pyarrow pyqtgraph && pip install lmdb"]
+RUN ["/bin/zsh", "-c", "source ~/.zshrc && cd opt && git clone https://github.com/pearsonlab/improv && cd improv && git checkout docker && conda install pyarrow pyqtgraph && pip install lmdb && pip install pyarrow==0.13"]
 
 # Download test data
 RUN cd ~/caiman_data/example_movies && mkdir Mesoscope && cd Mesoscope && wget https://caiman.flatironinstitute.org/~neuro/caiman_downloadables/Tolias_mesoscope_2.hdf5

@@ -24,6 +24,24 @@ Note that the following is only needed for GUI access.
     docker run -it --rm --shm-size=16g improv
     ```
 
+## Ubuntu
+
+Tested on Ubuntu 19.10, Docker Engine version 19.03.5
+
+#### First time
+1. Install [Docker](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
+
+#### Run
+1. Grant Docker access to X11 for GUI
+    ```bash
+    xhost +local:docker
+    ```
+
+2. Run Docker image
+    ```bash
+    sudo docker run -ti --rm -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY --shm-size=8g improv
+    ```
+
 ## macOS 10.15 Catalina
 
 Tested on macOS 10.15.1, Docker Desktop for macOS version 2.1.0.5 (40693)
@@ -31,23 +49,25 @@ Tested on macOS 10.15.1, Docker Desktop for macOS version 2.1.0.5 (40693)
 #### First time
 Note that the following is only needed for GUI access. [Reference](https://cntnr.io/running-guis-with-docker-on-mac-os-x-a14df6a76efc)
 
-1. Install Command Line Tools for Xcode.
+1. Install [Docker](https://docs.docker.com/docker-for-mac/install/)
+
+2. Install Command Line Tools for Xcode.
     ```bash
     xcode-select --install
     ```
 
-2. Install `Homebrew`.
+3. Install `Homebrew`.
     ```bash
     /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
     ```
 
-3. Install `socat` and `XQuartz`.
+4. Install `socat` and `XQuartz`.
     ```bash
     brew install socat
     brew install xquartz
     ```
 
-4. Edit `XQuartz` security settings.
+5. Edit `XQuartz` security settings.
     ```bash
     open -a Xquartz
     ```
