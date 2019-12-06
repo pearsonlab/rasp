@@ -19,7 +19,7 @@ RUN ["/bin/zsh", "-c", "source ~/.zshrc && cd opt && git clone https://github.co
 # Download test data
 RUN cd ~/caiman_data/example_movies && mkdir Mesoscope && cd Mesoscope && wget https://caiman.flatironinstitute.org/~neuro/caiman_downloadables/Tolias_mesoscope_2.hdf5
 
-COPY files/online_cnmf.py /opt/CaImAn/caiman/source_extraction/cnmf/online_cnmf.py
+COPY online_cnmf.py /opt/CaImAn/caiman/source_extraction/cnmf/online_cnmf.py
 
 RUN chmod +x /opt/improv/docker_entrypoint.sh
 ENTRYPOINT /opt/improv/docker_entrypoint.sh
