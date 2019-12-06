@@ -21,8 +21,8 @@ RUN cd ~/caiman_data/example_movies && mkdir Mesoscope && cd Mesoscope && wget h
 
 COPY online_cnmf.py /opt/CaImAn/caiman/source_extraction/cnmf/online_cnmf.py
 
-RUN chmod +x /opt/improv/docker_entrypoint.sh
-ENTRYPOINT /opt/improv/docker_entrypoint.sh
+RUN chmod +x /opt/improv/docker/docker_entrypoint.sh
+ENTRYPOINT /opt/improv/docker/docker_entrypoint.sh
 
 # https://github.com/microsoft/WSL/issues/4166
 # docker build . -t caiman
