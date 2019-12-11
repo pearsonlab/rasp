@@ -20,8 +20,8 @@ RUN cd ~/caiman_data/example_movies && mkdir Mesoscope && cd Mesoscope && wget h
 #
 # RUN ["/bin/bash", "-c", "apt-get  install -y cabextract && wget http://ftp.uk.debian.org/debian/pool/contrib/m/msttcorefonts/ttf-mscorefonts-installer_3.7_all.deb && dpkg -i ttf-mscorefonts-installer_3.7_all.deb"]
 
-# RUN chmod +x /opt/improv/docker/docker_entrypoint.sh
-# ENTRYPOINT /opt/improv/docker/docker_entrypoint.sh
+RUN chmod +x /opt/improv/docker/docker_entrypoint.sh
+ENTRYPOINT /opt/improv/docker/docker_entrypoint.sh
 
 # https://github.com/microsoft/WSL/issues/4166
 # docker build . -t caiman
