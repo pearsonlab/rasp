@@ -13,6 +13,8 @@ from pyqtgraph import EllipseROI, PolyLineROI, ColorMap, ROI, LineSegmentROI
 from queue import Empty
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
+from .figure_saver import FigureSaver
+import cv2
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -39,6 +41,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.comm = comm #Link back to Nexus for transmitting signals
 
         self.total_times = []
+        self.saver = FigureSaver()
 
         pyqtgraph.setConfigOption('background', QColor(100, 100, 100))
         super(FrontEnd, self).__init__(parent)
@@ -76,11 +79,17 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
             #plot video
             try:
-                self.updateVideo()
+                raw, color, weight = self.updateVideo()
             except Exception:
                 logger.error('Error in FrontEnd update Video:  {}'.format(e))
                 import traceback
                 print('---------------------Exception in update video: ' , traceback.format_exc())
+            else:
+                if self.visual.frame_num > 10 and self.visual.frame_num % 10 == 0:
+                    self.savePlots(raw, color, weight)
+
+                if self.visual.frame_num == 100:  # TODO: Call when Acquirer ran out.
+                    self.saver.gen_gif()
 
         #re-update
         if self.checkBox.isChecked():
@@ -214,6 +223,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 self.rawplot_3.setImage(image)
                 self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
+        return raw, color, weight
+
     def updateLines(self):
         ''' Helper function to plot the line traces
             of the activity of the selected neurons.
@@ -275,7 +286,28 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                     polar[i].setData(x, y, pen=pens[i])
         # else:
         #     print('tune is none')
-        
+
+    def savePlots(self, img_raw, img_processed, weights):
+        """ Capture current state (images/plots) and send to FigureSaver for export. """
+
+        try:
+            Cx, C, Cpop, tune, LL = self.visual.getCurves()
+        except TypeError:
+            pass
+        else:
+            # Draw red circle
+            img_processed = img_processed.copy()
+            center_coordinates = (int(self.selected[0][1]), int(self.selected[0][0]) - 10)
+            radius = 10
+            thickness = 2
+            cv2.circle(img_processed, center_coordinates, radius, (255, 0, 0, 255), thickness,
+                       lineType=cv2.LINE_AA)  # In-place
+
+            frame_num = self.visual.frame_num
+            self.saver.save_activity(Cx, C, Cpop, np.rot90(img_raw), np.rot90(img_processed),
+                                     name=f'activity_{frame_num: 03u}.png')
+            self.saver.save_model(LL, weights, name=f'model_{frame_num: 03u}.png')
+
     def mouseClick(self, event):
         '''Clicked on processed image to select neurons
         '''
