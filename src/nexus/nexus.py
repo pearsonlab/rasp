@@ -548,5 +548,5 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='../docker_demo.yaml')
+    nexus.createNexus(file='docker_demo.yaml')
     nexus.startNexus() #start polling, create processes    
