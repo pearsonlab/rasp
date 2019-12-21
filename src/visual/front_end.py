@@ -305,8 +305,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
 
             frame_num = self.visual.frame_num
             self.saver.save_activity(Cx, C, Cpop, np.rot90(img_raw), np.rot90(img_processed),
-                                     name=f'activity_{frame_num: 03u}.png')
-            self.saver.save_model(LL, weights, name=f'model_{frame_num: 03u}.png')
+                                     name=f'activity_{frame_num:04}.png')
+            self.saver.save_model(LL, weights, name=f'model_{frame_num:04}.png')
 
     def mouseClick(self, event):
         '''Clicked on processed image to select neurons
