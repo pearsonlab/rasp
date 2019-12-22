@@ -346,9 +346,10 @@ class Nexus():
 
                     self.run()  # Auto-start w/ GUI
 
-                    #TODO: Maybe have flag for auto-start, else require explict command
-                    # if not self.tweak.hasGUI:
-                    #     self.run()
+            elif sig[0] == Spike.quit():
+                logger.warning('Quitting the program!')
+                self.flags['quit'] = True
+                self.quit()
 
     def destroyNexus(self):
         ''' Method that calls the internal method
