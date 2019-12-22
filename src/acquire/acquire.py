@@ -92,6 +92,8 @@ class FileAcquirer(Actor):
             self.data = None
             self.q_comm.put(None)
             self.done = True
+            time.sleep(5)
+            self.q_comm.put([Spike.quit()])
             #self.f.close()
     
     def getFrame(self, num):
