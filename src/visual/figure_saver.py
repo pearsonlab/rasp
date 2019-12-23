@@ -104,7 +104,6 @@ class FigureSaver:
             ax = np.reshape(ax, n[0] * n[1])
         yield ax
 
-        plt.tight_layout()
         if save is not None:
             plt.savefig(self.path_save / save)
         plt.close(fig)
