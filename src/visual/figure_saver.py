@@ -78,8 +78,12 @@ class FigureSaver:
             axs[0].set_ylabel('log-likelihood')
             axs[0].set_title('Log-likelihood', fontsize=14, loc='left', pad=9)
 
-            axs[1].imshow(weights, cmap='viridis')
-            axs[1].grid('off')
+            i = axs[1].imshow(weights, cmap='viridis')
+            plt.colorbar(i)
+            axs[1].grid(False)
+            axs[1].set_title('Weight Matrix', fontsize=14, loc='left', pad=9)
+            axs[1].set_xlabel('Neuron #')
+            axs[1].set_ylabel('Neuron #')
 
         self.files['model'].append(self.path_save / name)
 

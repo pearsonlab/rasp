@@ -88,7 +88,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 if self.visual.frame_num > 10 and self.visual.frame_num % 10 == 0 and self.demo:
                     self.savePlots(raw, color, weight)
 
-        if self.demo and self.visual.frame_num == 51:  # Terminate
+        if self.demo and self.visual.frame_num == 1001:  # Terminate
             self.visual.saver.gen_gif()
             self.visual.q_comm.put([Spike.quit()])
 
