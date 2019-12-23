@@ -13,7 +13,6 @@ from pyqtgraph import EllipseROI, PolyLineROI, ColorMap, ROI, LineSegmentROI
 from queue import Empty
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
-from .figure_saver import FigureSaver
 import cv2
 
 import logging; logger = logging.getLogger(__name__)
@@ -33,7 +32,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
              6: ( 240,  5, 240),
              7: ( 240, 5, 64)}
 
-    def __init__(self, visual, comm, parent=None):
+    def __init__(self, visual, comm, parent=None, demo=True):
         ''' Setup GUI
             Setup and start Nexus controls
         '''
@@ -41,7 +40,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.comm = comm #Link back to Nexus for transmitting signals
 
         self.total_times = []
-        self.saver = FigureSaver()
+        self.demo = demo
 
         pyqtgraph.setConfigOption('background', QColor(100, 100, 100))
         super(FrontEnd, self).__init__(parent)
@@ -59,7 +58,8 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
         self.rawplot_3.getImageItem().mouseClickEvent = self.weightClick #select a neuron by weight
 
-        self.update()  # Auto-start
+        if self.demo:
+            self.update()  # Auto-start
 
     def update(self):
         ''' Update visualization while running
@@ -85,11 +85,12 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 import traceback
                 print('---------------------Exception in update video: ' , traceback.format_exc())
             else:
-                if self.visual.frame_num > 10 and self.visual.frame_num % 10 == 0:
+                if self.visual.frame_num > 10 and self.visual.frame_num % 10 == 0 and self.demo:
                     self.savePlots(raw, color, weight)
 
-                if self.visual.frame_num == 100:  # TODO: Call when Acquirer ran out.
-                    self.saver.gen_gif()
+        if self.demo and self.visual.frame_num == 51:  # Terminate
+            self.visual.saver.gen_gif()
+            self.visual.q_comm.put([Spike.quit()])
 
         #re-update
         if self.checkBox.isChecked():
@@ -304,9 +305,10 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                        lineType=cv2.LINE_AA)  # In-place
 
             frame_num = self.visual.frame_num
-            self.saver.save_activity(Cx, C, Cpop, np.rot90(img_raw), np.rot90(img_processed),
-                                     name=f'activity_{frame_num:04}.png')
-            self.saver.save_model(LL, weights, name=f'model_{frame_num:04}.png')
+            self.visual.saver.save_activity(Cx, C, Cpop, np.rot90(img_raw), np.rot90(img_processed),
+                                            stim=self.visual.allStims, colors=self.COLOR,
+                                            name=f'activity_{frame_num:04}.png')
+            self.visual.saver.save_model(LL, weights, name=f'model_{frame_num:04}.png')
 
     def mouseClick(self, event):
         '''Clicked on processed image to select neurons

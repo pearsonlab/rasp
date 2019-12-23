@@ -12,6 +12,7 @@ import sys
 from nexus.actor import Actor, Spike
 from queue import Empty
 from collections import deque
+from .figure_saver import FigureSaver
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ class CaimanVisual(Actor):
         for i in range(8):  # TODO: Hard-coded
             self.stimStatus[i] = deque()
 
+        self.saver = FigureSaver()
         # self.flip = False #TODO
 
     def setup(self):

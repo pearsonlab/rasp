@@ -26,7 +26,7 @@ class FigureSaver:
 
         self.files = {name: list() for name in self.types}
 
-    def save_activity(self, Cx, C, Cpop, raw, color, name=None):
+    def save_activity(self, Cx, C, Cpop, raw, processed, stim=None, colors=None, name=None):
         """ Save raw/processed images and neuron/population activity plot. """
 
         if name is None:
@@ -39,7 +39,7 @@ class FigureSaver:
             axs[0].set_axis_off()
             axs[0].set_title('Raw Image', fontsize=14, loc='left', pad=9)
 
-            axs[1].imshow(color)
+            axs[1].imshow(processed)
             axs[1].set_axis_off()
             axs[1].set_title('Processed Image', fontsize=14, loc='left', pad=9)
 
@@ -47,6 +47,15 @@ class FigureSaver:
             axs[2].set_xlabel('Frame')
             axs[2].set_ylabel('Population Activity')
             axs[2].set_title('Population Activity', fontsize=14, loc='left', pad=9)
+            if stim is not None and colors is not None:
+                for i in range(len(colors)):
+                    try:
+                        if len(stim[i]) > 0:
+                            display = np.array(stim[i])
+                            display = display[display > np.min(Cx)]
+                            axs[2].plot(display, [int(np.max(Cpop)) + 1] * len(display), 's', color=np.array(colors[i])/255)
+                    except KeyError:
+                        pass
 
             axs[3].plot(Cx, C)
             axs[3].set_xlabel('Frame')
@@ -75,6 +84,7 @@ class FigureSaver:
         self.files['model'].append(self.path_save / name)
 
     def gen_gif(self):
+        print('GIF!')
         """ Combine all saved images of each type into a GIF file. """
         for name, fs in self.files.items():
             images = [imageio.imread(f) for f in fs]
