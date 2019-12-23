@@ -258,12 +258,12 @@ class Nexus():
             except Full as f:
                 logger.warning('Signal queue '+q.name+' full, cannot tell it to quit: {}'.format(f))
 
-        self.processes.append(self.p_GUI)
-        #self.processes.append(self.p_watch)
         for p in self.processes:
             # if p.is_alive():
             #     p.terminate()
             p.join()
+
+        self.p_GUI.terminate()
 
         logger.warning('Done with available frames')
         print('total time ', time.time()-self.t)
