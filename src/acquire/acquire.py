@@ -227,7 +227,7 @@ class BehaviorAcquirer(Actor):
         self.q_out.put({self.n:[self.curr_stim, self.onoff]})
         #logger.info('Changed stimulus! {}'.format(self.curr_stim))
         #self.q_comm.put()
-        time.sleep(0.068)
+        time.sleep(0.333)
         self.n += 1
 
 class FolderAcquirer(Actor):

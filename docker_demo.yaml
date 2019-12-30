@@ -8,7 +8,7 @@ actors:
     package: acquire.acquire
     class: FileAcquirer
     filename: /root/caiman_data/example_movies/Mesoscope/Tolias_mesoscope_2.hdf5
-    framerate: 15
+    framerate: 3
 
   Processor:
     package: process.process
