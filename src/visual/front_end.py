@@ -75,7 +75,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             #plot video
             try:
                 self.updateVideo()
-            except Exception:
+            except Exception as e:
                 logger.error('Error in FrontEnd update Video:  {}'.format(e))
                 import traceback
                 print('---------------------Exception in update video: ' , traceback.format_exc())
@@ -154,6 +154,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         #self.rawplot.ui.histogram.vb.disableAutoRange()
         self.rawplot.ui.histogram.vb.setLimits(yMin=-0.1, yMax=200) #0-255 needed, saturated here for easy viewing
 
+        self.grplot_5.setLabel('bottom', "Frames")
+        self.grplot_5.setLabel('left', " - Log Likelihood")
+
         # if self.visual.showConnectivity:
         #     self.rawplot_3.setColorMap(cmapToColormap(cm.inferno))
 
@@ -201,16 +204,16 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         if self.visual.showConnectivity and weight is not None:
-            self.rawplot_3.setImage(weight)
-            colordata = (np.array(cmapToColormap(cm.inferno).color) * 255).astype(np.uint8)
-            cmap = ColorMap(pos=np.linspace(0, 1.0, len(colordata)), color=colordata)
+            self.rawplot_3.setImage(weight*100)
+            colordata = (np.array(cmapToColormap(cm.viridis).color) * 255).astype(np.uint8)
+            cmap = ColorMap(pos=np.linspace(0, 1, len(colordata)), color=colordata)
             self.rawplot_3.setColorMap(cmap)
-            self.rawplot_3.ui.histogram.vb.setLimits(yMin=-1, yMax=1)
+            # self.rawplot_3.ui.histogram.vb.setLimits(yMin=0.1, yMax=1)
         else:
             if image is not None:
                 image = np.rot90(image, 2)
                 self.rawplot_3.setImage(image)
-                self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
+                # self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
     def updateLines(self):
         ''' Helper function to plot the line traces
@@ -239,7 +242,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 try:
                     if len(self.visual.allStims[i]) > 0:
                         display = np.array(self.visual.allStims[i])
-                        display = display[display>np.min(Cx)]
+                        display = np.clip(display, np.min(Cx), np.max(Cx))
                         plot.setData(display, [int(np.max(Cpop))+1] * len(display),
                                     symbol='s', symbolSize=6, antialias=False,
                                     pen=None, symbolPen=self.COLOR[i], symbolBrush=self.COLOR[i])
@@ -286,35 +289,35 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
         selectedraw[1] = int(mousePoint.y())
         self._updateRedCirc()
 
-        # if self.last_n is None:
-        #     self.last_n = self.visual.selectedNeuron
+        if self.last_n is None:
+            self.last_n = self.visual.selectedNeuron
 
-        # if self.flagW: #nothing drawn yet
-        #     loc, lines, strengths = self.visual.selectNW(selectedraw[0], selectedraw[1])
-        #     # print('clicked lines ', lines)
-        #     self.lines = []
-        #     self.pens = []
-        #     colors =['g']*9 + ['r']*9
-        #     for i in range(18):
-        #         n = lines[i]
-        #         if strengths[i] > 1e-6:
-        #             if strengths[i] > 1e-4:
-        #                 self.pens.append(pyqtgraph.mkPen(width=2, color=colors[i]))
-        #             else:
-        #                 self.pens.append(pyqtgraph.mkPen(width=1, color=colors[i]))
-        #             self.lines.append(LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
-        #             self.rawplot_2.getView().addItem(self.lines[i])
-        #         else:
-        #             self.pens.append(pyqtgraph.mkPen(width=1, color=colors[i]))
-        #             self.lines.append(LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
-        #             self.rawplot_2.getView().addItem(self.lines[i])
+        if self.flagW: #nothing drawn yet
+            loc, lines, strengths = self.visual.selectNW(selectedraw[0], selectedraw[1])
+            # print('clicked lines ', lines)
+            self.lines = []
+            self.pens = []
+            colors =['g']*9 + ['r']*9
+            for i in range(18):
+                n = lines[i]
+                if strengths[i] > 1e-6:
+                    if strengths[i] > 1e-4:
+                        self.pens.append(pyqtgraph.mkPen(width=2, color=colors[i]))
+                    else:
+                        self.pens.append(pyqtgraph.mkPen(width=1, color=colors[i]))
+                    self.lines.append(LineSegmentROI(positions=([n[0],n[2]],[n[1],n[3]]), handles=(None,None), pen=self.pens[i], movable=False))
+                    self.rawplot_2.getView().addItem(self.lines[i])
+                else:
+                    self.pens.append(pyqtgraph.mkPen(width=1, color=colors[i]))
+                    self.lines.append(LineSegmentROI(positions=([n[0],n[0]],[n[0],n[0]]), handles=(None,None), pen=self.pens[i], movable=False))
+                    self.rawplot_2.getView().addItem(self.lines[i])
 
-        #     self.last_n = self.visual.selectedNeuron
-        #     self.flagW = False
-        # elif self.last_n == self.visual.selectedNeuron:
-        #     for i in range(18):
-        #         self.rawplot_2.getView().removeItem(self.lines[i])
-        #     self.flagW = True
+            self.last_n = self.visual.selectedNeuron
+            self.flagW = False
+        elif self.last_n == self.visual.selectedNeuron:
+            for i in range(18):
+                self.rawplot_2.getView().removeItem(self.lines[i])
+            self.flagW = True
 
 
     def weightClick(self, event):

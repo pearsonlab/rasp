@@ -133,8 +133,6 @@ class TbifAcquirer(FileAcquirer):
                         tmp = np.reshape(np.asarray(img, dtype='uint16'), (header[2], header[3]), order='F')
                         self.data.append(tmp.transpose())
                     self.data = np.array(self.data)
-                    # self.stim = np.array(self.stim)
-                    # np.savetxt('stim_data.txt', self.stim)
                     print('data is ', len(self.data))
             else: 
                 logger.error('Cannot load file, bad extension')
@@ -179,7 +177,7 @@ class TbifAcquirer(FileAcquirer):
         '''
         if num >= len(self.data):
             num = num % len(self.data)
-        return self.data[num,30:470,:]
+        return self.data[num,:,:] #30:470,:]
 
 class BehaviorAcquirer(Actor):
     ''' Actor that acquires information of behavioral stimulus
