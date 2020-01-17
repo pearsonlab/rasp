@@ -1,10 +1,37 @@
 import os
 import yaml
 import io
+from inspect import signature
+from importlib import import_module
 
 import logging; logger = logging.getLogger(__name__)
 
 #TODO: Write a save function for Tweak objects output as YAML configFile but using TweakModule objects
+
+class RepeatedActorError(Exception):
+    def __init__(self, repeat):
+
+        super().__init__()
+
+        self.name = 'RepeatedActorError'
+        self.repeat = repeat
+
+        self.message = 'Actor name has already been used: "{}"'.format(repeat)
+
+    def __str__(self):
+        return self.message
+
+class RepeatedConnectionsError(Exception):
+    def __init__(self, repeat):
+
+        super().__init__()
+        self.name= 'RepeatedConnectionsError'
+        self.repeat=repeat
+
+        self.message= 'Connection name has already been used: "{}"'.format(repeat)
+
+    def __str__(self):
+        return self.message
 
 class Tweak():
     ''' Handles configuration and logs of configs for
@@ -33,20 +60,46 @@ class Tweak():
 
         for name,actor in cfg['actors'].items(): 
             # put import/name info in TweakModule object TODO: make ordered?
+
+            if name in self.actors.keys():
+                raise RepeatedActorError(name)
+
             packagename = actor.pop('package')
             classname = actor.pop('class')
             
-            tweakModule = TweakModule(name, packagename, classname, options=actor)
+            try:
+                __import__(packagename, fromlist=[classname])
 
+            except ModuleNotFoundError:
+                logger.error('Error: Packagename not valid')
+
+            except ImportError:
+                logger.error('Error: Classname not valid within package')
+
+            mod = import_module(packagename)
+            clss = getattr(mod, classname)
+            sig= signature(clss)
+            tweakModule = TweakModule(name, packagename, classname, options=actor)
+            try:
+                sig.bind(tweakModule.options)
+            except TypeError as e:
+                logger.error('Error: Invalid arguments passed')
+                params= ''
+                for parameter in sig.parameters:
+                    params = params + ' ' + parameter.name
+                logger.warning('Expected Parameters:' + params)
             if "GUI" in name:
                 self.hasGUI = True
                 self.gui = tweakModule
             
             else:
                 self.actors.update({name:tweakModule})
-        
+                
         for name,conn in cfg['connections'].items():
             #TODO check for correctness  TODO: make more generic (not just q_out)
+            if name in self.connections.keys():
+                raise RepeatedConnectionsError(name)
+
             self.connections.update({name:conn}) #conn should be a list
         
 
@@ -65,3 +118,12 @@ class TweakModule():
         self.packagename = packagename
         self.classname = classname
         self.options = options
+
+if __name__ == '__main__':
+    tweak = Tweak(configFile='test/basic_demo')
+    tweak.createConfig()
+    for actor in tweak.actors:
+        print(actor)
+    
+    for connection in tweak.connections:
+        print(connection)

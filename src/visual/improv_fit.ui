@@ -539,6 +539,19 @@ Neuron</string>
      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; color:#eeeeec;&quot;&gt;Model Fitting&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
     </property>
    </widget>
+   <widget class="QLabel" name="dir_icon">
+    <property name="geometry">
+     <rect>
+      <x>184</x>
+      <y>106</y>
+      <width>67</width>
+      <height>65</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

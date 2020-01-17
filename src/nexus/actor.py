@@ -2,6 +2,7 @@ import asyncio
 from queue import Empty
 import time
 from typing import Awaitable, Callable
+import traceback
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -172,6 +173,7 @@ class RunManager():
                     self.runMethod() #subfunction for running singly
                 except Exception as e:
                     logger.error('Actor '+self.actorName+' exception during run: {}'.format(e))
+                    print(traceback.format_exc())
             elif self.config:
                 try:
                     self.setup() #subfunction for setting up the actor
@@ -224,7 +226,6 @@ class AsyncRunManager():
         self.q_comm = q_comm
         self.module_name = name
         self.loop = asyncio.get_event_loop()
-
         self.start = time.time()
 
     async def __aenter__(self):

@@ -2,7 +2,6 @@ import datetime
 import os
 import pickle
 import time
-import lmdb
 import numpy as np
 import pyarrow as arrow
 import pyarrow.plasma as plasma
@@ -84,17 +83,17 @@ class Limbo(StoreInterface):
             logger.info('Successfully connected to store')
         except Exception as e:
             logger.exception('Cannot connect to store: {0}'.format(e))
-            raise Exception
+            raise CannotConnectToStoreError(store_loc)
         return self.client
 
     def put(self, object, object_name, save=False):
-        ''' Put a single object referenced by its string name 
+        ''' Put a single object referenced by its string name
             into the store
         '''
         object_id = None
         try:
             # Need to pickle if object is csc_matrix
-            if isinstance(obj, csc_matrix):
+            if isinstance(object, csc_matrix):
                 object_id = self.client.put(pickle.dumps(object, protocol=pickle.HIGHEST_PROTOCOL))
             else:
                 object_id = self.client.put(object)
@@ -122,10 +121,10 @@ class Limbo(StoreInterface):
         if self.stored.get(object_name) is None:
             logger.error('Never recorded storing this object: '+object_name)
             # Don't know anything about this object, treat as problematic
-            raise CannotGetObjectError
+            raise CannotGetObjectError(query = object_name)
         else:
             return self._get(object_name)
-    
+
     def getID(self, obj_id, hdd_only=False):
         ''' Preferred mechanism for getting. TODO: Rename
         '''
@@ -134,7 +133,7 @@ class Limbo(StoreInterface):
             res = self.client.get(obj_id,0)
             if isinstance(res, type):
                 logger.warning('Object {} cannot be found.'.format(obj_id))
-                raise ObjectNotFoundError
+                raise ObjectNotFoundError(obj_id_or_name = obj_id)
             # Deal with pickled objects.
             elif isinstance(res, bytes): #TODO don't use generic bytes
                 return pickle.loads(res)
@@ -170,7 +169,7 @@ class Limbo(StoreInterface):
         ''' Subscribe to a section? of the ds for singals
             Throws unknown errors
         '''
-        try: 
+        try:
             self.client.subscribe()
         except Exception as e:
             logger.error('Unknown error: {}'.format(e))
@@ -205,11 +204,11 @@ class Limbo(StoreInterface):
         ''' returns its info about what it has stored
         '''
         return self.stored
-    
+
     def _put(self, obj, id):
         ''' Internal put
         '''
-        return self.client.put(obj, id)    
+        return self.client.put(obj, id)
 
     def _get(self, object_name):
         ''' Get an object from the store using its name
@@ -218,9 +217,10 @@ class Limbo(StoreInterface):
         '''
         res = self.getID(self.stored.get(object_name))
         # Can also use contains() to check
+        logger.warning('{}'.format(object_name))
         if isinstance(res, ObjectNotAvailable):
             logger.warning('Object {} cannot be found.'.format(object_name))
-            raise ObjectNotFoundError #TODO: Don't raise?
+            raise ObjectNotFoundError(obj_id_or_name = object_name) #TODO: Don't raise?
         else:
             return res
 
@@ -228,7 +228,7 @@ class Limbo(StoreInterface):
     # def deleteName(self, object_name):
     #     ''' Deletes an object from the store based on name
     #         assumes we have id from name
-    #         This prevents us from deleting other portions of 
+    #         This prevents us from deleting other portions of
     #         the store that we don't have access to
     #     '''
 
@@ -239,20 +239,20 @@ class Limbo(StoreInterface):
     #     else:
     #         retcode = self._delete(object_name)
     #         self.stored.pop(object_name)
-            
+
     # def delete(self, id):
     #     try:
     #         self.client.delete([id])
     #     except Exception as e:
     #         logger.error('Couldnt delete: {}'.format(e))
 
-    def saveStore(self, fileName='/home/store_dump'):
+    def saveStore(self, fileName='data/store_dump'):
         ''' Save the entire store to disk
             Uses pickle, should extend to mmap, hd5f, ...
         '''
         raise NotImplementedError
 
-    def saveTweak(self, tweak_ids, fileName='/home/tweak_dump'):
+    def saveTweak(self, tweak_ids, fileName='data/tweak_dump'):
         ''' Save current Tweak object containing parameters
             to run the experiment.
             Tweak is pickleable
@@ -264,7 +264,7 @@ class Limbo(StoreInterface):
         with open(fileName, 'wb') as output:
             pickle.dump(tweak, output, -1)
 
-    def saveSubstore(self, keys, fileName='/home/substore_dump'):
+    def saveSubstore(self, keys, fileName='data/substore_dump'):
         ''' Save portion of store based on keys
             to disk
         '''
@@ -288,6 +288,8 @@ class LMDBStore(StoreInterface):
         from_limbo: If instantiated from Limbo. Enables object ID functionality.
         '''
 
+        import lmdb
+
         if name is None:
             name = f'/lmdb_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}'
 
@@ -305,9 +307,9 @@ class LMDBStore(StoreInterface):
         self.from_limbo = from_limbo
 
     def get(self, obj_name_or_id):
-        ''' Get object from object name (!from_limbo) or ID (from_limbo). 
+        ''' Get object from object name (!from_limbo) or ID (from_limbo).
             Return None if object is not found.
-        ''''
+        '''
 
         with self.lmdb_env.begin() as txn:
             get_key = self.lmdb_obj_id_to_key[obj_name_or_id]
@@ -340,7 +342,7 @@ class LMDBStore(StoreInterface):
 
             self.lmdb_put_cache = {}
 
-            if flush_this_immediately:
+            if save:
                 self.lmdb_env.sync()
 
     def delete(self, obj_id):
@@ -349,10 +351,10 @@ class LMDBStore(StoreInterface):
         with self.lmdb_env.begin(write=True) as txn:
             out = txn.pop(self.lmdb_obj_id_to_key[obj_id])
         if out is None:
-            raise ObjectNotFoundError
+            raise ObjectNotFoundError(obj_id_or_name = obj_id)
 
     def flush(self):
-        ''' Must run before exiting. 
+        ''' Must run before exiting.
             Flushes buffer to disk.
         '''
         self.lmdb_env.sync()
@@ -370,11 +372,46 @@ def saveObj(obj, name):
 
 
 class ObjectNotFoundError(Exception):
-    pass
 
+    def __init__(self, obj_id_or_name):
+
+        super().__init__()
+
+        self.name = 'ObjectNotFoundError'
+        self.obj_id_or_name = obj_id_or_name
+
+        # TODO: self.message does not properly receive obj_id_or_name
+        self.message = 'Cannnot find object with ID/name "{}"'.format(obj_id_or_name)
+
+    def __str__(self):
+        return self.message
 
 class CannotGetObjectError(Exception):
-    pass
+
+    def __init__(self, query):
+
+        super().__init__()
+
+        self.name = 'CannotGetObjectError'
+        self.query = query
+        self.message = 'Cannot get object {}'.format(self.query)
+
+    def __str__(self):
+        return self.message
+
+class CannotConnectToStoreError(Exception):
+    '''Raised when failing to connect to store.
+    '''
+    def __init__(self, store_loc):
+
+        super().__init__()
+
+        self.name = 'CannotConnectToStoreError'
+
+        self.message = 'Cannot connect to store at {}'.format(str(store_loc))
+
+    def __str__(self):
+        return self.message
 
 class Watcher():
     ''' Monitors the store as separate process
@@ -399,10 +436,10 @@ class Watcher():
                     self.checkStore2()
                 except Exception as e:
                     logger.error('Watcher exception during run: {}'.format(e))
-                    #break 
-            try: 
+                    #break
+            try:
                 signal = self.q_sig.get(timeout=0.005)
-                if signal == Spike.run(): 
+                if signal == Spike.run():
                     self.flag = True
                     logger.warning('Received run signal, begin running')
                 elif signal == Spike.quit():

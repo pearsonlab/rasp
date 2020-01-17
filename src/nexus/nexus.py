@@ -29,8 +29,8 @@ logging.basicConfig(level=logging.DEBUG,
                     format='%(name)s %(message)s',
                     handlers=[logging.FileHandler("example2.log"),
                               logging.StreamHandler()])
-#logging.basicConfig(filename='logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()), 
-                   #filemode='w', 
+#logging.basicConfig(filename='logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()),
+                   #filemode='w',
                   #format='%(asctime)s | %(levelname)-8s | %(name)s | %(lineno)04d | %(message)s')
 
         #fh = logging.FileHandler('logs/nexus_{:%Y%m%d%H%M%S}.log'.format(datetime.now()))
@@ -48,10 +48,10 @@ class Nexus():
 
     def __str__(self):
         return self.name
-    
+
     def createNexus(self, file=None):
         self._startStore(40000000000) #default size should be system-dependent; this is 40 GB
-    
+
         #connect to store and subscribe to notifications
         self.limbo = store.Limbo()
         self.limbo.subscribe()
@@ -89,19 +89,19 @@ class Nexus():
             loop.add_signal_handler(
                 s, lambda s=s: asyncio.ensure_future(self.stop_polling(s, loop))) #TODO
 
-        loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks 
+        loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
 
     def loadTweak(self, file=None):
         ''' For each connection:
             create a Link with a name (purpose), start, and end
-            Start links to one actor's name, end to the other. 
+            Start links to one actor's name, end to the other.
             Nexus gives start_actor the Link as a q_in,
               and end_actor the Link as a q_out
-            Nexus maintains dict of name and associated Link. 
-            Nexus also has list of Links that it is itself connected to 
-              for communication purposes. 
+            Nexus maintains dict of name and associated Link.
+            Nexus also has list of Links that it is itself connected to
+              for communication purposes.
             OR
-            For each connection, create 2 Links. Nexus acts as intermediary. 
+            For each connection, create 2 Links. Nexus acts as intermediary.
         '''
         #TODO load from file or user input, as in dialogue through FrontEnd?
 
@@ -114,11 +114,11 @@ class Nexus():
         if self.tweak.hasGUI:
             # Have to load GUI first (at least with Caiman) #TODO: Fix Caiman instead?
             name = self.tweak.gui.name
-            m = self.tweak.gui # m is TweakModule 
+            m = self.tweak.gui # m is TweakModule
             # treat GUI uniquely since user communication comes from here
             try:
                 visualClass = m.options['visual']
-                # need to instantiate this actor 
+                # need to instantiate this actor
                 visualActor = self.tweak.actors[visualClass]
                 self.createActor(visualClass, visualActor)
                 # then add links for visual
@@ -138,7 +138,7 @@ class Nexus():
 
         # First set up each class/actor
         for name,actor in self.tweak.actors.items():
-            if name not in self.actors.keys(): 
+            if name not in self.actors.keys():
                 #Check for actors being instantiated twice
                 self.createActor(name, actor)
 
@@ -177,7 +177,7 @@ class Nexus():
         for source,drain in self.tweak.connections.items():
             name = source.split('.')[0]
             #current assumption is connection goes from q_out to something(s) else
-            if len(drain) > 1: #we need multiasyncqueue 
+            if len(drain) > 1: #we need multiasyncqueue
                 link, endLinks = MultiLink(name+'_multi', source, drain)
                 self.data_queues.update({source:link})
                 for i,e in enumerate(endLinks):
@@ -209,7 +209,7 @@ class Nexus():
 
     def runActor(self, actor):
         '''Run the actor continually; used for separate processes
-            #TODO: hook into monitoring here? 
+            #TODO: hook into monitoring here?
         '''
         actor.run()
 
@@ -226,7 +226,7 @@ class Nexus():
     def start(self):
         logger.info('Starting processes')
         self.t = time.time()
-        
+
         for p in self.processes:
             p.start()
 
@@ -249,9 +249,9 @@ class Nexus():
     def quit(self):
         # with open('timing/noticiations.txt', 'w') as output:
         #     output.write(str(self.listing))
-        
+
         logger.warning('Killing child processes')
-        
+
         for q in self.sig_queues.values():
             try:
                 q.put_nowait(Spike.quit())
@@ -284,10 +284,10 @@ class Nexus():
         for q in polling:
             tasks.append(asyncio.ensure_future(q.get_async()))
 
-        while not self.flags['quit']:   
+        while not self.flags['quit']:
             done, pending = await asyncio.wait(tasks, return_when=concurrent.futures.FIRST_COMPLETED)
             #TODO: actually kill pending tasks
-            
+
             for i,t in enumerate(tasks):
                 if t in done or polling[i].status == 'done': #catch tasks that complete await wait/gather
                     r = polling[i].result
@@ -383,18 +383,18 @@ class Nexus():
         ''' TODO: update asyncio library calls
         '''
         logging.info('Received exit signal {}'.format(signal.name))
-        
-        tasks = [t for t in asyncio.Task.all_tasks() if t is not 
+
+        tasks = [t for t in asyncio.Task.all_tasks() if t is not
                 asyncio.Task.current_task()]
 
         [task.cancel() for task in tasks]
 
-        #TODO: Check for hanging behavior
+        #TODO: Fix for hanging behavior
         logging.info('Canceling outstanding tasks')
         await asyncio.gather(*tasks)
         loop.stop()
         logging.info('Shutdown complete.')
-    
+
 
 def Link(name, start, end):
     ''' Abstract constructor for a queue that Nexus uses for
@@ -425,7 +425,7 @@ class AsyncQueue(object):
 
     def getStart(self):
         return self.start
-    
+
     def getEnd(self):
         return self.end
 
@@ -445,7 +445,7 @@ class AsyncQueue(object):
                     'get', 'get_nowait', 'close']:
             return getattr(self.queue, name)
         else:
-            raise AttributeError("'%s' object has no attribute '%s'" % 
+            raise AttributeError("'%s' object has no attribute '%s'" %
                                     (self.__class__.__name__, name))
 
     def __repr__(self):
@@ -516,8 +516,8 @@ class MultiAsyncQueue(AsyncQueue):
 
     def __repr__(self):
         #return str(self.__class__) + ": " + str(self.__dict__)
-        return 'MultiLink '+self.name 
-    
+        return 'MultiLink '+self.name
+
     def __getattr__(self, name):
         # Remove put and put_nowait and define behavior specifically
         #TODO: remove get capability
@@ -525,7 +525,7 @@ class MultiAsyncQueue(AsyncQueue):
                     'get', 'get_nowait', 'close']:
             return getattr(self.queue, name)
         else:
-            raise AttributeError("'%s' object has no attribute '%s'" % 
+            raise AttributeError("'%s' object has no attribute '%s'" %
                                     (self.__class__.__name__, name))
 
     def put(self, item):
@@ -542,7 +542,5 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='eva_demo.yaml')
-    #nexus.setupAll()
-    nexus.startNexus() #start polling, create processes
-    
+    nexus.createNexus(file='exp_oct21_demo.yaml')
+    nexus.startNexus() #start polling, create processes    

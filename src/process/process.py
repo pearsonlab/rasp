@@ -42,10 +42,10 @@ class CaimanProcessor(Actor):
 
         self.loadParams(param_file=self.param_file)
         self.params = self.client.get('params_dict')
-        
+
         # MUST include inital set of frames
         # TODO: Institute check here as requirement to Nexus
-        
+
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)
         self.frame_number = 0 #self.params['init_batch']
@@ -68,7 +68,7 @@ class CaimanProcessor(Actor):
 
         with RunManager(self.name, self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
-            
+
         print('Processor broke, avg time per frame: ', np.mean(self.total_times, axis=0))
         print('Processor got through ', self.frame_number, ' frames')
         np.savetxt('timing/process_frame_time.txt', np.array(self.total_times))
@@ -76,17 +76,10 @@ class CaimanProcessor(Actor):
 
         self.shape_time = np.array(self.onAc.t_shapes)
         self.detect_time = np.array(self.onAc.t_detect)
-        # self.init_time = np.array(self.onAc.t_init)
-        # self.buff_time = np.array(self.onAc.t_buff)
-        # self.stat_time = np.array(self.onAc.t_stat)
 
         np.savetxt('timing/fitframe_time.txt', np.array(self.fitframe_time))
         np.savetxt('timing/shape_time.txt', self.shape_time)
         np.savetxt('timing/detect_time.txt', self.detect_time)
-
-        # np.savetxt('timing/init_time.txt', self.init_time)
-        # np.savetxt('timing/buff_time.txt', self.buff_time)
-        # np.savetxt('timing/stat_time.txt', self.stat_time)
 
         np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
         np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
@@ -102,6 +95,10 @@ class CaimanProcessor(Actor):
                 print(traceback.format_exc())
         else:
             print('No OASIS')
+        self.coords1 = [o['CoM'] for o in self.coords]
+        print(self.coords1[0])
+        print('type ', type(self.coords1[0]))
+        np.savetxt('contours.txt', np.array(self.coords1))
 
     def runProcess(self):
         ''' Run process. Runs once per frame.
@@ -111,19 +108,18 @@ class CaimanProcessor(Actor):
         '''
         #TODO: Error handling for if these parameters don't work
             #should implement in Tweak (?) or getting too complicated for users..
-        
+
         #proc_params = self.client.get('params_dict')
         output = self.params['output']
         init = self.params['init_batch']
         frame = self._checkFrames()
-        
+
         if frame is not None:
             t = time.time()
             self.done = False
             try:
                 self.frame = self.client.getID(frame[0][str(self.frame_number)])
                 self.frame = self._processFrame(self.frame, self.frame_number+init)
-                #self.frame = frame.copy()
                 t2 = time.time()
                 self._fitFrame(self.frame_number+init, self.frame.reshape(-1, order='F'))
                 self.fitframe_time.append([time.time()-t2])
@@ -132,12 +128,13 @@ class CaimanProcessor(Actor):
             except ObjectNotFoundError:
                 logger.error('Processor: Frame {} unavailable from store, droppping'.format(self.frame_number))
                 self.dropped_frames.append(self.frame_number)
+                self.q_out.put([1])
             except KeyError as e:
                 logger.error('Processor: Key error... {0}'.format(e))
                 # Proceed at all costs
                 self.dropped_frames.append(self.frame_number)
             except Exception as e:
-                logger.error('Processor error: {}: {} during frame number {}'.format(type(e).__name__, 
+                logger.error('Processor error: {}: {} during frame number {}'.format(type(e).__name__,
                                                                                             e, self.frame_number))
                 print(traceback.format_exc())
                 self.dropped_frames.append(self.frame_number)
@@ -145,9 +142,6 @@ class CaimanProcessor(Actor):
             self.total_times.append(time.time()-t)
         else:
             pass
-            # logger.error('Done with all available frames: {0}'.format(self.frame_number))
-            # self.q_comm.put(None)
-            # self.done = True
 
     def loadParams(self, param_file=None):
         ''' Load parameters from file or 'defaults' into store
@@ -167,8 +161,8 @@ class CaimanProcessor(Actor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/tbif_ex.h5'], #Tolias_mesoscope_2.hdf5'],
-                   'fr': 3.6,
+            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'],
+                   'fr': 3.5,
                    'decay_time': 0.5,
                    'gSig': (3,3),
                    'p': 1,
@@ -181,13 +175,13 @@ class CaimanProcessor(Actor):
                    'init_method': 'bare',
                    'normalize': True,
                    'sniper_mode': False,
-                   'K': 10,
+                   'K': 20,
                    'epochs': 1,
                    'max_shifts_online': np.ceil(10).astype('int'),
                    'pw_rigid': False,
                    'dist_shape_update': True,
                    'show_movie': False,
-                   'update_freq': 500,
+                #    'update_freq': 50,
                    'minibatch_shape': 100,
                    'output': 'outputEstimates'}
         self.client.put(params_dict, 'params_dict')
@@ -206,8 +200,8 @@ class CaimanProcessor(Actor):
         t = time.time()
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
-        before = 0 #self.frame_number-500 if self.frame_number > 500 else 0
-        #C = self.onAc.estimates.C_on.get_ordered()
+        before = 0#self.frame_number-500 if self.frame_number > 500 else 0
+        C = self.onAc.estimates.C_on[nb:self.onAc.M, before:self.frame_number] #.get_ordered()
         t2 = time.time()
         if self.onAc.estimates.OASISinstances is not None:
             try:
@@ -228,15 +222,15 @@ class CaimanProcessor(Actor):
                 #         # max_len = max([len(osi.s[before:self.frame_number]) for osi in self.onAc.estimates.OASISinstances])
                 #         # S = np.array([np.lib.pad(osi.s[before:self.frame_number], (0, max_len-len(osi.s[before:self.frame_number])), 'constant', constant_values=0) for osi in self.onAc.estimates.OASISinstances])
                 # else:
-                S = np.stack([osi.s[before:self.frame_number] for osi in self.onAc.estimates.OASISinstances])    
+                S = np.stack([osi.s[before:self.frame_number] for osi in self.onAc.estimates.OASISinstances])
             except IndexError:
                 print('Index error!')
-                # print('shape good frames ', good_frames.shape)       
+                # print('shape good frames ', good_frames.shape)
                 # print('good frames', good_frames)
                 print('len dropped frames ', len(self.dropped_frames))
                 # if tmp2: print('tmp2 shape', tmp2.shape)
                 print(self.frame_number)
-                print(before)         
+                print(before)
         else:
             S = np.zeros((self.onAc.estimates.C_on.shape[0], self.frame_number - before))
         t3 = time.time()
@@ -252,14 +246,14 @@ class CaimanProcessor(Actor):
         ids = []
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
-        ids.append(self.client.put(S, 'S'+str(self.frame_number)))
+        ids.append(self.client.put(C, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
         self.q_out.put(ids)
         #self.q_comm.put([self.frame_number])
 
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4, t6-t5])
-    
+
 
     def _checkFrames(self):
         ''' Check to see if we have frames for processing
@@ -298,7 +292,7 @@ class CaimanProcessor(Actor):
             except Exception as e:
                 logger.error('Unknown exception {0}'.format(e))
                 raise Exception
-            
+
             if self.onAc.params.get('motion', 'pw_rigid'):
                 frame_cor, shift, _, xy_grid = tile_and_correct(frame, templ, self.onAc.params.motion['strides'], self.onAc.params.motion['overlaps'],
                                                                             self.onAc.params.motion['max_shifts'], newoverlaps=None, newstrides=None, upsample_factor_grid=4,
@@ -335,10 +329,10 @@ class CaimanProcessor(Actor):
             self.A = A
             self.coords = get_contours(A, dims)
 
-        elif np.shape(A)[1] > np.shape(self.A)[1] and self.frame_number % 50 == 0: 
+        elif np.shape(A)[1] > np.shape(self.A)[1]: # and self.frame_number % 50 == 0:
             #Only recalc if we have new components
             # FIXME: Since this is only for viz, only do this every 100 frames
-            # TODO: maybe only recalc coords that are new? 
+            # TODO: maybe only recalc coords that are new?
             self.A = A
             self.coords = get_contours(A, dims)
             self.counter += 1
@@ -368,11 +362,3 @@ class CaimanProcessor(Actor):
 
 class NaNFrameException(Exception):
     pass
-
-
-
-
-
-
-
-

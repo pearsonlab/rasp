@@ -18,10 +18,9 @@ from builtins import map
 from builtins import range
 from builtins import str
 from builtins import zip
-from math import sqrt
-from time import time
 
 import cv2
+from math import sqrt
 import numpy as np
 from past.utils import old_div
 from scipy.ndimage import percentile_filter
@@ -30,6 +29,9 @@ from scipy.sparse import coo_matrix, csc_matrix, spdiags
 from scipy.stats import norm
 from sklearn.decomposition import NMF
 from sklearn.preprocessing import normalize
+from time import time
+from typing import List, Tuple
+import tensorflow as tf
 
 import caiman
 #  from caiman.source_extraction.cnmf import params
@@ -42,7 +44,7 @@ from .utilities import update_order, get_file_size, peak_local_max
 from ... import mmapping
 from ...components_evaluation import compute_event_exceptionality
 from ...motion_correction import motion_correct_iteration_fast, tile_and_correct
-from ...utils.utils import save_dict_to_hdf5, load_dict_from_hdf5
+from ...utils.utils import save_dict_to_hdf5, load_dict_from_hdf5, load_graph
 
 try:
     cv2.setNumThreads(0)
@@ -201,6 +203,7 @@ class OnACID(object):
             self.params.get('data', 'dims') + (-1,), order='F'), sig=self.params.get('init', 'gSig'), siz=self.params.get('init', 'gSiz'), nDimBlur=len(self.params.get('data', 'dims')))**2
         self.estimates.rho_buf = np.reshape(
             self.estimates.rho_buf, (np.prod(self.params.get('data', 'dims')), -1)).T
+        self.estimates.rho_buf = np.ascontiguousarray(self.estimates.rho_buf)
         self.estimates.rho_buf = RingBuffer(self.estimates.rho_buf, self.params.get('online', 'minibatch_shape'))
         self.estimates.AtA = (self.estimates.Ab.T.dot(self.estimates.Ab)).toarray()
         self.estimates.AtY_buf = self.estimates.Ab.T.dot(self.estimates.Yr_buf.T)
@@ -208,32 +211,49 @@ class OnACID(object):
             min(self.params.get('online', 'init_batch'), self.params.get('online', 'minibatch_shape')) - 1), 0)
         self.estimates.groups = list(map(list, update_order(self.estimates.Ab)[0]))
         self.update_counter = 2**np.linspace(0, 1, self.N, dtype=np.float32)
-        self.time_neuron_added = []
+        self.time_neuron_added:List = []
         for nneeuu in range(self.N):
             self.time_neuron_added.append((nneeuu, self.params.get('online', 'init_batch')))
         if self.params.get('online', 'dist_shape_update'):
             self.time_spend = 0
-            self.comp_upd = []
+            self.comp_upd:List = []
         # setup per patch classifier
 
         if self.params.get('online', 'path_to_model') is None or self.params.get('online', 'sniper_mode') is False:
             loaded_model = None
             self.params.set('online', {'sniper_mode': False})
+            self.tf_in = None
+            self.tf_out = None
         else:
-            import keras
-            from keras.models import model_from_json
-            path = self.params.get('online', 'path_to_model').split(".")[:-1]
-            json_path = ".".join(path + ["json"])
-            model_path = ".".join(path + ["h5"])
-
-            json_file = open(json_path, 'r')
-            loaded_model_json = json_file.read()
-            json_file.close()
-            loaded_model = model_from_json(loaded_model_json)
-            loaded_model.load_weights(model_path)
-            opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
-            loaded_model.compile(loss=keras.losses.categorical_crossentropy,
-                                 optimizer=opt, metrics=['accuracy'])
+            try:
+                import keras
+                from keras.models import model_from_json
+                #logging.debug('Using Keras')
+                use_keras = True
+            except(ModuleNotFoundError):
+                use_keras = False
+                #logging.debug('Using Tensorflow')
+            if use_keras:
+                path = self.params.get('online', 'path_to_model').split(".")[:-1]
+                json_path = ".".join(path + ["json"])
+                model_path = ".".join(path + ["h5"])
+                json_file = open(json_path, 'r')
+                loaded_model_json = json_file.read()
+                json_file.close()
+                loaded_model = model_from_json(loaded_model_json)
+                loaded_model.load_weights(model_path)
+                opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
+                loaded_model.compile(loss=keras.losses.categorical_crossentropy,
+                                     optimizer=opt, metrics=['accuracy'])
+                self.tf_in = None
+                self.tf_out = None
+            else:
+                path = self.params.get('online', 'path_to_model').split(".")[:-1]
+                model_path = '.'.join(path + ['h5', 'pb'])
+                loaded_model = load_graph(model_path)
+                self.tf_in = loaded_model.get_tensor_by_name('prefix/conv2d_1_input:0')
+                self.tf_out = loaded_model.get_tensor_by_name('prefix/output_node0:0')
+                loaded_model = tf.Session(graph=loaded_model)
 
         self.loaded_model = loaded_model
         return self
@@ -271,7 +291,6 @@ class OnACID(object):
         if (not self.params.get('online', 'simultaneously')) or self.params.get('preprocess', 'p') == 0:
             # get noisy fluor value via NNLS (project data on shapes & demix)
             C_in = self.estimates.noisyC[:self.M, t - 1].copy()
-            #print('shapes: ', frame.shape, self.estimates.Ab.shape, C_in.shape, self.estimates.AtA.shape, self.estimates.C_on.shape, 'for t ', t)
             self.estimates.C_on[:self.M, t], self.estimates.noisyC[:self.M, t] = HALS4activity(
                 frame, self.estimates.Ab, C_in, self.estimates.AtA, iters=num_iters_hals, groups=self.estimates.groups)
             if self.params.get('preprocess', 'p'):
@@ -319,7 +338,7 @@ class OnACID(object):
             rho = np.reshape(rho, np.prod(self.params.get('data', 'dims')))
             self.estimates.rho_buf.append(rho)
 
-            (self.estimates.Ab, Cf_temp, self.estimates.Yres_buf, self.rhos_buf,
+            (self.estimates.Ab, Cf_temp, self.estimates.Yres_buf, self.estimates.rho_buf,
                 self.estimates.CC, self.estimates.CY, self.ind_A, self.estimates.sv,
                 self.estimates.groups, self.estimates.ind_new, self.ind_new_all,
                 self.estimates.sv, self.cnn_pos) = update_num_components(
@@ -344,7 +363,8 @@ class OnACID(object):
                 thresh_CNN_noisy = self.params.get('online', 'thresh_CNN_noisy'),
                 sniper_mode=self.params.get('online', 'sniper_mode'),
                 use_peak_max=self.params.get('online', 'use_peak_max'),
-                mean_buff=self.estimates.mean_buff)
+                mean_buff=self.estimates.mean_buff, tf_in=self.tf_in,
+                tf_out=self.tf_out)
 
             num_added = len(self.ind_A) - self.N
 
@@ -406,7 +426,7 @@ class OnACID(object):
                 # set the update counter to 0 for components that are overlaping the newly added
                 idx_overlap = self.estimates.AtA[nb_:-num_added, -num_added:].nonzero()[0]
                 self.update_counter[idx_overlap] = 0
-        #self.t_detect.append(time() - t_new)
+        self.t_detect.append(time() - t_new)
         if self.params.get('online', 'batch_update_suff_stat'):
         # faster update using minibatch of frames
             min_batch = min(self.params.get('online', 'update_freq'), mbs)
@@ -558,7 +578,7 @@ class OnACID(object):
         fls = self.params.get('data', 'fnames')
         opts = self.params.get_group('online')
         Y = caiman.load(fls[0], subindices=slice(0, opts['init_batch'],
-                 None)).astype(np.float32)
+                 None), var_name_hdf5=self.params.get('data', 'var_name_hdf5')).astype(np.float32)
 
         ds_factor = np.maximum(opts['ds_factor'], 1)
         if ds_factor > 1:
@@ -581,8 +601,8 @@ class OnACID(object):
         print('Size frame:' + str(img_norm.shape))
         if self.params.get('online', 'normalize'):
             Y = Y/img_norm[None, :, :]
-        if opts['show_movie']:
-            self.bnd_Y = np.percentile(Y,(0.001,100-0.001))
+        #if opts['show_movie']:
+        self.bnd_Y = np.percentile(Y,(0.001,100-0.001))
         _, d1, d2 = Y.shape
         Yr = Y.to_2D().T        # convert data into 2D array
         self.img_min = img_min
@@ -627,7 +647,7 @@ class OnACID(object):
 
         elif self.params.get('online', 'init_method') == 'seeded':
             self.estimates.A, self.estimates.b, self.estimates.C, self.estimates.f, self.estimates.YrA = seeded_initialization(
-                    Y.transpose(1, 2, 0), self.estimates.A, gnb=self.params.get('init', 'nb'), k=self.params.get('init', 'k'),
+                    Y.transpose(1, 2, 0), self.estimates.A, gnb=self.params.get('init', 'nb'), k=self.params.get('init', 'K'),
                     gSig=self.params.get('init', 'gSig'), return_object=False)
             self.estimates.S = np.zeros_like(self.estimates.C)
             nr = self.estimates.C.shape[0]
@@ -643,7 +663,7 @@ class OnACID(object):
         dims = Y.shape[1:]
         self.params.set('data', {'dims': dims})
         T1 = np.array(Ts).sum()*self.params.get('online', 'epochs')
-        T1 *= 10
+        T1 = 100000 #*= 10
         print('T1 is ', T1)
         self._prepare_object(Yr, T1)
         if opts['show_movie']:
@@ -702,12 +722,12 @@ class OnACID(object):
         extra_files = len(fls) - 1
         init_files = 1
         t = init_batch
-        self.Ab_epoch = []
+        self.Ab_epoch:List = []
         t_online = []
         self.comp_upd = []
-        self.t_shapes = []
-        self.t_detect = []
-        self.t_motion = []
+        self.t_shapes:List = []
+        self.t_detect:List = []
+        self.t_motion:List = []
         max_shifts_online = self.params.get('online', 'max_shifts_online')
         if extra_files == 0:     # check whether there are any additional files
             process_files = fls[:init_files]     # end processing at this file
@@ -728,7 +748,8 @@ class OnACID(object):
 
             for file_count, ffll in enumerate(process_files):
                 print('Now processing file ' + ffll)
-                Y_ = caiman.load(ffll, subindices=slice(init_batc_iter[file_count], None, None))
+                Y_ = caiman.load(ffll, var_name_hdf5=self.params.get('data', 'var_name_hdf5'), 
+                                 subindices=slice(init_batc_iter[file_count], None, None))
 
                 old_comps = self.N     # number of existing components
                 for frame_count, frame in enumerate(Y_):   # process each file
@@ -798,8 +819,12 @@ class OnACID(object):
                          epochs:t], self.estimates.C_on[:self.params.get('init', 'nb'), t - t // epochs:t]
         noisyC = self.estimates.noisyC[self.params.get('init', 'nb'):self.M, t - t // epochs:t]
         self.estimates.YrA = noisyC - self.estimates.C
-        self.estimates.bl = [osi.b for osi in self.estimates.OASISinstances] if hasattr(
-            self, 'OASISinstances') else [0] * self.estimates.C.shape[0]
+        if self.estimates.OASISinstances is not None:
+            self.estimates.bl = [osi.b for osi in self.estimates.OASISinstances]
+            self.estimates.S = np.stack([osi.s for osi in self.estimates.OASISinstances])
+        else:
+            self.estimates.bl = [0] * self.estimates.C.shape[0]
+            self.estimates.S = np.zeros_like(self.estimates.C)
         if self.params.get('online', 'save_online_movie'):
             out.release()
         if self.params.get('online', 'show_movie'):
@@ -823,7 +848,7 @@ class OnACID(object):
         C, f = est.C_on[gnb:self.M, :], est.C_on[:gnb, :]
         # inferred activity due to components (no background)
         frame_plot = (frame_cor.copy() - self.bnd_Y[0])/np.diff(self.bnd_Y)
-        comps_frame = A.dot(C[:, self.t - 1]).reshape(self.dims, order='F')        
+        comps_frame = A.dot(C[:, self.t - 1]).reshape(self.dims, order='F')
         bgkrnd_frame = b.dot(f[:, self.t - 1]).reshape(self.dims, order='F')  # denoised frame (components + background)
         denoised_frame = comps_frame + bgkrnd_frame
         denoised_frame = (denoised_frame.copy() - self.bnd_Y[0])/np.diff(self.bnd_Y)
@@ -977,7 +1002,7 @@ def seeded_initialization(Y, Ain, dims=None, init_batch=1000, order_init=None, g
         not_px = np.array(not_px).flatten()
     Yr = np.reshape(Y, (Ain.shape[0], Y.shape[-1]), order='F')
     model = NMF(n_components=gnb, init='nndsvdar', max_iter=10)
-    b_temp = model.fit_transform(np.maximum(Yr[not_px], 0), iter=20)
+    b_temp = model.fit_transform(np.maximum(Yr[not_px], 0))
     f_in = model.components_.squeeze()
     f_in = np.atleast_2d(f_in)
     Y_resf = np.dot(Yr, f_in.T)
@@ -1409,7 +1434,8 @@ def get_candidate_components(sv, dims, Yres_buf, min_num_trial=3, gSig=(5, 5),
                              gHalf=(5, 5), sniper_mode=True, rval_thr=0.85,
                              patch_size=50, loaded_model=None, test_both=False,
                              thresh_CNN_noisy=0.5, use_peak_max=False,
-                             thresh_std_peak_resid = 1, mean_buff=None):
+                             thresh_std_peak_resid = 1, mean_buff=None,
+                             tf_in=None, tf_out=None):
     """
     Extract new candidate components from the residual buffer and test them
     using space correlation or the CNN classifier. The function runs the CNN
@@ -1423,8 +1449,8 @@ def get_candidate_components(sv, dims, Yres_buf, min_num_trial=3, gSig=(5, 5),
     idx = []
     all_indices = []
     ijsig_all = []
-    cnn_pos = []
-    local_maxima = []
+    cnn_pos:List = []
+    local_maxima:List = []
     Y_patch = []
     ksize = tuple([int(3 * i / 2) * 2 + 1 for i in gSig])
     compute_corr = test_both
@@ -1473,31 +1499,34 @@ def get_candidate_components(sv, dims, Yres_buf, min_num_trial=3, gSig=(5, 5),
         ind = np.ravel_multi_index(ij, dims, order='C')
         ijSig = [[max(i - g, 0), min(i+g+1, d)] for i, g, d in zip(ij, gHalf, dims)]
         ijsig_all.append(ijSig)
-        indeces = np.ravel_multi_index(np.ix_(*[np.arange(ij[0], ij[1])
+        indices = np.ravel_multi_index(np.ix_(*[np.arange(ij[0], ij[1])
                                                 for ij in ijSig]), dims, order='F').ravel(order='C')
 
-        # indeces_ = np.ravel_multi_index(np.ix_(*[np.arange(ij[0], ij[1])
+        # indices_ = np.ravel_multi_index(np.ix_(*[np.arange(ij[0], ij[1])
         #                 for ij in ijSig]), dims, order='C').ravel(order = 'C')
 
-        ain = np.maximum(mean_buff[indeces], 0)
+        ain = np.maximum(mean_buff[indices], 0)
 
         if sniper_mode:
             half_crop_cnn = tuple([int(np.minimum(gs*2, patch_size/2)) for gs in gSig])
             ij_cnn = [min(max(ij_val,g_val),dim_val-g_val-1) for ij_val, g_val, dim_val in zip(ij,half_crop_cnn,dims)]
             ijSig_cnn = [[max(i - g, 0), min(i+g+1,d)] for i, g, d in zip(ij_cnn, half_crop_cnn, dims)]
-            indeces_cnn = np.ravel_multi_index(np.ix_(*[np.arange(ij[0], ij[1])
+            indices_cnn = np.ravel_multi_index(np.ix_(*[np.arange(ij[0], ij[1])
                             for ij in ijSig_cnn]), dims, order='F').ravel(order = 'C')
-            ain_cnn = mean_buff[indeces_cnn]
+            ain_cnn = mean_buff[indices_cnn]
 
         else:
             compute_corr = True  # determine when to compute corr coef
 
         na = ain.dot(ain)
-        # sv[indeces_] /= 1  # 0
+        # sv[indices_] /= 1  # 0
         if na:
             ain /= sqrt(na)
             Ain.append(ain)
-            Y_patch.append(Yres_buf.T[indeces, :]) if compute_corr else all_indices.append(indeces)
+            if compute_corr:
+                Y_patch.append(Yres_buf.T[indices, :])
+            else:
+                all_indices.append(indices)
             idx.append(ind)
             if sniper_mode:
                 Ain_cnn.append(ain_cnn)
@@ -1509,7 +1538,10 @@ def get_candidate_components(sv, dims, Yres_buf, min_num_trial=3, gSig=(5, 5),
         Ain2 /= np.std(Ain2,axis=1)[:,None]
         Ain2 = np.reshape(Ain2,(-1,) + tuple(np.diff(ijSig_cnn).squeeze()),order= 'F')
         Ain2 = np.stack([cv2.resize(ain,(patch_size ,patch_size)) for ain in Ain2])
-        predictions = loaded_model.predict(Ain2[:,:,:,np.newaxis], batch_size=min_num_trial, verbose=0)
+        if tf_in is None:
+            predictions = loaded_model.predict(Ain2[:,:,:,np.newaxis], batch_size=min_num_trial, verbose=0)
+        else:
+            predictions = loaded_model.run(tf_out, feed_dict={tf_in: Ain2[:, :, :, np.newaxis]})
         keep_cnn = list(np.where(predictions[:, 0] > thresh_CNN_noisy)[0])
         discard = list(np.where(predictions[:, 0] <= thresh_CNN_noisy)[0])
         cnn_pos = Ain2[keep_cnn]
@@ -1526,7 +1558,7 @@ def get_candidate_components(sv, dims, Yres_buf, min_num_trial=3, gSig=(5, 5),
             rval = corr(ain.copy(), np.mean(Ypx, -1))
             if rval > rval_thr:
                 keep_corr.append(i)
-        keep_final = list(set().union(keep_cnn, keep_corr))
+        keep_final:List = list(set().union(keep_cnn, keep_corr))
         if len(keep_final) > 0:
             Ain = np.stack(Ain)[keep_final]
         else:
@@ -1559,7 +1591,8 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
                           Ab_dense=None, max_num_added=1, min_num_trial=1,
                           loaded_model=None, thresh_CNN_noisy=0.99,
                           sniper_mode=False, use_peak_max=False,
-                          test_both=False, mean_buff=None):
+                          test_both=False, mean_buff=None, tf_in=None,
+                          tf_out=None):
     """
     Checks for new components in the residual buffer and incorporates them if they pass the acceptance tests
     """
@@ -1580,7 +1613,8 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
         sv, dims, Yres_buf=Yres_buf, min_num_trial=min_num_trial, gSig=gSig,
         gHalf=gHalf, sniper_mode=sniper_mode, rval_thr=rval_thr, patch_size=50,
         loaded_model=loaded_model, thresh_CNN_noisy=thresh_CNN_noisy,
-        use_peak_max=use_peak_max, test_both=test_both, mean_buff=mean_buff)
+        use_peak_max=use_peak_max, test_both=test_both, mean_buff=mean_buff,
+        tf_in=tf_in, tf_out=tf_out)
 
     ind_new_all = ijsig_all
 
@@ -1593,7 +1627,7 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
         ijSig = [[max(i - temp_g, 0), min(i + temp_g + 1, d)] for i, temp_g, d in zip(ij, gHalf, dims)]
         dims_ain = (np.abs(np.diff(ijSig[1])[0]), np.abs(np.diff(ijSig[0])[0]))
 
-        indeces = np.ravel_multi_index(
+        indices = np.ravel_multi_index(
                 np.ix_(*[np.arange(ij[0], ij[1])
                        for ij in ijSig]), dims, order='F').ravel()
 
@@ -1603,11 +1637,11 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
 
         if Ab_dense is None:
             Ain = np.zeros((np.prod(dims), 1), dtype=np.float32)
-            Ain[indeces, :] = ain[:, None]
+            Ain[indices, :] = ain[:, None]
             ff = np.where((Ab.T.dot(Ain).T > thresh_overlap)
                           [:, gnb:])[1] + gnb
         else:
-            ff = np.where(Ab_dense[indeces, gnb:M].T.dot(
+            ff = np.where(Ab_dense[indices, gnb:M].T.dot(
                 ain).T > thresh_overlap)[0] + gnb
 
         if ff.size > 0:
@@ -1624,7 +1658,7 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
             # e.g. 1 * sigma * sqrt(1-sum(gamma)) corresponds roughly to the root mean square (non-zero) spike size, sqrt(<s^2>)
             #      2 * sigma * sqrt(1-sum(gamma)) corresponds roughly to the 95% percentile of (non-zero) spike sizes
             #      3 * sigma * sqrt(1-sum(gamma)) corresponds roughly to the 99.7% percentile of (non-zero) spike sizes
-            s_min = -s_min * sqrt((ain**2).dot(sn[indeces]**2)) * sqrt(1 - np.sum(g))
+            s_min = -s_min * sqrt((ain**2).dot(sn[indices]**2)) * sqrt(1 - np.sum(g))
 
         cin_res = cin_res.get_ordered()
         if accepted:
@@ -1657,7 +1691,7 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
                 if not useOASIS:
                     # lambda from Selesnick's 3*sigma*|K| rule
                     # use noise estimate from init batch or use std_rr?
-                    #                    sn_ = sqrt((ain**2).dot(sn[indeces]**2)) / sqrt(1 - g**2)
+                    #                    sn_ = sqrt((ain**2).dot(sn[indices]**2)) / sqrt(1 - g**2)
                     sn_ = std_rr
                     oas = OASIS(np.ravel(g)[0], 3 * sn_ /
                                 (sqrt(1 - g**2) if np.size(g) == 1 else
@@ -1671,12 +1705,12 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
 
                 oases.append(oas)
 
-            Ain_csc = csc_matrix((ain, (indeces, [0] * len(indeces))), (np.prod(dims), 1), dtype=np.float32)
+            Ain_csc = csc_matrix((ain, (indices, [0] * len(indices))), (np.prod(dims), 1), dtype=np.float32)
             if Ab_dense is None:
                 groups = update_order(Ab, Ain, groups)[0]
             else:
-                groups = update_order(Ab_dense[indeces, :M], ain, groups)[0]
-                Ab_dense[indeces, M] = ain
+                groups = update_order(Ab_dense[indices, :M], ain, groups)[0]
+                Ab_dense[indices, M] = ain
 
             # faster version of scipy.sparse.hstack
             csc_append(Ab, Ain_csc)
@@ -1688,7 +1722,7 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
             Cf_ = Cf
             cin_circ_ = cin_circ
 
-            CY[M, indeces] = cin_.dot(Y_buf_[:, indeces]) / tt
+            CY[M, indices] = cin_.dot(Y_buf_[:, indices]) / tt
 
             # preallocate memory for speed up?
             CC1 = np.hstack([CC, Cf_.dot(cin_circ_ / tt)[:, None]])
@@ -1700,7 +1734,7 @@ def update_num_components(t, sv, Ab, Cf, Yres_buf, Y_buf, rho_buf,
             N = N + 1
             M = M + 1
 
-            Yres_buf[:, indeces] -= np.outer(cin, ain)
+            Yres_buf[:, indices] -= np.outer(cin, ain)
 
             # restrict blurring to region where component is located
             # update bigger region than neural patch to avoid boundary effects
@@ -1769,7 +1803,7 @@ def remove_components_online(ind_rem, gnb, Ab, use_dense, Ab_dense, AtA, CY,
 
     Args:
         ind_rem list
-            indeces of components to be removed (starting from zero)
+            indices of components to be removed (starting from zero)
         gnb int
             number of global background components
         Ab  csc_matrix
@@ -1817,15 +1851,11 @@ def initialize_movie_online(Y, K, gSig, rf, stride, base_name,
     Initialize movie using CNMF on minibatch. See CNMF parameters
     """
 
-    _, d1, d2 = Y.shape
-    dims = (d1, d2)
     Yr = Y.to_2D().T
     # merging threshold, max correlation allowed
     # order of the autoregressive system
-    #T = Y.shape[0]
     base_name = base_name + '.mmap'
     fname_new = Y.save(base_name, order='C')
-    #%
     Yr, dims, T = caiman.load_memmap(fname_new)
     d1, d2 = dims
     images = np.reshape(Yr.T, [T] + list(dims), order='F')
