@@ -77,7 +77,7 @@ class Nexus():
         for name,m in self.actors.items(): #m accesses the specific actor class instance
             if 'GUI' not in name: #GUI already started
                 p = Process(target=self.runActor, name=name, args=(m,))
-                p.daemon = True
+                p.daemon = False if name == 'Processor' else True
                 self.processes.append(p)
 
         self.start()
@@ -549,5 +549,5 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='docker_demo.yaml')
+    nexus.createNexus(file='suite_demo.yaml')
     nexus.startNexus() #start polling, create processes    

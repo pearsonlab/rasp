@@ -25,7 +25,6 @@ dependencies:
 - tifffile
 - tqdm
 # rasp
-- pyarrow=0.12.1
 - pyqtgraph
 # Suite2p
 - pip
@@ -33,10 +32,11 @@ dependencies:
 - mkl
 - numpy>=1.16
 - numba>=0.43.1
+- pyarrow=0.13
+- seaborn
 - pip:
-  - PyQt5
-  - git+https://github.com/pyqtgraph/pyqtgraph
   - natsort
   - scanimage-tiff-reader
   - rastermap==0.1.0
-  - suite2p
+  - lmdb
+  - suite2p==0.6.16
