@@ -33,7 +33,8 @@ class BatchProcessor(Actor):
         super().__init__(*args)
 
         self.buffer_size = buffer_size
-        self.path = path
+        self.path = Path(path)
+        self.path.mkdir(exist_ok=True)
 
         self.frame_buffer: np.ndarray = None
         self.frame_number = 0
@@ -116,7 +117,7 @@ class BatchProcessor(Actor):
         )
 
         # Need to create a new folder for each file to prevent suite2p from overwriting old files.
-        path = Path(f'{self.path}/{self.tiff_name[-1]}')
+        path = self.path / self.tiff_name[-1]
         path.mkdir(exist_ok=True)
 
         tifffile.imsave(path / f'{self.tiff_name[-1]}.tif', self.frame_buffer)
