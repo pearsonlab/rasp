@@ -85,7 +85,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
                 import traceback
                 print('---------------------Exception in update video: ' , traceback.format_exc())
             else:
-                if self.visual.frame_num > 10 and self.visual.frame_num % 10 == 0 and self.demo:
+                if self.visual.frame_num > 10 and self.visual.frame_num % 10 == 9 and self.demo:
                     self.savePlots(raw, color, weight)
 
         if self.demo and self.visual.frame_num == 1001:  # Terminate
@@ -213,6 +213,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         if self.visual.showConnectivity and weight is not None:
+            weight[np.abs(weight) > 10] = 0  # TODO Deal with numerical blow-up.
             self.rawplot_3.setImage(weight)
             colordata = (np.array(cmapToColormap(cm.inferno).color) * 255).astype(np.uint8)
             cmap = ColorMap(pos=np.linspace(0, 1.0, len(colordata)), color=colordata)
