@@ -492,3 +492,40 @@ class ReplayAcquirer(FileAcquirer):
         if num >= len(self.data):
             num = num % len(self.data)
         return self.data[num,:,:]
+
+
+class TiffAcquirer(Actor):
+    """
+    Loops through a TIF file.
+
+    """
+    def __init__(self, *args, filename=None, framerate=30, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.path = Path(filename)
+        if not self.path.exists():
+            raise ValueError(f'TIFF file {self.path} does not exist.')
+        self.imgs = np.array(0)
+
+        self.n_frame = 0
+        self.fps = framerate
+
+        self.t_per_frame = list()
+
+    def setup(self):
+        self.imgs = imread(self.path.as_posix())
+
+    def run(self):
+        with RunManager(self.name, self.run_acquirer, self.setup, self.q_sig, self.q_comm) as rm:
+            print(rm)
+
+    def run_acquirer(self):
+        t0 = time.time()
+
+        id_store = self.client.put(self.imgs[self.n_frame % len(self.imgs), ...], 'acq_raw' + str(self.n_frame))
+        self.q_out.put([{str(self.n_frame): id_store}])
+        self.n_frame += 1
+
+        time.sleep(1 / self.fps)
+
+        self.t_per_frame.append(time.time() - t0)
