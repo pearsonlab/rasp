@@ -84,11 +84,27 @@ class CaimanProcessor(Actor):
         np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
         np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
 
+        # before = self.params['init_batch']
+        # nb = self.onAc.params.get('init', 'nb')
+        # np.savetxt('raw_C.txt', np.array(self.onAc.estimates.C_on[nb:self.onAc.M, before:self.frame_number+before]))
+
         print('Number of times coords updated ', self.counter)
+
+        # with open('../S.pk', 'wb') as f:
+        #     init = self.params['init_batch']
+        #     S = np.stack([osi.s[init:] for osi in self.onAc.estimates.OASISinstances])
+        #     print('--------Final S shape: ', S.shape)
+        #     pickle.dump(S, f)
+        # with open('../A.pk', 'wb') as f:
+        #     nb = self.onAc.params.get('init', 'nb')
+        #     A = self.onAc.estimates.Ab[:, nb:]
+        #     print(type(A))
+        #     pickle.dump(A, f)
 
         if self.onAc.estimates.OASISinstances is not None:
             try:
-                S = np.stack([osi.s for osi in self.onAc.estimates.OASISinstances])
+                init = self.params['init_batch']
+                S = np.stack([osi.s[init:] for osi in self.onAc.estimates.OASISinstances])
                 np.savetxt('end_spikes.txt', S)
             except Exception as e:
                 logger.error('Exception {}: {} during frame number {}'.format(type(e).__name__, e, self.frame_number))
@@ -161,21 +177,21 @@ class CaimanProcessor(Actor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': ['/root/caiman_data/example_movies/Mesoscope/Tolias_mesoscope_2.hdf5'],
-                   'fr': 3.5,
-                   'decay_time': 0.5,
+            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'], #tbif_ex.h5'],
+                   'fr': 2,
+                   'decay_time': 0.8,
                    'gSig': (3,3),
                    'p': 1,
-                   'min_SNR': 0.8,
-                   'rval_thr': 0.9,
+                   'min_SNR': 1.5,
+                   'rval_thr': 1,
                    'ds_factor': 1,
                    'nb': 2,
                    'motion_correct': True,
                    'init_batch': 100,
                    'init_method': 'bare',
                    'normalize': True,
-                   'sniper_mode': False,
-                   'K': 20,
+                   'sniper_mode': True,
+                   'K': 10,
                    'epochs': 1,
                    'max_shifts_online': np.ceil(10).astype('int'),
                    'pw_rigid': False,
@@ -200,8 +216,8 @@ class CaimanProcessor(Actor):
         t = time.time()
         nb = self.onAc.params.get('init', 'nb')
         A = self.onAc.estimates.Ab[:, nb:]
-        before = 0#self.frame_number-500 if self.frame_number > 500 else 0
-        C = self.onAc.estimates.C_on[nb:self.onAc.M, before:self.frame_number] #.get_ordered()
+        before = self.params['init_batch'] #self.frame_number-500 if self.frame_number > 500 else 0
+        C = self.onAc.estimates.C_on[nb:self.onAc.M, before:self.frame_number+before] #.get_ordered()
         t2 = time.time()
         if self.onAc.estimates.OASISinstances is not None:
             try:
@@ -222,7 +238,7 @@ class CaimanProcessor(Actor):
                 #         # max_len = max([len(osi.s[before:self.frame_number]) for osi in self.onAc.estimates.OASISinstances])
                 #         # S = np.array([np.lib.pad(osi.s[before:self.frame_number], (0, max_len-len(osi.s[before:self.frame_number])), 'constant', constant_values=0) for osi in self.onAc.estimates.OASISinstances])
                 # else:
-                S = np.stack([osi.s[before:self.frame_number] for osi in self.onAc.estimates.OASISinstances])
+                S = np.stack([osi.s[before:self.frame_number+before] for osi in self.onAc.estimates.OASISinstances])
             except IndexError:
                 print('Index error!')
                 # print('shape good frames ', good_frames.shape)
@@ -246,7 +262,7 @@ class CaimanProcessor(Actor):
         ids = []
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
-        ids.append(self.client.put(S, 'S'+str(self.frame_number)))
+        ids.append(self.client.put(C, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
         self.q_out.put(ids)
@@ -294,11 +310,11 @@ class CaimanProcessor(Actor):
                 raise Exception
 
             if self.onAc.params.get('motion', 'pw_rigid'):
-                frame_cor, shift, _, xy_grid = tile_and_correct(frame, templ, self.onAc.params.motion['strides'], self.onAc.params.motion['overlaps'],
+                frame_cor, shift = tile_and_correct(frame, templ, self.onAc.params.motion['strides'], self.onAc.params.motion['overlaps'],
                                                                             self.onAc.params.motion['max_shifts'], newoverlaps=None, newstrides=None, upsample_factor_grid=4,
                                                                             upsample_factor_fft=10, show_movie=False, max_deviation_rigid=self.onAc.params.motion['max_deviation_rigid'],
                                                                             add_to_movie=0, shifts_opencv=True, gSig_filt=None,
-                                                                            use_cuda=False, border_nan='copy')
+                                                                            use_cuda=False, border_nan='copy')[:2]
             else:
                 frame_cor, shift = motion_correct_iteration_fast(frame, templ, self.max_shifts_online, self.max_shifts_online)
             self.onAc.estimates.shifts.append(shift)

@@ -8,7 +8,7 @@ actors:
     package: acquire.acquire
     class: TbifAcquirer
     filename: data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif
-    framerate: 3.6
+    framerate: 2
 
   Processor:
     package: process.process

@@ -77,7 +77,7 @@ class Nexus():
         for name,m in self.actors.items(): #m accesses the specific actor class instance
             if 'GUI' not in name: #GUI already started
                 p = Process(target=self.runActor, name=name, args=(m,))
-                p.daemon = False if name == 'Processor' else True
+                p.daemon = False if name == 'Processor' else True  # suite2p creates child processes.
                 self.processes.append(p)
 
         self.start()
@@ -258,12 +258,12 @@ class Nexus():
             except Full as f:
                 logger.warning('Signal queue '+q.name+' full, cannot tell it to quit: {}'.format(f))
 
+        self.processes.append(self.p_GUI)
+        #self.processes.append(self.p_watch)
         for p in self.processes:
             # if p.is_alive():
             #     p.terminate()
             p.join()
-
-        self.p_GUI.terminate()
 
         logger.warning('Done with available frames')
         print('total time ', time.time()-self.t)
@@ -307,10 +307,6 @@ class Nexus():
         '''
         name = name.split('_')[0]
         logger.info('Received signal from GUI: '+flag[0])
-
-        logger.info('Running setup')
-        self.setup()  # Auto-setup
-
         if flag[0]:
             if flag[0] == Spike.run():
                 logger.info('Begin run!')
@@ -344,12 +340,9 @@ class Nexus():
                     self.allowStart = True      #TODO: replace with q_sig to FE/Visual
                     logger.info('Allowing start')
 
-                    self.run()  # Auto-start w/ GUI
-
-            elif sig[0] == Spike.quit():
-                logger.warning('Quitting the program!')
-                self.flags['quit'] = True
-                self.quit()
+                    #TODO: Maybe have flag for auto-start, else require explict command
+                    # if not self.tweak.hasGUI:
+                    #     self.run()
 
     def destroyNexus(self):
         ''' Method that calls the internal method
@@ -549,5 +542,5 @@ if __name__ == '__main__':
     # set_start_method('fork')
 
     nexus = Nexus('Nexus')
-    nexus.createNexus(file='suite_demo.yaml')
+    nexus.createNexus(file='basic_demo.yaml')
     nexus.startNexus() #start polling, create processes    
