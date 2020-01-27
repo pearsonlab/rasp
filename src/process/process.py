@@ -177,7 +177,7 @@ class CaimanProcessor(Actor):
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
             cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'], #tbif_ex.h5'],
+            params_dict = {'fnames': ['/root/caiman_data/example_movies/Mesoscope/Tolias_mesoscope_2.hdf5'],
                    'fr': 2,
                    'decay_time': 0.8,
                    'gSig': (3,3),
@@ -262,7 +262,7 @@ class CaimanProcessor(Actor):
         ids = []
         ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
         ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
-        ids.append(self.client.put(C, 'S'+str(self.frame_number)))
+        ids.append(self.client.put(S, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
         self.q_out.put(ids)
