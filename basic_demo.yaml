@@ -1,7 +1,7 @@
 actors:
   GUI:
     package: visual.visual
-    class: DisplayVisual
+    class: BasicVisual
     visual: Visual
 
   Acquirer:
@@ -16,7 +16,7 @@ actors:
 
   Visual:
     package: visual.visual
-    class: CaimanVisual
+    class: BasicCaimanVisual
   
   Analysis:
     package: analysis.analysis

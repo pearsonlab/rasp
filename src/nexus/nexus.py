@@ -77,7 +77,7 @@ class Nexus():
         for name,m in self.actors.items(): #m accesses the specific actor class instance
             if 'GUI' not in name: #GUI already started
                 p = Process(target=self.runActor, name=name, args=(m,))
-                p.daemon = False if name == 'Processor' else True
+                p.daemon = True
                 self.processes.append(p)
 
         self.start()
@@ -258,6 +258,8 @@ class Nexus():
             except Full as f:
                 logger.warning('Signal queue '+q.name+' full, cannot tell it to quit: {}'.format(f))
 
+        self.processes.append(self.p_GUI)
+        #self.processes.append(self.p_watch)
         for p in self.processes:
             # if p.is_alive():
             #     p.terminate()
