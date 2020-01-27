@@ -92,8 +92,6 @@ class FileAcquirer(Actor):
             self.data = None
             self.q_comm.put(None)
             self.done = True
-            time.sleep(5)
-            self.q_comm.put([Spike.quit()])
             #self.f.close()
     
     def getFrame(self, num):
@@ -225,7 +223,7 @@ class BehaviorAcquirer(Actor):
         self.q_out.put({self.n:[self.curr_stim, self.onoff]})
         #logger.info('Changed stimulus! {}'.format(self.curr_stim))
         #self.q_comm.put()
-        time.sleep(0.333)
+        time.sleep(0.068)
         self.n += 1
 
 class FolderAcquirer(Actor):
