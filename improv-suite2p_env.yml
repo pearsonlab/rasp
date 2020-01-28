@@ -24,7 +24,7 @@ dependencies:
 - spyder
 - tifffile
 - tqdm
-# rasp
+# improv
 - pyqtgraph
 # Suite2p
 - pip
