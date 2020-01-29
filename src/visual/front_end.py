@@ -457,7 +457,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
         self.pushButton_2.clicked.connect(_call(self._setup))
         self.pushButton.clicked.connect(_call(self._loadParams)) #File Dialog, then tell Nexus to load tweak
         self.checkBox.stateChanged.connect(self.update) #Show live front-end updates
-        
+
 
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
         self.slider.valueChanged.connect(_call(self.sliderMoved)) #Threshold for magnitude selection
@@ -481,11 +481,11 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
         if self.checkBox.isChecked():
             self.draw = True
         else:
-            self.draw = False    
+            self.draw = False
         self.visual.draw = self.draw
-            
+
         QtCore.QTimer.singleShot(10, self.update)
-        
+
         self.total_times.append([self.visual.frame_num, time.time()-t])
 
     def extraSetup(self):
@@ -536,7 +536,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
                 polar.addItem(circle)
             polar.hideAxis('bottom')
             polar.hideAxis('left')
-        
+
         self.polar1 = polars[0].plot()
         self.polar2 = polars[1].plot()
         self.polar1.setData(x, y)
@@ -568,7 +568,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
         except FileNotFoundError as e:
             logger.error('File not found {}'.format(e))
             #raise FileNotFoundError
-    
+
     def _runProcess(self):
         '''Run ImageProcessor in separate thread
         '''
@@ -583,7 +583,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
 
     def _loadTweak(self, file):
         self.comm.put(['load', file])
-    
+
     def updateVideo(self):
         ''' TODO: Bug on clicking ROI --> trace and report to pyqtgraph
         '''
@@ -629,7 +629,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
         if(C is not None and Cx is not None):
             self.c1.setData(Cx, Cpop, pen=penW)
             self.c2.setData(Cx, C, pen=penR)
-            
+
             if(self.flag):
                 self.selected = self.visual.getFirstSelect()
                 if self.selected is not None:
@@ -640,7 +640,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
             self.num = tune[0].shape[0]
             theta = np.linspace(0, (315/360)*2*np.pi, self.num)
             theta = np.append(theta,0)
-            self.theta = theta  
+            self.theta = theta
             if(tune[0] is not None):
                 self.radius = np.zeros(self.num+1)
                 self.radius[:len(tune[0])] = tune[0]#/np.max(tune[0])
@@ -660,7 +660,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
                 self.polar1.setData(self.x2, self.y2, pen=penW)
         # else:
         #     logger.error('Visual received None tune')
-        
+
     def mouseClick(self, event):
         '''Clicked on raw image to select neurons
         '''
@@ -728,7 +728,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
             # print('GUI avg time ', np.mean(self.total_times))
             event.accept()
         else: event.ignore()
-            
+
 
 def _call(fnc, *args, **kwargs):
     ''' Call handler for (external) events
@@ -784,7 +784,7 @@ class QRangeSlider(QtWidgets.QWidget):
             slider.rangeChanged.connect(self._update_layout)
 
             self._layout.addWidget(slider)
- 
+
         # initialize to reasonable defaults
         self._min_slider.setValue(1 * self._min_slider.maximum())
         self._max_slider.setValue(1 * self._max_slider.maximum())

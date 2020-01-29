@@ -8,31 +8,6 @@ import logging; logger = logging.getLogger(__name__)
 
 #TODO: Write a save function for Tweak objects output as YAML configFile but using TweakModule objects
 
-class RepeatedActorError(Exception):
-    def __init__(self, repeat):
-
-        super().__init__()
-
-        self.name = 'RepeatedActorError'
-        self.repeat = repeat
-
-        self.message = 'Actor name has already been used: "{}"'.format(repeat)
-
-    def __str__(self):
-        return self.message
-
-class RepeatedConnectionsError(Exception):
-    def __init__(self, repeat):
-
-        super().__init__()
-        self.name= 'RepeatedConnectionsError'
-        self.repeat=repeat
-
-        self.message= 'Connection name has already been used: "{}"'.format(repeat)
-
-    def __str__(self):
-        return self.message
-
 class Tweak():
     ''' Handles configuration and logs of configs for
         the entire server/processing pipeline.
@@ -118,6 +93,34 @@ class TweakModule():
         self.packagename = packagename
         self.classname = classname
         self.options = options
+
+
+class RepeatedActorError(Exception):
+    def __init__(self, repeat):
+
+        super().__init__()
+
+        self.name = 'RepeatedActorError'
+        self.repeat = repeat
+
+        self.message = 'Actor name has already been used: "{}"'.format(repeat)
+
+    def __str__(self):
+        return self.message
+
+
+class RepeatedConnectionsError(Exception):
+    def __init__(self, repeat):
+
+        super().__init__()
+        self.name= 'RepeatedConnectionsError'
+        self.repeat=repeat
+
+        self.message= 'Connection name has already been used: "{}"'.format(repeat)
+
+    def __str__(self):
+        return self.message
+
 
 if __name__ == '__main__':
     tweak = Tweak(configFile='test/basic_demo')

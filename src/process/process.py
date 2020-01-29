@@ -308,7 +308,7 @@ class CaimanProcessor(Actor):
             except Exception as e:
                 logger.error('Unknown exception {0}'.format(e))
                 raise Exception
-            
+
             if self.onAc.params.get('motion', 'pw_rigid'):
                 frame_cor, shift = tile_and_correct(frame, templ, self.onAc.params.motion['strides'], self.onAc.params.motion['overlaps'],
                                                                             self.onAc.params.motion['max_shifts'], newoverlaps=None, newstrides=None, upsample_factor_grid=4,

@@ -495,16 +495,15 @@ class ReplayAcquirer(FileAcquirer):
 
 
 class TiffAcquirer(Actor):
-    """
-    Loops through a TIF file.
+    ''' Loops through a TIF file.
+    '''
 
-    """
     def __init__(self, *args, filename=None, framerate=30, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.path = Path(filename)
         if not self.path.exists():
-            raise ValueError(f'TIFF file {self.path} does not exist.')
+            raise ValueError('TIFF file {} does not exist.'.format(self.path))
         self.imgs = np.array(0)
 
         self.n_frame = 0
