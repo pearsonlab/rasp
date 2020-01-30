@@ -133,8 +133,6 @@ class TbifAcquirer(FileAcquirer):
                         tmp = np.reshape(np.asarray(img, dtype='uint16'), (header[2], header[3]), order='F')
                         self.data.append(tmp.transpose())
                     self.data = np.array(self.data)
-                    # self.stim = np.array(self.stim)
-                    # np.savetxt('stim_data.txt', self.stim)
                     print('data is ', len(self.data))
             else: 
                 logger.error('Cannot load file, bad extension')
@@ -179,7 +177,49 @@ class TbifAcquirer(FileAcquirer):
         '''
         if num >= len(self.data):
             num = num % len(self.data)
-        return self.data[num,30:470,:]
+        return self.data[num,:,:] #30:470,:]
+
+class StimAcquirer(Actor):
+
+    def __init__(self, *args, param_file=None, filename=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.param_file = param_file
+        self.filename= filename
+
+
+    def setup(self):
+        self.n= 0
+        if os.path.exists(self.filename):
+            print('Looking for ', self.filename)
+            n, ext = os.path.splitext(self.filename)[:2]
+            if ext== ".txt":
+                self.stim=[]
+                f= np.loadtxt(self.filename)
+                for i, frame in enumerate(f):
+                    stiminfo= frame[0:2]
+                    self.stim.append(stiminfo)
+
+            else: 
+                logger.error('Cannot load file, bad extension')
+                raise Exception
+
+        else: raise FileNotFoundError
+        
+    def run(self):
+        ''' Run continuously, waiting for input
+        '''
+        with RunManager(self.name, self.getInput, self.setup, self.q_sig, self.q_comm) as rm:
+            logger.info(rm)
+
+    def getInput(self):
+        ''' Check for input from behavioral control
+        '''
+        if (self.n<len(self.stim)):
+            self.q_out.put({self.n:self.stim[self.n]})
+        time.sleep(0.068)
+        self.n+=1
+
+
 
 class BehaviorAcquirer(Actor):
     ''' Actor that acquires information of behavioral stimulus
@@ -227,6 +267,7 @@ class BehaviorAcquirer(Actor):
         #self.q_comm.put()
         time.sleep(0.068)
         self.n += 1
+
 
 class FolderAcquirer(Actor):
     ''' TODO: Current behavior is looping over all files in a folder.
@@ -494,3 +535,39 @@ class ReplayAcquirer(FileAcquirer):
         if num >= len(self.data):
             num = num % len(self.data)
         return self.data[num,:,:]
+
+
+class TiffAcquirer(Actor):
+    ''' Loops through a TIF file.
+    '''
+
+    def __init__(self, *args, filename=None, framerate=30, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.path = Path(filename)
+        if not self.path.exists():
+            raise ValueError('TIFF file {} does not exist.'.format(self.path))
+        self.imgs = np.array(0)
+
+        self.n_frame = 0
+        self.fps = framerate
+
+        self.t_per_frame = list()
+
+    def setup(self):
+        self.imgs = imread(self.path.as_posix())
+
+    def run(self):
+        with RunManager(self.name, self.run_acquirer, self.setup, self.q_sig, self.q_comm) as rm:
+            print(rm)
+
+    def run_acquirer(self):
+        t0 = time.time()
+
+        id_store = self.client.put(self.imgs[self.n_frame % len(self.imgs), ...], 'acq_raw' + str(self.n_frame))
+        self.q_out.put([{str(self.n_frame): id_store}])
+        self.n_frame += 1
+
+        time.sleep(1 / self.fps)
+
+        self.t_per_frame.append(time.time() - t0)

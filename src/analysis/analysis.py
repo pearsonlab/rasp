@@ -803,14 +803,11 @@ class ModelAnalysis(Actor):
     def __init__(self, *args):
         super().__init__(*args)
         w = np.zeros((2,2)) #guess 2 neurons initially?
-        h = np.zeros((2,2)) #dh is 2
+        h = np.zeros((2,10)) #dh is 10
         k = np.zeros((2,8))
         b = np.zeros(2)
         self.theta = np.concatenate((w,h,b,k), axis=None).flatten()
-        self.p = {'numNeurons': 2, 'hist_dim': 2, 'numSamples': 1, 'dt': 0.1, 'stim_dim': 8} #TODO: from config file..
-
-        data = np.zeros((2,10))
-        print('Testing init zero model ', self.ll(data, np.zeros((8,10))))
+        self.p = {'numNeurons': 2, 'hist_dim': 10, 'numSamples': 1, 'dt': 0.1, 'stim_dim': 8} #TODO: from config file..
 
     def setup(self, param_file=None):
         '''
@@ -864,6 +861,7 @@ class ModelAnalysis(Actor):
         np.savetxt('timing/analysis_timestamp.txt', np.array(self.timestamp))
         np.savetxt('analysis_estsAvg.txt', np.array(self.estsAvg))
         np.savetxt('analysis_proc_S.txt', np.array(self.S))
+        np.savetxt('analysis_LL.txt', np.array(self.LL))
 
     def runStep(self):
         ''' Take numpy estimates and frame_number
@@ -898,6 +896,13 @@ class ModelAnalysis(Actor):
             
             self.globalAvg = np.mean(self.estsAvg[:,:8], axis=0)
             self.tune = [self.estsAvg[:,:8], self.globalAvg]
+        
+            # N  = self.p['numNeurons']
+            # dh = self.p['hist_dim']
+            # ds = self.p['stim_dim']
+            # k = np.square(self.theta[N*(N+dh+1):].reshape((N, ds))*1e6)
+            # self.globalAvg = np.mean(k, axis=0)
+            # self.tune_k = [k, self.globalAvg]
 
             # Compute coloring of neurons for processed frame
             # Also rotate and stack as needed for plotting
@@ -945,7 +950,7 @@ class ModelAnalysis(Actor):
         y_step = np.where(np.isnan(y_step), 0, y_step) #Why are there nans here anyway?? #TODO
 
         t0 = time.time()
-        self.theta -= 1e-5*self.ll_grad(y_step, stim_step)#*(self.frame/100)
+        self.theta -= 1e-5*self.ll_grad(y_step, stim_step)
         self.LL.append(self.ll(y_step, stim_step))
         # print(time.time()-t0, self.p['numNeurons'], self.LL[-1])
 
@@ -1018,7 +1023,8 @@ class ModelAnalysis(Actor):
         # gradient for coupling terms
         yr = np.roll(data['y'], 1)
         #yr[0,:] = 0
-        grad['w'] = rateDiff.dot(yr.T)/M #+ d_abs(theta['w'])
+        grad['w'] = rateDiff.dot(yr.T)/M #+ 2*np.abs(self.theta[:N*N].reshape((N,N)))/(N*N)
+        #self.d_abs(self.theta[:N*N].reshape((N,N)))
         
         # gradient for history terms
         grad['h'] = np.zeros((N,dh))
@@ -1047,6 +1053,11 @@ class ModelAnalysis(Actor):
         arr = np.where(np.isnan(arr), 0, arr)
         arr[arr == np.inf] = 0
         return arr
+
+    def d_abs(self, weights):
+        pos = (weights>=0)*1
+        neg = (weights<0)*-1
+        return pos+neg
 
     def runModel(self, data):
         '''
@@ -1105,7 +1116,7 @@ class ModelAnalysis(Actor):
             else:
                 weights = 0
 
-            stim = k[i,:].dot(s)
+            stim = k[i,:].dot(s) #np.square(k[i,:]).dot(s)
             
             expo[i] = (b[i] + hist + weights + stim) #+ eps #remove log 0 errors
         
@@ -1197,6 +1208,7 @@ class ModelAnalysis(Actor):
         stim = [self.lastOnOff, self.currStim]
         N  = self.p['numNeurons']
         w = self.theta[:N*N].reshape((N,N))
+
         ids.append(self.client.put(self.Cx, 'Cx'+str(self.frame)))
         ids.append(self.client.put(self.Call, 'Call'+str(self.frame)))
         ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
@@ -1221,10 +1233,10 @@ class ModelAnalysis(Actor):
             l = np.array(l)
             # print('stim ', s, ' is l ', l)
             if l.size>0:
-                onInd = np.array([np.arange(o+5,o+15) for o in np.nditer(l)]).flatten()
+                onInd = np.array([np.arange(o+4,o+18) for o in np.nditer(l)]).flatten()
                 onInd = onInd[onInd<ests_num]
                 # print('on ', onInd)
-                offInd = np.array([np.arange(o-10,o-1) for o in np.nditer(l)]).flatten() #TODO replace
+                offInd = np.array([np.arange(o-10,o+25) for o in np.nditer(l)]).flatten() #TODO replace
                 offInd = offInd[offInd>=0]
                 offInd = offInd[offInd<ests_num]
                 # print('off ', offInd)
@@ -1238,7 +1250,7 @@ class ModelAnalysis(Actor):
                     else:
                         offEst = np.zeros(ests.shape[0])
                     try:
-                        estsAvg[int(s)] = onEst #(onEst / offEst) - 1
+                        estsAvg[int(s)] = onEst - offEst #(onEst / offEst) - 1
                     except FloatingPointError:
                         print('Could not compute on/off: ', onEst, offEst)
                         estsAvg[int(s)] = onEst
@@ -1251,6 +1263,7 @@ class ModelAnalysis(Actor):
             #     estsAvg[int(s)] = np.zeros(ests.shape[0])
 
         estsAvg = np.array(estsAvg)
+        #TODO: efficient update, no copy
         polarAvg[2] = estsAvg[9,:] #np.sum(estsAvg[[9,11,15],:], axis=0)
         polarAvg[1] = estsAvg[10, :]
         polarAvg[0] = estsAvg[3, :] #np.sum(estsAvg[[3,5,8],:], axis=0)
@@ -1284,6 +1297,7 @@ class ModelAnalysis(Actor):
             for i,c in enumerate(self.coords):
                 #c = np.array(c)
                 ind = c[~np.isnan(c).any(axis=1)].astype(int)
+                #TODO: Compute all colors simultaneously! then index in...
                 cv2.fillConvexPoly(color, ind, self._tuningColor(i, color[ind[:,1], ind[:,0]]))
 
         # TODO: keep list of neural colors. Compute tuning colors and IF NEW, fill ConvexPoly. 
@@ -1294,7 +1308,9 @@ class ModelAnalysis(Actor):
     def _tuningColor(self, ind, inten):
         ''' ind identifies the neuron by number
         '''
-        if self.estsAvg[ind] is not None: # and np.sum(np.abs(self.estsAvg[ind]))>2:
+        ests = self.estsAvg
+        #ests = self.tune_k[0] 
+        if ests[ind] is not None: # and np.sum(np.abs(self.estsAvg[ind]))>2:
             try:
                 # trying sort and compare
                 # rel = self.estsAvg[ind]/np.max(self.estsAvg[ind])
@@ -1307,64 +1323,91 @@ class ModelAnalysis(Actor):
                 #     return (255, 255, 255, 50)
 
                 # trying summation coloring
-                return self.manual_Color_Sum(self.estsAvg[ind])
+                return self.manual_Color_Sum(ests[ind])
 
                 # scale by intensity
                 # tc = np.nanargmax(self.estsAvg[ind])
-                # r, g, b = self.manual_Color(tc)
+                # r, g, b,  = self.manual_Color_Sum(self.estsAvg[ind]) #self.manual_Color(tc)
                 # # h = (np.nanargmax(self.estsAvg[ind])*45)/360
-                # # intensity = 1 - np.mean(inten[0][0])/255.0
+                # intensity = 1 #- np.mean(inten[0][0])/255.0
                 # # r, g, b, = colorsys.hls_to_rgb(h, intensity, 1)
                 # # r, g, b = [x*255.0 for x in (r, g, b)]
-                # return (r, g, b) + (255,) #(intensity*255,)
+                # return (r, g, b) + (intensity*255,)
                 
             except ValueError:
                 return (255,255,255,0)
             except Exception:
                 print('inten is ', inten)
-                print('estsAvg[i] is ', self.estsAvg[ind])
+                print('ests[i] is ', ests[ind])
         else:
             return (255,255,255,50) #0)
+
+    def manual_Color_Sum_k(self, x):
+        ''' x should be length 8 array for coloring
+        '''
+
+        mat_weight = np.array([
+            [1, 0.25, 0],
+            [0.75, 1, 0],
+            [0, 1, 0],
+            [0, 0.75, 1],
+            [0, 0.25, 1],
+            [0.25, 0, 1.],
+            [1, 0, 1],
+            [1, 0, 0.25],
+        ])
+
+        color = x @ mat_weight
+
+        blend = 0.8  #0.3
+        thresh = 0.2   #0.1
+        thresh_max = blend * np.max(color)
+
+        color = np.clip(color, thresh, thresh_max)
+        color -= thresh
+        color /= thresh_max
+        color = np.nan_to_num(color)
+
+        if color.any() and np.linalg.norm(color-np.ones(3))>0.35:
+            # print('color is ', color, 'with distance', np.linalg.norm(color-np.ones(3)))
+            color *=255
+            return (color[0], color[1], color[2], 255)       
+        else:
+            return (255, 255, 255, 10)
 
     def manual_Color_Sum(self, x):
         ''' x should be length 12 array for coloring
         '''
 
-        r = x[0]*1 + x[1]*0.75 + x[2]*0 + x[3]*0 + x[4]*0 + x[5]*0.25 + \
-            x[6]*1 + x[7]*1 + x[8]*1 + x[9]*0 + x[10]*0 + x[11]*1 
+        mat_weight = np.array([
+            [1, 0.25, 0],
+            [0.75, 1, 0],
+            [0, 2, 0],
+            [0, 0.75, 1],
+            [0, 0.25, 1],
+            [0.25, 0, 1.],
+            [1, 0, 1],
+            [1, 0, 0.25],
+            [1, 0, 0],
+            [0, 0, 1],
+            [0, 0, 1],
+            [1, 0, 0]
+        ])
 
-        g = x[0]*0.25 + x[1]*1 + x[2]*1 + x[3]*0.75 + x[4]*0.25 + x[5]*0 + \
-            x[6]*0 + x[7]*0 + x[8]*0 + x[9]*0 + x[10]*0 + x[11]*0 
+        color = x @ mat_weight
 
-        b = x[0]*0 + x[1]*0 + x[2]*0 + x[3]*1 + x[4]*1 + x[5]*1 + \
-            x[6]*1 + x[7]*0.25 + x[8]*0 + x[9]*1 + x[10]*1 + x[11]*0 
+        blend = 0.8  #0.3
+        thresh = 0.2   #0.1
+        thresh_max = blend * np.max(color)
 
-        blend = 0.3
-        thresh = 0.1
+        color = np.clip(color, thresh, thresh_max)
+        color -= thresh
+        color /= thresh_max
+        color = np.nan_to_num(color)
 
-        maxVal = np.max(np.array([r, g, b]))
-
-        if maxVal > 0:
-            r /= maxVal
-            g /= maxVal
-            b /= maxVal
-        #     if r > blend*maxVal:
-        #         r = blend*maxVal
-        #     if g>blend*maxVal:
-        #         g = blend*maxVal
-        #     if b>blend*maxVal:
-        #         b = blend*maxVal
-        if r<thresh:
-            r=0
-        if g<thresh:
-            g=0
-        if b<thresh:
-            b=0
-        r*=255
-        g*=255
-        b*=255
-
-        if r>0 or g>0 or b>0:
-            return (r, g, b, 255)       
+        if color.any() and np.linalg.norm(color-np.ones(3))>0.35:
+            # print('color is ', color, 'with distance', np.linalg.norm(color-np.ones(3)))
+            color *=255
+            return (color[0], color[1], color[2], 255)       
         else:
-            return (255, 255, 255, 50)
+            return (255, 255, 255, 10)

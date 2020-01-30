@@ -132,3 +132,6 @@ dmypy.json
 *.hdf5
 *.ipynb
 *.iml
+
+output/
+*.tif
