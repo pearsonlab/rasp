@@ -6,8 +6,8 @@ actors:
 
   Acquirer:
     package: acquire.acquire
-    class: TbifAcquirer
-    filename: data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif
+    class: FileAcquirer
+    filename: data/tbif_ex_crop_500frames.h5
     framerate: 2
 
   Processor:
@@ -22,9 +22,15 @@ actors:
     package: analysis.analysis
     class: ModelAnalysis
 
+  InputStim:
+    package: acquire.acquire
+    class: StimAcquirer
+    filename: data/stim_data_500frames.txt
+
+
 
 connections:
   Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue]
   Processor.q_out: [Analysis.q_in]
   Analysis.q_out: [Visual.q_in]
-  Acquirer.stim_queue: [Analysis.input_stim_queue]
+  InputStim.q_out: [Analysis.input_stim_queue]
