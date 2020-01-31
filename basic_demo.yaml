@@ -13,6 +13,7 @@ actors:
   Processor:
     package: process.process
     class: CaimanProcessor
+    init_filename: data/Tolias_mesoscope_2.hdf5
 
   Visual:
     package: visual.visual

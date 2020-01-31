@@ -25,9 +25,11 @@ class CaimanProcessor(Actor):
        interface with our pipeline.
        Uses code from caiman/source_extraction/cnmf/online_cnmf.py
     '''
-    def __init__(self, *args, config_file=None):
+    def __init__(self, *args, init_filename='data/tbif_ex.h5', config_file=None):
         super().__init__(*args)
+        print('initfile ', init_filename, 'config file ', config_file)
         self.param_file = config_file
+        self.init_filename = init_filename
 
     def setup(self):
         ''' Create OnACID object and initialize it
@@ -176,8 +178,8 @@ class CaimanProcessor(Actor):
             # each parameter needed by default (TODO change that?)
             # TODO add parameter validation inside Tweak
             home = expanduser("~")
-            cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/Tolias_mesoscope_2.hdf5'], #tbif_ex.h5'],
+            cwd = os.getcwd()+'/'
+            params_dict = {'fnames': [cwd+self.init_filename],
                    'fr': 2,
                    'decay_time': 0.8,
                    'gSig': (3,3),

@@ -235,6 +235,7 @@ class Suite2pProcessor(Actor):
         ''' Put relevant analyses results into the data store
             for later classes (e.g. ModelAnalysis) to access
         '''
+        #TODO: local var faster?
         ids = []
         ids.append(self.client.put(coords, 'coords'+str(self.frame_number+1)))
         ids.append(self.client.put(img_mean, 'proc_image'+str(self.frame_number+1)))
