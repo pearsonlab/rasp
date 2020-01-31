@@ -179,6 +179,48 @@ class TbifAcquirer(FileAcquirer):
             num = num % len(self.data)
         return self.data[num,:,:] #30:470,:]
 
+class StimAcquirer(Actor):
+
+    def __init__(self, *args, param_file=None, filename=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.param_file = param_file
+        self.filename= filename
+
+
+    def setup(self):
+        self.n= 0
+        if os.path.exists(self.filename):
+            print('Looking for ', self.filename)
+            n, ext = os.path.splitext(self.filename)[:2]
+            if ext== ".txt":
+                self.stim=[]
+                f= np.loadtxt(self.filename)
+                for i, frame in enumerate(f):
+                    stiminfo= frame[0:2]
+                    self.stim.append(stiminfo)
+
+            else: 
+                logger.error('Cannot load file, bad extension')
+                raise Exception
+
+        else: raise FileNotFoundError
+        
+    def run(self):
+        ''' Run continuously, waiting for input
+        '''
+        with RunManager(self.name, self.getInput, self.setup, self.q_sig, self.q_comm) as rm:
+            logger.info(rm)
+
+    def getInput(self):
+        ''' Check for input from behavioral control
+        '''
+        if (self.n<len(self.stim)):
+            self.q_out.put({self.n:self.stim[self.n]})
+        time.sleep(0.068)
+        self.n+=1
+
+
+
 class BehaviorAcquirer(Actor):
     ''' Actor that acquires information of behavioral stimulus
         during the experiment
@@ -225,6 +267,7 @@ class BehaviorAcquirer(Actor):
         #self.q_comm.put()
         time.sleep(0.068)
         self.n += 1
+
 
 class FolderAcquirer(Actor):
     ''' TODO: Current behavior is looping over all files in a folder.
