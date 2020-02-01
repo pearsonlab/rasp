@@ -1,5 +1,6 @@
 import time
 import pickle
+import json
 import cv2
 import numpy as np
 import scipy.sparse
@@ -128,7 +129,6 @@ class CaimanProcessor(Actor):
             #should implement in Tweak (?) or getting too complicated for users..
 
         #proc_params = self.client.get('params_dict')
-        output = self.params['output']
         init = self.params['init_batch']
         frame = self._checkFrames()
 
@@ -141,7 +141,7 @@ class CaimanProcessor(Actor):
                 t2 = time.time()
                 self._fitFrame(self.frame_number+init, self.frame.reshape(-1, order='F'))
                 self.fitframe_time.append([time.time()-t2])
-                self.putEstimates(self.onAc.estimates, output)
+                self.putEstimates()
                 self.timestamp.append([time.time(), self.frame_number])
             except ObjectNotFoundError:
                 logger.error('Processor: Frame {} unavailable from store, droppping'.format(self.frame_number))
@@ -166,19 +166,19 @@ class CaimanProcessor(Actor):
             TODO: accept user input from GUI
             This also effectively registers specific params
             that CaimanProcessor needs with Nexus
+            TODO: Wrap init_filename into caiman params if params exist
         '''
-
+        cwd = os.getcwd()+'/'
         if param_file is not None:
             try:
                 params_dict = self._load_params_from_file(param_file)
+                params_dict['fnames'] = [cwd+self.init_filename]
             except Exception as e:
                 logger.exception('File cannot be loaded. {0}'.format(e))
         else:
             # defaults from demo scripts; CNMFParams does not set
             # each parameter needed by default (TODO change that?)
             # TODO add parameter validation inside Tweak
-            home = expanduser("~")
-            cwd = os.getcwd()+'/'
             params_dict = {'fnames': [cwd+self.init_filename],
                    'fr': 2,
                    'decay_time': 0.8,
@@ -195,25 +195,23 @@ class CaimanProcessor(Actor):
                    'sniper_mode': True,
                    'K': 10,
                    'epochs': 1,
-                   'max_shifts_online': np.ceil(10).astype('int'),
+                   'max_shifts_online': 10,
                    'pw_rigid': False,
                    'dist_shape_update': True,
                    'show_movie': False,
-                #    'update_freq': 50,
-                   'minibatch_shape': 100,
-                   'output': 'outputEstimates'}
+                   'minibatch_shape': 100}
         self.client.put(params_dict, 'params_dict')
 
     def _load_params_from_file(self, param_file):
         '''Filehandler for loading caiman parameters
-            TODO
+            TODO: Error handling, check params as loaded
         '''
-        return {}
+        params_dict = json.load(open(param_file, 'r'))
+        return params_dict
 
-    def putEstimates(self, estimates, output):
+    def putEstimates(self):
         ''' Put whatever estimates we currently have
-            into the output location specified
-            TODO rewrite output input
+            into the data store
         '''
         t = time.time()
         nb = self.onAc.params.get('init', 'nb')
