@@ -1,6 +1,6 @@
-# RASP in Windows Subsystem for Linux
+# improv in Windows Subsystem for Linux
 
-### This is a guide to installing and running RASP on Windows systems using Windows Subsystem for Linux (WSL)
+### This is a guide to installing and running improv on Windows systems using Windows Subsystem for Linux (WSL)
 
 <br>
 
@@ -46,7 +46,7 @@ Furthermore, certain directories must be added to the PATH environmental variabl
     export PATH="~/anaconda3/bin:$PATH"
     ```
 
-## III. Installing & Running X Server for RASP GUI
+## III. Installing & Running X Server for any GUIs with improv
 1. Download and install [VcXsrv](https://sourceforge.net/projects/vcxsrv/)
 2. Run XLaunch
     - Set Display number to "0"
@@ -58,17 +58,17 @@ Furthermore, certain directories must be added to the PATH environmental variabl
     export DISPLAY=:0
     ```
 
-## IV. RASP Installation
-1. Clone RASP
+## IV. improv Installation
+1. Clone improv
     ```
-    git clone https://github.com/pearsonlab/rasp
+    git clone https://github.com/pearsonlab/improv
     ```
-2. Clone RASP submodules
+2. Clone improv submodules
     ```
     git submodule update --init
     ```
 3. Create Anaconda environment <br>
-This creates a new anaconda environment named `caiman` using Python 3.6, which should be used for all future RASP installations and executions. Execute the following command in the CaImAn dir.
+This creates a new anaconda environment named `caiman` using Python 3.6, which can be used for improv installations and executions. Execute the following command in the CaImAn dir.
     ```
     conda env create -f environment.yml -n caiman
     conda activate caiman 
@@ -88,7 +88,7 @@ Execute the following command within the CaImAn directory and `caiman` env.
 `plasma_store_server` is most likely located in the bin directory of the `caiman` conda environment: `~/anaconda3/envs/caiman/bin`. You can find where your environment is installed by entering `conda info --envs`. <br>
 
 
-## V. Run RASP
+## V. Run improv
 See [Common Issues](#Common-Issues) for errors and missing dependencies that might need to be installed.
 
 1. Activate WSL
@@ -99,13 +99,10 @@ See [Common Issues](#Common-Issues) for errors and missing dependencies that mig
     ```
     conda activate caiman
     ```
-3. cd into `rasp/src` <br>
-This step is not needed if `rasp` is added to the `$PYTHONPATH`
-4. Move `basic_demo.yml` file to `src` dir
-6. Run XLaunch (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
-7. Run RASP 
+3. Run XLaunch (see [Section V](#V.-Installing-&-Running-X-Server-for-GUI-Framework))
+4. Run improv 
     ```
-    python -m nexus.nexus
+    python -m nexus.nexus demos/basic/basic_demo.yaml
     ```
 
 <br>
@@ -136,7 +133,7 @@ Several issues can appear during the CaImAn installation process. It is recommen
         sudo apt-get install g++
         ```
 
-## III. Errors Running RASP
+## III. Errors Running improv
 
 1. `ImportError: libGl.so.1: cannot open shared object file`
     - Solved by running the following
@@ -166,8 +163,5 @@ Several issues can appear during the CaImAn installation process. It is recommen
         sudo apt-get install gcc
         sudo apt-get install g++
         ```
-
-5. RASP freezing entirely
-    - Solved by commented out `self.limbo.subscribe()` in nexus.py createNexus() function and `self.client.subscribe()` in store.py under the Watcher class
 
 
