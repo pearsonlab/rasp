@@ -1,5 +1,6 @@
 import time
 import pickle
+import json
 import cv2
 import numpy as np
 import scipy.sparse
@@ -25,9 +26,11 @@ class CaimanProcessor(Actor):
        interface with our pipeline.
        Uses code from caiman/source_extraction/cnmf/online_cnmf.py
     '''
-    def __init__(self, *args, config_file=None):
+    def __init__(self, *args, init_filename='data/tbif_ex.h5', config_file=None):
         super().__init__(*args)
+        print('initfile ', init_filename, 'config file ', config_file)
         self.param_file = config_file
+        self.init_filename = init_filename
 
     def setup(self):
         ''' Create OnACID object and initialize it
@@ -71,18 +74,18 @@ class CaimanProcessor(Actor):
 
         print('Processor broke, avg time per frame: ', np.mean(self.total_times, axis=0))
         print('Processor got through ', self.frame_number, ' frames')
-        np.savetxt('timing/process_frame_time.txt', np.array(self.total_times))
-        np.savetxt('timing/process_timestamp.txt', np.array(self.timestamp))
+        np.savetxt('output/timing/process_frame_time.txt', np.array(self.total_times))
+        np.savetxt('output/timing/process_timestamp.txt', np.array(self.timestamp))
 
         self.shape_time = np.array(self.onAc.t_shapes)
         self.detect_time = np.array(self.onAc.t_detect)
 
-        np.savetxt('timing/fitframe_time.txt', np.array(self.fitframe_time))
-        np.savetxt('timing/shape_time.txt', self.shape_time)
-        np.savetxt('timing/detect_time.txt', self.detect_time)
+        np.savetxt('output/timing/fitframe_time.txt', np.array(self.fitframe_time))
+        np.savetxt('output/timing/shape_time.txt', self.shape_time)
+        np.savetxt('output/timing/detect_time.txt', self.detect_time)
 
-        np.savetxt('timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
-        np.savetxt('timing/procFrame_time.txt', np.array(self.procFrame_time))
+        np.savetxt('output/timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
+        np.savetxt('output/timing/procFrame_time.txt', np.array(self.procFrame_time))
 
         # before = self.params['init_batch']
         # nb = self.onAc.params.get('init', 'nb')
@@ -105,7 +108,7 @@ class CaimanProcessor(Actor):
             try:
                 init = self.params['init_batch']
                 S = np.stack([osi.s[init:] for osi in self.onAc.estimates.OASISinstances])
-                np.savetxt('end_spikes.txt', S)
+                np.savetxt('output/end_spikes.txt', S)
             except Exception as e:
                 logger.error('Exception {}: {} during frame number {}'.format(type(e).__name__, e, self.frame_number))
                 print(traceback.format_exc())
@@ -114,7 +117,7 @@ class CaimanProcessor(Actor):
         self.coords1 = [o['CoM'] for o in self.coords]
         print(self.coords1[0])
         print('type ', type(self.coords1[0]))
-        np.savetxt('contours.txt', np.array(self.coords1))
+        np.savetxt('output/contours.txt', np.array(self.coords1))
 
     def runProcess(self):
         ''' Run process. Runs once per frame.
@@ -126,7 +129,6 @@ class CaimanProcessor(Actor):
             #should implement in Tweak (?) or getting too complicated for users..
 
         #proc_params = self.client.get('params_dict')
-        output = self.params['output']
         init = self.params['init_batch']
         frame = self._checkFrames()
 
@@ -139,7 +141,7 @@ class CaimanProcessor(Actor):
                 t2 = time.time()
                 self._fitFrame(self.frame_number+init, self.frame.reshape(-1, order='F'))
                 self.fitframe_time.append([time.time()-t2])
-                self.putEstimates(self.onAc.estimates, output)
+                self.putEstimates()
                 self.timestamp.append([time.time(), self.frame_number])
             except ObjectNotFoundError:
                 logger.error('Processor: Frame {} unavailable from store, droppping'.format(self.frame_number))
@@ -164,20 +166,20 @@ class CaimanProcessor(Actor):
             TODO: accept user input from GUI
             This also effectively registers specific params
             that CaimanProcessor needs with Nexus
+            TODO: Wrap init_filename into caiman params if params exist
         '''
-
+        cwd = os.getcwd()+'/'
         if param_file is not None:
             try:
                 params_dict = self._load_params_from_file(param_file)
+                params_dict['fnames'] = [cwd+self.init_filename]
             except Exception as e:
                 logger.exception('File cannot be loaded. {0}'.format(e))
         else:
             # defaults from demo scripts; CNMFParams does not set
             # each parameter needed by default (TODO change that?)
             # TODO add parameter validation inside Tweak
-            home = expanduser("~")
-            cwd = os.getcwd()
-            params_dict = {'fnames': [cwd+'/data/tbif_ex_crop_500frames.h5'], #tbif_ex.h5'],
+            params_dict = {'fnames': [cwd+self.init_filename],
                    'fr': 2,
                    'decay_time': 0.8,
                    'gSig': (3,3),
@@ -193,25 +195,23 @@ class CaimanProcessor(Actor):
                    'sniper_mode': True,
                    'K': 10,
                    'epochs': 1,
-                   'max_shifts_online': np.ceil(10).astype('int'),
+                   'max_shifts_online': 10,
                    'pw_rigid': False,
                    'dist_shape_update': True,
                    'show_movie': False,
-                #    'update_freq': 50,
-                   'minibatch_shape': 100,
-                   'output': 'outputEstimates'}
+                   'minibatch_shape': 100}
         self.client.put(params_dict, 'params_dict')
 
     def _load_params_from_file(self, param_file):
         '''Filehandler for loading caiman parameters
-            TODO
+            TODO: Error handling, check params as loaded
         '''
-        return {}
+        params_dict = json.load(open(param_file, 'r'))
+        return params_dict
 
-    def putEstimates(self, estimates, output):
+    def putEstimates(self):
         ''' Put whatever estimates we currently have
-            into the output location specified
-            TODO rewrite output input
+            into the data store
         '''
         t = time.time()
         nb = self.onAc.params.get('init', 'nb')
@@ -253,7 +253,7 @@ class CaimanProcessor(Actor):
 
         image = self.makeImage()
         if self.frame_number == 1:
-            np.savetxt('image.txt', np.array(image))
+            np.savetxt('output/image.txt', np.array(image))
         t4 = time.time()
         dims = image.shape
         self._updateCoords(A,dims)

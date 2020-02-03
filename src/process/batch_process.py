@@ -20,7 +20,7 @@ class Suite2pProcessor(Actor):
         Designed for output to ModelAnalysis.
     '''
 
-    def __init__(self, *args, buffer_size=200, path='output', **kwargs):
+    def __init__(self, *args, buffer_size=200, path='output/suite2p', **kwargs):
         ''' buffer_size: Size of frame batches.
             path: Path to saved TIFF files.
         '''
@@ -235,6 +235,7 @@ class Suite2pProcessor(Actor):
         ''' Put relevant analyses results into the data store
             for later classes (e.g. ModelAnalysis) to access
         '''
+        #TODO: local var faster?
         ids = []
         ids.append(self.client.put(coords, 'coords'+str(self.frame_number+1)))
         ids.append(self.client.put(img_mean, 'proc_image'+str(self.frame_number+1)))

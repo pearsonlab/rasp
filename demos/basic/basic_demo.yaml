@@ -1,0 +1,36 @@
+actors:
+  GUI:
+    package: visual.visual
+    class: BasicVisual
+    visual: Visual
+
+  Acquirer:
+    package: acquire.acquire
+    class: FileAcquirer
+    filename: data/Tolias_mesoscope_2.hdf5
+    framerate: 30
+
+  Processor:
+    package: process.process
+    class: CaimanProcessor
+    init_filename: data/Tolias_mesoscope_2.hdf5
+    config_file: basic_caiman_params.txt
+
+  Visual:
+    package: visual.visual
+    class: BasicCaimanVisual
+  
+  Analysis:
+    package: analysis.analysis
+    class: MeanAnalysis
+
+  InputStim:
+    package: acquire.acquire
+    class: BehaviorAcquirer
+
+
+connections:
+  Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue]
+  Processor.q_out: [Analysis.q_in]
+  Analysis.q_out: [Visual.q_in]
+  InputStim.q_out: [Analysis.input_stim_queue]

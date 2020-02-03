@@ -167,7 +167,7 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             File location determined from user input
             Throws FileNotFound error
         '''
-        fname = QFileDialog.getOpenFileName(self, 'Open file', '/home')
+        fname = QFileDialog.getOpenFileName(self, 'Open file', 'demos/')
             #TODO: make default home folder system-independent
         try:
             self._loadTweak(fname[0])
@@ -428,9 +428,9 @@ class FrontEnd(QtGui.QMainWindow, rasp_ui.Ui_MainWindow):
             # print('Visual broke, avg time per frame: ', np.mean(self.visual.total_times, axis=0))
             print('Visual got through ', self.visual.frame_num, ' frames')
             # print('GUI avg time ', np.mean(self.total_times))
-            np.savetxt('timing/visual_frame_time.txt', np.array(self.visual.total_times))
-            np.savetxt('timing/gui_frame_time.txt', np.array(self.total_times))
-            np.savetxt('timing/visual_timestamp.txt', np.array(self.visual.timestamp))
+            np.savetxt('output/timing/visual_frame_time.txt', np.array(self.visual.total_times))
+            np.savetxt('output/timing/gui_frame_time.txt', np.array(self.total_times))
+            np.savetxt('output/timing/visual_timestamp.txt', np.array(self.visual.timestamp))
             event.accept()
         else: event.ignore()
 
@@ -561,7 +561,7 @@ class BasicFrontEnd(QtGui.QMainWindow, basic_rasp_ui.Ui_MainWindow):
             File location determined from user input
             Throws FileNotFound error
         '''
-        fname = QFileDialog.getOpenFileName(self, 'Open file', '/home')
+        fname = QFileDialog.getOpenFileName(self, 'Open file', 'demos/')
             #TODO: make default home folder system-independent
         try:
             self._loadTweak(fname[0])
