@@ -40,12 +40,7 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Extraneous
-random/
-timing/
-analyzed/
 logs/
-play/
-timing_mesoscope/
 data/
 
 # Unit test / coverage reports
@@ -102,7 +97,6 @@ celerybeat-schedule
 # Environments
 .env
 .venv
-env/
 venv/
 ENV/
 env.bak/
