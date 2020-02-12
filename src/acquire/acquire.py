@@ -32,8 +32,8 @@ class FileAcquirer(Actor):
            Open file stream
            #TODO: implement more than h5 files
         '''        
+        print('Looking for ', self.filename)
         if os.path.exists(self.filename):
-            print('Looking for ', self.filename)
             n, ext = os.path.splitext(self.filename)[:2]
             if ext == '.h5' or ext == '.hdf5':
                 with h5py.File(self.filename, 'r') as file:
