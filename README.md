@@ -14,7 +14,9 @@ We can provide up-to-the-moment estimates of the functional connectivity by fitt
 
 ### How improv works
 
+improv's design is based on a steamlined version of the actor model for concurrent computation. Each component of the system (experimental pipeline) is considered an 'actor' and has a unique role. They interact via message passing, without the need for a central broker. Actors are implemented as user-defined classes that inherit from improv's Actor class, which supplies all queues for message passing and orchestrates process execution and error handling. Messages between actors are composed of keys that correspond to items in a shared, in-memory data store. This both minimizes communication overhead and data copying between processes. 
 
+<img src="https://web.duke.edu/mind/level2/faculty/pearson/assets/images/zebrafish/actor_model.png" width=70%>
 
 ### Contact
 To get in touch, feel free to email us at anne.draelos@duke.edu or reach out on Twitter <a href="http://twitter.com/annedraelos" target="_blank">@annedraelos</a>. 
