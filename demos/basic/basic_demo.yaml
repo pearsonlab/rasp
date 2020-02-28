@@ -1,31 +1,31 @@
 actors:
   GUI:
-    package: visual.visual
+    package: improv.actors.visual
     class: BasicVisual
     visual: Visual
 
   Acquirer:
-    package: acquire.acquire
+    package: improv.actors.acquire
     class: FileAcquirer
-    filename: data/Tolias_mesoscope_2.hdf5
+    filename: data/Tolias_mesoscope_3.hdf5
     framerate: 30
 
   Processor:
-    package: process.process
-    class: CaimanProcessor
-    init_filename: data/Tolias_mesoscope_2.hdf5
-    config_file: demos/basic/basic_caiman_params.txt
+    package: actors.basic_processor
+    class: BasicProcessor
+    init_filename: data/Tolias_mesoscope_3.hdf5
+    config_file: basic_caiman_params.txt
 
   Visual:
-    package: visual.visual
+    package: improv.actors.visual
     class: BasicCaimanVisual
   
   Analysis:
-    package: analysis.analysis
+    package: improv.actors.analysis
     class: MeanAnalysis
 
   InputStim:
-    package: acquire.acquire
+    package: improv.actors.acquire
     class: BehaviorAcquirer
 
 
