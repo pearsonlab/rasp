@@ -1,7 +1,7 @@
 from unittest import TestCase
 import subprocess
 import asyncio
-from nexus.actor import RunManager, AsyncRunManager
+from improv.actor import RunManager, AsyncRunManager
 from multiprocessing import Process
 
 class StoreDependentTestCase(TestCase):
@@ -14,10 +14,28 @@ class StoreDependentTestCase(TestCase):
         '''
         self.p = subprocess.Popen(['plasma_store',
                               '-s', '/tmp/store',
-                              '-m', str(10000000)],
+                              '-m', str(10000)],
                               stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
 
+    def tearDown(self):
+        ''' Kill the server
+        '''
+
+        self.p.kill()
+
+class ExternalStoreTestCase(TestCase):
+    
+    def setUp(self):
+        ''' Start the server
+        '''
+
+        self.p = subprocess.Popen(['plasma_store',
+                              '-s', '/tmp/store',
+                              '-m', str(100000*1024),
+                              '-e', 'hashtable://test'],
+                              stdout=subprocess.DEVNULL,
+                              stderr=subprocess.DEVNULL)
     def tearDown(self):
         ''' Kill the server
         '''

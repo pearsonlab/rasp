@@ -1,16 +1,17 @@
 
 from unittest import TestCase
-from test.test_utils import StoreDependentTestCase
-from src.nexus.store import Limbo
+from test.test_utils import StoreDependentTestCase, ExternalStoreTestCase
+from improv.store import Limbo
 from multiprocessing import Process
-from pyarrow import PlasmaObjectExists
+from pyarrow.plasma import PlasmaObjectExists
+from pyarrow.plasma import ObjectNotAvailable
 from scipy.sparse import csc_matrix
 import numpy as np
 import pyarrow.plasma as plasma
 from pyarrow.lib import ArrowIOError
-from nexus.store import ObjectNotFoundError
-from nexus.store import CannotGetObjectError
-from nexus.store import CannotConnectToStoreError
+from improv.store import ObjectNotFoundError
+from improv.store import CannotGetObjectError
+from improv.store import CannotConnectToStoreError
 import pickle
 
 
@@ -125,7 +126,56 @@ class Limbo_Put(StoreDependentTestCase):
 
     def tearDown(self):
         super(Limbo_Put, self).tearDown()
+'''
+class test_evict(StoreDependentTestCase):
 
+    def setUp(self):
+        super(test_evict, self).setUp()
+        self.limbo = Limbo()
+
+    #def test_evict(self):
+    #    id1=self.limbo.random_ObjectID(1)
+    #    x1=self.limbo.client.create(id1[0], 1000)
+    #    self.limbo.client.seal(id1[0])
+    #    self.limbo.client.evict(1)
+
+    #    self.limbo.client.get(id1)
+    #    self.assertRaises(ObjectNotAvailable)
+
+    #    id2=self.limbo.random_ObjectID(1)
+    #    id3=self.limbo.random_ObjectID(1)
+    #    x2=self.limbo.client.create(id2[0], 999)
+    #    x3=self.limbo.client.create(id3[0], 998)
+
+    #    self.limbo.client.seal(id2[0])
+    #    self.limbo.client.seal(id3[0])
+
+    #    ids= id2 + id3
+
+    #    self.limbo.client.evict(1000)
+
+    #    self.limbo.client.get(ids)
+    #    self.assertRaises(ObjectNotAvailable)
+
+    def test_evict_when_full(self):
+        ids= self.limbo.random_ObjectID(20)
+        data = b'a' * 100 * 1024
+        metadata = b''        
+
+        #the last 10 objects will evict the first ten objects from the store
+        #due to size constraints
+        for i in range(11):
+            self.limbo.client.create_and_seal(ids[i], data, metadata)
+
+            self.assertTrue(self.limbo.client.contains(ids[i]))
+
+        for i in range(10):
+            [result]= self.limbo.client.get_buffers([ids[i]])
+            self.assertRaises(ObjectNotAvailable)
+
+    def tearDown(self):
+        super(test_evict, self).tearDown()
+'''
 
 class Limbo_PutGet(StoreDependentTestCase):
 
@@ -259,3 +309,32 @@ class Limbo_sparseMatrix(StoreDependentTestCase):
 
     def tearDown(self):
         super(Limbo_sparseMatrix, self).tearDown()
+
+class External_store(ExternalStoreTestCase):
+    
+    #unit tests modeled after plasma tests
+    #in Apache Arrow codebase
+    def setUp(self):
+        super(External_store, self).setUp()
+        self.limbo = Limbo()
+
+    
+    def test_extStore(self):
+        ids= self.limbo.random_ObjectID(20)
+        data = b'a' * 100 * 1024
+        metadata = b''        
+
+        #the last 10 objects will evict the first ten objects from the store
+        #due to size constraints
+        for i in range(20):
+            self.limbo.client.create_and_seal(ids[i], data, metadata)
+
+            self.assertTrue(self.limbo.client.contains(ids[i]))
+
+        for i in range(20):
+            [result] = self.limbo.client.get_buffers([ids[i]])
+
+            self.assertEqual(result.to_pybytes(), data)
+
+    def tearDown(self):
+        super(External_store, self).tearDown()
