@@ -1,13 +1,11 @@
 import time
 import os
 import h5py
-import struct
-import numpy as np
 import random
-from pathlib import Path
+from queue import Empty
+import numpy as np
 from skimage.external.tifffile import imread
 from improv.actor import Actor, Spike, RunManager
-from queue import Empty
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -201,10 +199,10 @@ class TiffAcquirer(Actor):
 
     def __init__(self, *args, filename=None, framerate=30, **kwargs):
         super().__init__(*args, **kwargs)
+        self.filename = filename
 
-        self.path = Path(filename)
-        if not self.path.exists():
-            raise ValueError('TIFF file {} does not exist.'.format(self.path))
+        if not os.path.exists(filename):
+            raise ValueError('TIFF file {} does not exist.'.format(filename))
         self.imgs = np.array(0)
 
         self.n_frame = 0
@@ -213,7 +211,7 @@ class TiffAcquirer(Actor):
         self.t_per_frame = list()
 
     def setup(self):
-        self.imgs = imread(self.path.as_posix())
+        self.imgs = imread(self.filename)
 
     def run(self):
         with RunManager(self.name, self.run_acquirer, self.setup, self.q_sig, self.q_comm) as rm:

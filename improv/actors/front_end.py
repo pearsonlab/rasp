@@ -1,10 +1,3 @@
-from PyQt5 import QtGui,QtCore,QtWidgets
-from PyQt5.QtGui import QColor, QPixmap
-from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtWidgets import QMessageBox, QFileDialog
-from improv.GUI import improv_basic
-from improv.store import Limbo
-from improv.actor import Spike
 import numpy as np
 from math import floor
 import time
@@ -13,6 +6,14 @@ from pyqtgraph import EllipseROI, PolyLineROI, ColorMap, ROI, LineSegmentROI
 from queue import Empty
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
+from PyQt5 import QtGui,QtCore,QtWidgets
+from PyQt5.QtGui import QColor, QPixmap
+from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtWidgets import QMessageBox, QFileDialog
+
+from improv.actors import improv_basic
+from improv.store import Limbo
+from improv.actor import Spike
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

@@ -2,7 +2,7 @@ from PyQt5 import QtGui,QtCore,QtWidgets
 from PyQt5.QtGui import QColor, QPixmap
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
-import improv_fit
+from actors import improv_fit
 from improv.store import Limbo
 from improv.actor import Spike
 import numpy as np
@@ -192,7 +192,6 @@ class FrontEnd(QtGui.QMainWindow, improv_fit.Ui_MainWindow):
         '''
         image = None
         raw, color, weight = self.visual.getFrames()
-        image = self.visual.plotThreshFrame(self.thresh_r*2)
         if raw is not None:
             raw = np.rot90(raw,2)
             if np.unique(raw).size > 1:
@@ -210,9 +209,7 @@ class FrontEnd(QtGui.QMainWindow, improv_fit.Ui_MainWindow):
             self.rawplot_3.setColorMap(cmap)
             # self.rawplot_3.ui.histogram.vb.setLimits(yMin=0.1, yMax=1)
         else:
-            if image is not None:
-                image = np.rot90(image, 2)
-                self.rawplot_3.setImage(image)
+            pass
                 # self.rawplot_3.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
     def updateLines(self):

@@ -2,25 +2,26 @@ actors:
   GUI:
     package: actors.visual_model
     class: DisplayVisual
-    visual: CaimanVisual
+    visual: Visual
 
   Acquirer:
-    package: acquire.acquire
+    package: actors.acquire_tbif
     class: TbifAcquirer
     filename: data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif
     framerate: 2
 
   Processor:
-    package: process.process
+    package: actors.processor
     class: CaimanProcessor
-    init_filename: data/tbif_ex.h5
+    init_filename: data/tbif_ex_crop.h5
+    config_file: eva_caiman_params.txt
 
   Visual:
-    package: visual.visual
+    package: actors.visual_model
     class: CaimanVisual
   
   Analysis:
-    package: analysis.analysis
+    package: actors.analysis_model
     class: ModelAnalysis
 
 

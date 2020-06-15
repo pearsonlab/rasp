@@ -1,17 +1,16 @@
 import time
-import numpy as np
 import cv2
-from improv.store import Limbo, ObjectNotFoundError
-from scipy.spatial.distance import cdist
-from math import floor
-import colorsys
-from PyQt5 import QtGui, QtWidgets
+import numpy as np
 import pyqtgraph as pg
-from improv.GUI.front_end import BasicFrontEnd
-import sys
-from improv.actor import Actor, Spike
+from math import floor
 from queue import Empty
 from collections import deque
+from PyQt5 import QtGui, QtWidgets
+from scipy.spatial.distance import cdist
+
+from improv.actor import Actor, Spike
+from improv.store import Limbo, ObjectNotFoundError
+from improv.actors.front_end import BasicFrontEnd
 
 import logging; logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ class BasicVisual(Actor):
         Intended to be setup with a visual actor, BasicCaimanVisual (below).
     '''
 
-    def setup(self, visual=None):
+    def setup(self, visual):
         logger.info('Running setup for '+self.name)
         self.visual = visual
         self.visual.setup()

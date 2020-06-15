@@ -6,9 +6,9 @@ import numpy as np
 import random
 from pathlib import Path
 from skimage.external.tifffile import imread
-from nexus.actor import Actor, Spike, RunManager
+from improv.actor import Actor, Spike, RunManager
 from queue import Empty
-from acquire.acquire import FileAcquirer
+from improv.actors.acquire import FileAcquirer
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -71,3 +71,8 @@ class TbifAcquirer(FileAcquirer):
             self.done = True
 
         self.total_times.append(time.time()-t)
+
+    def getFrame(self, num):
+        ''' Here just return frame from loaded data
+        '''
+        return self.data[num,30:470,:]

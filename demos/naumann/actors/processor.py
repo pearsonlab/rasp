@@ -4,7 +4,7 @@ import json
 import cv2
 import numpy as np
 import scipy.sparse
-from nexus.store import Limbo, CannotGetObjectError, ObjectNotFoundError
+from improv.store import Limbo, CannotGetObjectError, ObjectNotFoundError
 from caiman.source_extraction import cnmf
 from caiman.source_extraction.cnmf.utilities import detrend_df_f
 from caiman.source_extraction.cnmf.online_cnmf import OnACID
@@ -15,7 +15,7 @@ import caiman as cm
 from os.path import expanduser
 import os
 from queue import Empty
-from nexus.actor import Actor, Spike, RunManager
+from improv.actor import Actor, Spike, RunManager
 import traceback
 
 import logging; logger = logging.getLogger(__name__)

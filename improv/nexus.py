@@ -113,7 +113,7 @@ class Nexus():
         self.createConnections()
 
         if self.tweak.hasGUI:
-            # Have to load GUI first (at least with Caiman) #TODO: Fix Caiman instead?
+            # Have to load GUI first (at least with Caiman)
             name = self.tweak.gui.name
             m = self.tweak.gui # m is TweakModule
             # treat GUI uniquely since user communication comes from here

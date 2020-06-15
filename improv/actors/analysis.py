@@ -1,11 +1,11 @@
-from improv.actor import Actor, Spike, RunManager
-from improv.store import ObjectNotFoundError
-from queue import Empty
-import numpy as np
 import time
 import cv2
-import colorsys
-import scipy
+# import colorsys
+import numpy as np
+from queue import Empty
+
+from improv.actor import Actor, Spike, RunManager
+from improv.store import ObjectNotFoundError
 
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

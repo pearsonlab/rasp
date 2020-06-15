@@ -7,7 +7,7 @@ from math import floor
 import colorsys
 from PyQt5 import QtGui, QtWidgets
 import pyqtgraph as pg
-from GUI import FrontEnd
+from actors.GUI import FrontEnd
 import sys
 from improv.actor import Actor, Spike
 from queue import Empty
@@ -157,6 +157,7 @@ class CaimanVisual(Actor):
         if np.min(dist) < 50:
             selected = neurons[np.argmin(dist)]
             self.selectedNeuron = selected
+            print('ID for selected neuron is :', selected)
             self.com1 = [np.array([self.raw.shape[0]-com[selected][0], self.raw.shape[1]-com[selected][1]])]
         else:
             logger.error('No neurons nearby where you clicked')
