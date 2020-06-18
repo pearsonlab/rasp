@@ -1,6 +1,6 @@
 actors:
   GUI:
-    package: improv.actors.visual
+    package: actors.visual
     class: BasicVisual
     visual: Visual
 
@@ -17,7 +17,7 @@ actors:
     config_file: basic_caiman_params.txt
 
   Visual:
-    package: improv.actors.visual
+    package: actors.visual
     class: BasicCaimanVisual
   
   Analysis:

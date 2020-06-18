@@ -1,6 +1,5 @@
 import time
 import cv2
-# import colorsys
 import numpy as np
 from queue import Empty
 
@@ -23,7 +22,6 @@ class MeanAnalysis(Actor):
         # TODO: same as behaviorAcquisition, need number of stimuli here. Make adaptive later
         self.num_stim = 21 
         self.frame = 0
-        # self.curr_stim = 0 #start with zeroth stim unless signaled otherwise
         self.stim = {}
         self.stimStart = {}
         self.window = 500 #TODO: make user input, choose scrolling window for Visual
@@ -61,11 +59,7 @@ class MeanAnalysis(Actor):
         np.savetxt('output/timing/analysiscolor_frame_time.txt', np.array(self.colortime))
         np.savetxt('output/timing/analysis_timestamp.txt', np.array(self.timestamp))
 
-        np.savetxt('output/analysis_estsAvg.txt', np.array(self.estsAvg))
-        # np.savetxt('output/analysis_estsOn.txt', np.array(self.estsOn))
-        # np.savetxt('output/analysis_estsOff.txt', np.array(self.estsOff))
-        np.savetxt('output/analysis_proc_S.txt', np.array(self.S))
-        # np.savetxt('output/analysis_spikeAvg.txt', np.array(self.spikeAvg))
+        np.savetxt('output/final/analysis_tuning_curves.txt', np.array(self.polarAvg))
 
     def runAvg(self):
         ''' Take numpy estimates and frame_number
@@ -190,15 +184,12 @@ class MeanAnalysis(Actor):
         estsAvg = [np.zeros(ests.shape[0])]*self.num_stim
         for s,l in self.stimStart.items():
             l = np.array(l)
-            # print('stim ', s, ' is l ', l)
             if l.size>0:
                 onInd = np.array([np.arange(o+5,o+15) for o in np.nditer(l)]).flatten()
                 onInd = onInd[onInd<ests_num]
-                # print('on ', onInd)
                 offInd = np.array([np.arange(o-10,o-1) for o in np.nditer(l)]).flatten() #TODO replace
                 offInd = offInd[offInd>=0]
                 offInd = offInd[offInd<ests_num]
-                # print('off ', offInd)
                 try:
                     if onInd.size>0:
                         onEst = np.mean(ests[:,onInd], axis=1)
@@ -240,7 +231,6 @@ class MeanAnalysis(Actor):
         self.estsAvg = np.abs(np.transpose(np.array(polarAvg)))
         self.estsAvg = np.where(np.isnan(self.estsAvg), 0, self.estsAvg)
         self.estsAvg[self.estsAvg == np.inf] = 0
-        #self.estsAvg = np.clip(self.estsAvg*4, 0, 4)
         self.stimtime.append(time.time()-t)
 
     def stimAvg(self):

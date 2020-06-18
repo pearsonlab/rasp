@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file './rasp_ui_large.ui'
+# Form implementation generated from reading ui file './improv_basic.ui'
 #
 # Created by: PyQt5 UI code generator 5.12.2
 #

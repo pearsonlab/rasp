@@ -11,7 +11,7 @@ from PyQt5.QtGui import QColor, QPixmap
 from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QMessageBox, QFileDialog
 
-from improv.actors import improv_basic
+from . import improv_basic
 from improv.store import Limbo
 from improv.actor import Spike
 
@@ -44,7 +44,6 @@ class BasicFrontEnd(QtGui.QMainWindow, improv_basic.Ui_MainWindow):
         self.pushButton_2.clicked.connect(_call(self._setup))
         self.pushButton.clicked.connect(_call(self._loadParams)) #File Dialog, then tell Nexus to load tweak
         self.checkBox.stateChanged.connect(self.update) #Show live front-end updates
-
 
         self.rawplot_2.getImageItem().mouseClickEvent = self.mouseClick #Select a neuron
         self.slider.valueChanged.connect(_call(self.sliderMoved)) #Threshold for magnitude selection
