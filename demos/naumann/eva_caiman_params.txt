@@ -1,0 +1,1 @@
+{"fr": 2, "decay_time": 0.8, "gSig": [2, 2], "p": 1, "min_SNR": 1.5, "rval_thr": 1.5, "ds_factor": 1, "nb": 2, "motion_correct": true, "init_batch": 100, "init_method": "bare", "normalize": true, "sniper_mode": true, "K": 10, "epochs": 1, "max_shifts_online": 10, "pw_rigid": false, "dist_shape_update": true, "show_movie": false, "minibatch_shape": 100}

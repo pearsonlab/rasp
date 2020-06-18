@@ -5,7 +5,7 @@ import struct
 import numpy as np
 import random
 from pathlib import Path
-from skimage.external.tifffile import imread
+from skimage.io import imread
 from improv.actor import Actor, Spike, RunManager
 from queue import Empty
 from improv.actors.acquire import FileAcquirer
