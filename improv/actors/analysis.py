@@ -15,11 +15,12 @@ class MeanAnalysis(Actor):
         super().__init__(*args)
 
     def setup(self, param_file=None):
-        '''
+        ''' Set custom parameters here
+            Can also be done by e.g. loading them in from 
+            a configuration file. #TODO
         '''
         np.seterr(divide='ignore')
 
-        # TODO: same as behaviorAcquisition, need number of stimuli here. Make adaptive later
         self.num_stim = 21 
         self.frame = 0
         self.stim = {}
@@ -144,7 +145,6 @@ class MeanAnalysis(Actor):
     def updateStim_start(self, stim):
         frame = list(stim.keys())[0]
         whichStim = stim[frame][0]
-        # print('Got ', frame, whichStim, stim[frame][1])
         if whichStim not in self.stimStart.keys():
             self.stimStart.update({whichStim:[]})
         if abs(stim[frame][1])>1 :
