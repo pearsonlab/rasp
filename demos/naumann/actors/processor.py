@@ -268,6 +268,11 @@ class CaimanProcessor(Actor):
         self.q_out.put(ids)
         #self.q_comm.put([self.frame_number])
 
+        ## figures only
+        if self.frame_number in [100, 500, 1000, 2000, 2875]:
+            # save spikes
+            np.savetxt('output_snap/ests_S_frame'+str(self.frame_number)+'.txt', S)
+
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4, t6-t5])
 
 

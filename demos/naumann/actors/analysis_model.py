@@ -14,12 +14,13 @@ class ModelAnalysis(Actor):
     #TODO: Add additional error handling
     def __init__(self, *args):
         super().__init__(*args)
-        w = np.zeros((2,2)) #guess 2 neurons initially?
-        h = np.zeros((2,10)) #dh is 10
-        k = np.zeros((2,8))
-        b = np.zeros(2)
+        N = 20
+        w = np.zeros((N,N)) #guess XX neurons initially?
+        h = np.zeros((N,4)) #dh is 4
+        k = np.zeros((N,8))
+        b = np.zeros(N)
         self.theta = np.concatenate((w,h,b,k), axis=None).flatten()
-        self.p = {'numNeurons': 2, 'hist_dim': 10, 'numSamples': 1, 'dt': 0.1, 'stim_dim': 8} #TODO: from config file..
+        self.p = {'numNeurons': N, 'hist_dim': 4, 'numSamples': 1, 'dt': 0.5, 'stim_dim': 8} #TODO: from config file..
 
     def setup(self, param_file=None):
         '''
@@ -74,6 +75,8 @@ class ModelAnalysis(Actor):
         np.savetxt('output/analysis_estsAvg.txt', np.array(self.estsAvg))
         np.savetxt('output/analysis_proc_S.txt', np.array(self.S))
         np.savetxt('output/analysis_LL.txt', np.array(self.LL))
+        
+        np.savetxt('output_snap/stims.txt', self.currStimID)
 
     def runStep(self):
         ''' Take numpy estimates and frame_number
@@ -103,8 +106,9 @@ class ModelAnalysis(Actor):
             # Just do overall average activity for now
             self.stimAvg_start()
 
-            # fit to model
-            self.fit()
+            # fit to model once we have enough neurons
+            if self.C.shape[0]>=self.p['numNeurons']:
+                self.fit()
             
             self.globalAvg = np.mean(self.estsAvg[:,:8], axis=0)
             self.tune = [self.estsAvg[:,:8], self.globalAvg]
@@ -132,6 +136,16 @@ class ModelAnalysis(Actor):
                 self.Cpop = np.nanmean(self.C, axis=0)
                 self.Call = self.C #already a windowed version #[:,self.frame-window:self.frame]
             
+            ## for figures only
+            if self.frame in [200, 500, 1000, 2000, 2875]:
+                # save weights
+                N = self.p["numNeurons"]
+                np.savetxt('output_snap/model_weights_frame'+str(self.frame)+'.txt', self.theta[:N*N].reshape((N,N)))
+                # save calcium traces
+                np.savetxt('output_snap/ests_C_frame'+str(self.frame)+'.txt', self.C)
+                # save computed tuning curves
+                np.savetxt('output_snap/tuning_curves_frame'+str(self.frame)+'.txt', self.estsAvg)
+
             self.putAnalysis()
             self.timestamp.append([time.time(), self.frame])
             self.total_times.append(time.time()-t)
@@ -152,12 +166,12 @@ class ModelAnalysis(Actor):
 
         # print('First test: ', self.ll(self.S[:,:self.frame]))
 
-        if self.frame<100:
+        if self.frame<50:
             y_step = self.S[:,:self.frame]
             stim_step = self.currStimID[:, :self.frame]
         else:
-            y_step =  self.S[:,self.frame-100:self.frame]
-            stim_step = self.currStimID[:, self.frame-100:self.frame]
+            y_step =  self.S[:,self.frame-50:self.frame]
+            stim_step = self.currStimID[:, self.frame-50:self.frame]
 
         y_step = np.where(np.isnan(y_step), 0, y_step) #Why are there nans here anyway?? #TODO
 
@@ -187,22 +201,24 @@ class ModelAnalysis(Actor):
         data['y'] = y
         data['s'] = s
         rhat = self.runModel(data)
-        try:
-            rhat = rhat*dt
-        except FloatingPointError:
-            print('FPE in rhat*dt; likely underflow')
+        # try:
+        #     rhat = rhat*dt
+        # except FloatingPointError:
+        #     print('FPE in rhat*dt; likely underflow')
 
         # model parameters
-        w = self.theta[:N*N].reshape((N,N))
+        # w = self.theta[:N*N].reshape((N,N))
         # h = self.theta[N*N:N*(N+dh)].reshape((N,dh))
         # b = self.theta[N*(N+dh):].reshape(N)
 
         # compute negative log-likelihood
         # include l1 or l2 penalty on weights
-        l2 = scipy.linalg.norm(w) #100*np.sqrt(np.sum(np.square(theta['w'])))
-        l1 = np.sum(np.sum(np.abs(w)))/(N*N)
+        # l2 = scipy.linalg.norm(w) #100*np.sqrt(np.sum(np.square(theta['w'])))
+        # l1 = np.sum(np.sum(np.abs(w)))/(N*N)
 
-        ll_val = ((np.sum(rhat) - np.sum(y*np.log(rhat+eps))) )/y.shape[1]/N  #+ l1
+        ll_val = ((np.sum(rhat) - np.sum(y*np.log(rhat+eps))) )/(y.shape[1]*N**2)  #+ l1
+        # if np.isnan(ll_val):
+        #     logger.error('------------ nans in LL')
 
         return ll_val
 
@@ -217,8 +233,8 @@ class ModelAnalysis(Actor):
         data = {}
         data['y'] = y
         data['s'] = s
-        rhat = self.runModel(data)
-        rhat = rhat*dt
+        rhat = self.runModel(data)  #TODO: rewrite without dicts
+        # rhat = rhat*dt
 
         # compute gradient
         grad = dict()
@@ -237,6 +253,7 @@ class ModelAnalysis(Actor):
         #yr[0,:] = 0
         grad['w'] = rateDiff.dot(yr.T)/M #+ 2*np.abs(self.theta[:N*N].reshape((N,N)))/(N*N)
         #self.d_abs(self.theta[:N*N].reshape((N,N)))
+        np.fill_diagonal(grad['w'], 0)
         
         # gradient for history terms
         grad['h'] = np.zeros((N,dh))
@@ -246,25 +263,25 @@ class ModelAnalysis(Actor):
                 grad['h'][i,j] = np.sum(np.flip(data['y'],1)[i,:]*rateDiff[i,:])/M
 
         # check for nans
-        grad = self.gradCheck(grad)
+        # grad = self.gradCheck(grad)
 
         # flatten grad
         grad_flat = np.concatenate((grad['w'],grad['h'],grad['b'],grad['k']), axis=None).flatten()/N
 
         return grad_flat
 
-    def gradCheck(self, grad):
-        resgrad = {}
-        for key in grad.keys():
-            resgrad[key] = self.arrayCheck(grad[key], key)
-        return resgrad
+    # def gradCheck(self, grad):
+    #     resgrad = {}
+    #     for key in grad.keys():
+    #         resgrad[key] = self.arrayCheck(grad[key], key)
+    #     return resgrad
 
-    def arrayCheck(self, arr, name):
-        if ~np.isfinite(arr).all():
-            print('**** WARNING: Found non-finite value in ' + name + ' (%g percent of the values were bad)'%(np.mean(np.isfinite(arr))))
-        arr = np.where(np.isnan(arr), 0, arr)
-        arr[arr == np.inf] = 0
-        return arr
+    # def arrayCheck(self, arr, name):
+    #     if ~np.isfinite(arr).all():
+    #         print('**** WARNING: Found non-finite value in ' + name + ' (%g percent of the values were bad)'%(np.mean(np.isfinite(arr))))
+    #     arr = np.where(np.isnan(arr), 0, arr)
+    #     arr[arr == np.inf] = 0
+    #     return arr
 
     def d_abs(self, weights):
         pos = (weights>=0)*1
@@ -290,10 +307,10 @@ class ModelAnalysis(Actor):
             expo[:,j] = self.runModelStep(data['y'][:,j-dh:j], data['s'][:,j])
         
         # computed rates
-        try:
-            rates = f(expo)
-        except:
-            import pdb; pdb.set_trace()
+        # try:
+        rates = f(expo)
+        # except:
+        #     import pdb; pdb.set_trace()
 
         return rates
 
@@ -317,6 +334,7 @@ class ModelAnalysis(Actor):
 
         expo = np.zeros(N)
         for i in np.arange(0,N): # step through neurons
+            ## NOTE: brief benchmarking showed this faster than matrix ops
             # compute model firing rate
             if t<1:
                 hist = 0
@@ -324,6 +342,7 @@ class ModelAnalysis(Actor):
                 hist = np.sum(np.flip(h[i,:])*y[i,:])
                 
             if t>0:
+                w[i,i] = 0 #diagonals zero
                 weights = w[i,:].dot(y[:,-1])
             else:
                 weights = 0
@@ -366,7 +385,6 @@ class ModelAnalysis(Actor):
         frame = list(stim.keys())[0]
         whichStim = stim[frame][0]
         stimID = self.IDstim(int(whichStim))
-        # print('Got ', frame, whichStim, stim[frame][1])
         if whichStim not in self.stimStart.keys():
             self.stimStart.update({whichStim:[]})
             self.allStims.update({stimID:[]})
@@ -387,7 +405,7 @@ class ModelAnalysis(Actor):
             # stim off
             self.currStimID[:, frame] = np.zeros(8)
 
-        #TODO: only works if stim and frame received concurrently...
+        #TODO: only works if stim and frame received concurrently, which they are for this demo
 
         self.lastOnOff = curStim
 
