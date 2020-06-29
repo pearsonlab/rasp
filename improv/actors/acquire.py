@@ -186,9 +186,9 @@ class BehaviorAcquirer(Actor):
         ''' Check for input from behavioral control
         '''
         # Faking it for now.
-        if self.n % 100 == 0:
+        if self.n % 50 == 0:
             self.curr_stim = random.choice(self.behaviors)
-            self.onoff = random.choice([0,20])
+            self.onoff = random.choice([0,10])
             self.q_out.put({self.n:[self.curr_stim, self.onoff]})
             logger.info('Changed stimulus! {}'.format(self.curr_stim))
         time.sleep(0.068)

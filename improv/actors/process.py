@@ -26,10 +26,11 @@ class CaimanProcessor(Actor):
        interface with our pipeline.
        Uses code from caiman/source_extraction/cnmf/online_cnmf.py
     '''
-    def __init__(self, *args, init_filename='data/tbif_ex.h5', config_file=None):
+    def __init__(self, *args, init_filename='data/Tolias_mesoscope_2.hdf5', config_file=None):
         super().__init__(*args)
         print('initfile ', init_filename, 'config file ', config_file)
         self.param_file = config_file
+        print(init_filename)
         self.init_filename = init_filename
         self.frame_number = 0
 
@@ -49,6 +50,7 @@ class CaimanProcessor(Actor):
 
         # MUST include inital set of frames
         # TODO: Institute check here as requirement to Nexus
+        print(self.params['fnames'])
 
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)

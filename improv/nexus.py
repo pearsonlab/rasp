@@ -374,7 +374,7 @@ class Nexus():
         try:
             self.p_Limbo = subprocess.Popen(['plasma_store',
                               '-s', '/tmp/store',
-                              '-m', str(size)],
+                              '-m', str(size), '-e', HashTable],
                               stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
             logger.info('Store started successfully')
