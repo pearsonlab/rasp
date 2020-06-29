@@ -7,13 +7,13 @@ actors:
   Acquirer:
     package: improv.actors.acquire
     class: FileAcquirer
-    filename: data/Tolias_mesoscope_3.hdf5
+    filename: data/Tolias_mesoscope_2.hdf5
     framerate: 30
 
   Processor:
     package: actors.basic_processor
     class: BasicProcessor
-    init_filename: data/Tolias_mesoscope_3.hdf5
+    init_filename: data/Tolias_mesoscope_2.hdf5
     config_file: basic_caiman_params.txt
 
   Visual:

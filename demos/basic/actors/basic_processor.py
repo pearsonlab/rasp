@@ -25,7 +25,7 @@ class BasicProcessor(CaimanProcessor):
     '''
     
     #TODO: Default data set for this. Ask for using Tolias from caiman...?
-    def __init__(self, *args, init_filename='data/Tolias...?', config_file=None):
+    def __init__(self, *args, init_filename='data/Tolias_mesoscope_2.hdf5', config_file=None):
         super().__init__(*args, init_filename=init_filename, config_file=config_file)
     
     def run(self):
