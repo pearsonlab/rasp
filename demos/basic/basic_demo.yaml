@@ -16,6 +16,10 @@ actors:
     init_filename: data/Tolias_mesoscope_2.hdf5
     config_file: basic_caiman_params.txt
 
+  Watcher:
+    package: improv.actors.watcher
+    class: BasicWatcher
+
   Visual:
     package: actors.visual
     class: BasicCaimanVisual
@@ -31,6 +35,8 @@ actors:
 
 connections:
   Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue]
+  Acquirer.q_watch: [Watcher.q_in]
   Processor.q_out: [Analysis.q_in]
+  Processor.q_watch: [Watcher.q_in]
   Analysis.q_out: [Visual.q_in]
   InputStim.q_out: [Analysis.input_stim_queue]
