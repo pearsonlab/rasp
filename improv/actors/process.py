@@ -44,6 +44,7 @@ class CaimanProcessor(Actor):
         self.coords = None
         self.ests = None
         self.A = None
+        self.saving= True
 
         self.loadParams(param_file=self.param_file)
         self.params = self.client.get('params_dict')
@@ -57,6 +58,7 @@ class CaimanProcessor(Actor):
         #TODO: Need to rewrite init online as well to receive individual frames.
         self.onAc.initialize_online()
         self.max_shifts_online = self.onAc.params.get('online', 'max_shifts_online')
+
 
     def run(self):
         '''Run the processor continually on input frames
@@ -267,7 +269,10 @@ class CaimanProcessor(Actor):
         ids.append(self.client.put(C, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
+        
         self.q_out.put(ids)
+        self.q_watchout.put([ids[1], 'proc_image'+str(self.frame_number)])
+        print('------------ put in watcher '+ str(self.frame_number))
         #self.q_comm.put([self.frame_number])
 
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4, t6-t5])

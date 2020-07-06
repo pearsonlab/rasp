@@ -64,6 +64,11 @@ class Actor():
         self.q_out = q_out
         self.links.update({'q_out':self.q_out})
 
+    def setLinkWatch(self,  q_watch):
+
+        self.q_watchout= q_watch
+        self.links.update({'q_watchout':self.q_watchout})
+
     def addLink(self, name, link):
         ''' Function provided to add additional data links by name
             using same form as q_in or q_out

@@ -22,7 +22,7 @@ class FileAcquirer(Actor):
         self.data = None
         self.done = False
         self.flag = False
-        self.saving = False
+        self.saving = True
         self.filename = filename
         self.framerate = 1/framerate 
 
@@ -43,13 +43,15 @@ class FileAcquirer(Actor):
 
         else: raise FileNotFoundError
 
-        if self.saving:
-            save_file = self.filename.split('.')[0]+'_backup'+'.h5'
-            self.f = h5py.File(save_file, 'w', libver='latest')
-            self.dset = self.f.create_dataset("default", (len(self.data),)) #TODO: need to set maxsize to none?
+        print(self.q_out)
+
+        #if self.saving:
+        #    save_file = self.filename.split('.')[0]+'_backup'+'.h5'
+        #    self.f = h5py.File(save_file, 'w', libver='latest')
+        #    self.dset = self.f.create_dataset("default", (len(self.data),)) #TODO: need to set maxsize to none?
 
     def run(self):
-        ''' Run indefinitely. Calls runAcquirer after checking for singals
+        ''' Run indefinitely. Calls runAcquirer after checking for signals
         '''
         self.total_times = []
         self.timestamp = []
@@ -81,7 +83,8 @@ class FileAcquirer(Actor):
                 self.q_out.put([{str(self.frame_num):id}])
                 self.frame_num += 1
                 if self.saving:
-                    self.saveFrame(frame) #also log to disk #TODO: spawn separate process here?     
+                    id1= self.client.put(np.random.rand(5), 'test'+str(self.frame_num))
+                    self.q_watchout.put([id, str(self.frame_num)] ) #also log to disk #TODO: spawn separate process here?  
             except Exception as e:
                 logger.error('Acquirer general exception: {}'.format(e))
 
@@ -93,8 +96,8 @@ class FileAcquirer(Actor):
             self.data = None
             self.q_comm.put(None)
             self.done = True # stay awake in case we get e.g. a shutdown signal
-            if self.saving:
-                self.f.close()
+            #if self.saving:
+            #    self.f.close()
     
     def getFrame(self, num):
         ''' Here just return frame from loaded data
