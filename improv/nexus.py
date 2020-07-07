@@ -93,6 +93,7 @@ class Nexus():
                 s, lambda s=s: asyncio.ensure_future(self.stop_polling(s, loop))) #TODO
 
         loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
+        logger.info('Shutdown loop')
 
     def loadTweak(self, file=None):
         ''' For each connection:
@@ -235,11 +236,7 @@ class Nexus():
         '''Run the actor continually; used for separate processes
             #TODO: hook into monitoring here?
         '''
-        if 'Watcher' not in actor.name:
-            actor.run()
-        else:
-            loop= asyncio.get_event_loop()
-            loop.run_until_complete(actor.run())
+        actor.run()
 
     def startWatcher(self):
         self.watcher = store.Watcher('watcher', store.Limbo('watcher'))
@@ -250,6 +247,7 @@ class Nexus():
         self.p_watch = Process(target=self.watcher.run, name='watcher_process')
         self.p_watch.daemon = True
         self.p_watch.start()
+        self.processes.append(self.p_watch)
 
     def start(self):
         logger.info('Starting processes')
@@ -292,6 +290,7 @@ class Nexus():
         for p in self.processes:
             # if p.is_alive():
             #     p.terminate()
+            p.terminate()
             p.join()
 
         logger.warning('Done with available frames')
@@ -380,6 +379,8 @@ class Nexus():
         logger.warning('Destroying Nexus')
         self._closeStore()
         logger.warning('Killed the central store')
+
+         
 
     def _closeStore(self):
         ''' Internal method to kill the subprocess

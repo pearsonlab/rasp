@@ -269,10 +269,10 @@ class CaimanProcessor(Actor):
         ids.append(self.client.put(C, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
-        
+
         self.q_out.put(ids)
-        self.q_watchout.put([ids[1], 'proc_image'+str(self.frame_number)])
-        print('------------ put in watcher '+ str(self.frame_number))
+
+
         #self.q_comm.put([self.frame_number])
 
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4, t6-t5])

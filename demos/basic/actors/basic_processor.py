@@ -40,6 +40,7 @@ class BasicProcessor(CaimanProcessor):
         self.total_times = []
         self.timestamp = []
         self.counter = 0
+        self.saving=True
 
         with RunManager(self.name, self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
@@ -123,6 +124,10 @@ class BasicProcessor(CaimanProcessor):
         ids.append(self.frame_number)
         t5 = time.time()
         self.q_out.put(ids)
+
+
+        if self.saving:
+            self.q_watchout.put([ids[1], 'proc_image'+str(self.frame_number)])
         #self.q_comm.put([self.frame_number])
 
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4])
