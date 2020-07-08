@@ -40,7 +40,6 @@ class BasicProcessor(CaimanProcessor):
         self.total_times = []
         self.timestamp = []
         self.counter = 0
-        self.saving=True
 
         with RunManager(self.name, self.runProcess, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
@@ -73,7 +72,7 @@ class BasicProcessor(CaimanProcessor):
             t = time.time()
             self.done = False
             try:
-                self.frame = self.client.getID(frame[0][str(self.frame_number)])
+                self.frame = self.client.getID(frame[0][0])
                 self.frame = self._processFrame(self.frame, self.frame_number+init)
                 t2 = time.time()
                 self._fitFrame(self.frame_number+init, self.frame.reshape(-1, order='F'))
@@ -118,16 +117,18 @@ class BasicProcessor(CaimanProcessor):
         t4 = time.time()
 
         ids = []
-        ids.append(self.client.put(self.coords, 'coords'+str(self.frame_number)))
-        ids.append(self.client.put(image, 'proc_image'+str(self.frame_number)))
-        ids.append(self.client.put(C, 'C'+str(self.frame_number)))
-        ids.append(self.frame_number)
+        ids.append([self.client.put(self.coords, 'coords'+str(self.frame_number)), 'coords'+str(self.frame_number)])
+        ids.append([self.client.put(image, 'proc_image'+str(self.frame_number)), 'proc_image'+str(self.frame_number)])
+        ids.append([self.client.put(C, 'C'+str(self.frame_number)), 'C'+str(self.frame_number)])
+        ids.append([self.frame_number, str(self.frame_number)])
         t5 = time.time()
-        self.q_out.put(ids)
 
+        if self.frame_number %50 == 0:
+            self.put(ids, save= [False, True, False, False])
 
-        if self.saving:
-            self.q_watchout.put([ids[1], 'proc_image'+str(self.frame_number)])
+        else:
+            self.put(ids, save= [False]*4)
+
         #self.q_comm.put([self.frame_number])
 
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4])

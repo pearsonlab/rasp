@@ -1,5 +1,5 @@
 settings:
-  use_watcher: [Acquirer, Processor]
+  use_watcher: [Acquirer, Processor, Visual, Analysis]
 
 actors:
   GUI:

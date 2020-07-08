@@ -22,7 +22,6 @@ class FileAcquirer(Actor):
         self.data = None
         self.done = False
         self.flag = False
-        self.saving = True
         self.filename = filename
         self.framerate = 1/framerate 
 
@@ -80,11 +79,9 @@ class FileAcquirer(Actor):
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
             self.timestamp.append([time.time(), self.frame_num])
             try:
-                self.q_out.put([{str(self.frame_num):id}])
+                self.put([[id, str(self.frame_num)]], save=[True])
                 self.frame_num += 1
-                if self.saving:
-                    id1= self.client.put(np.random.rand(5), 'test'+str(self.frame_num))
-                    self.q_watchout.put([id, str(self.frame_num)] ) #also log to disk #TODO: spawn separate process here?  
+                 #also log to disk #TODO: spawn separate process here?  
             except Exception as e:
                 logger.error('Acquirer general exception: {}'.format(e))
 

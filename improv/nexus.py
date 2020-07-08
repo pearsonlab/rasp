@@ -19,7 +19,7 @@ from improv.actor import Spike
 from queue import Empty, Full
 import logging
 from datetime import datetime
-from improv.actors.watcher import BasicWatcher
+from improv.watcher import BasicWatcher
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

@@ -90,6 +90,21 @@ class Actor():
         '''
         raise NotImplementedError
 
+    def put(self, idnames, q_out= None, save=None):
+
+        if save==None:
+            save= [False]*len(idnames)
+
+        if q_out == None:
+            q_out= self.q_out
+
+        q_out.put(idnames)
+
+        for i in range(len(idnames)):
+            if save[i]:
+                self.q_watchout.put(idnames[i])
+
+
     def run(self):
         ''' Must run in continuous mode
             Also must check q_sig either at top of a run-loop
