@@ -121,13 +121,14 @@ class BasicProcessor(CaimanProcessor):
         ids.append([self.client.put(image, 'proc_image'+str(self.frame_number)), 'proc_image'+str(self.frame_number)])
         ids.append([self.client.put(C, 'C'+str(self.frame_number)), 'C'+str(self.frame_number)])
         ids.append([self.frame_number, str(self.frame_number)])
-        t5 = time.time()
 
         if self.frame_number %50 == 0:
-            self.put(ids, save= [False, True, False, False])
+            self.put(ids, save= [False, False, False, False])
 
         else:
             self.put(ids, save= [False]*4)
+
+        t5 = time.time()
 
         #self.q_comm.put([self.frame_number])
 
