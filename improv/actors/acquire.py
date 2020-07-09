@@ -42,8 +42,6 @@ class FileAcquirer(Actor):
 
         else: raise FileNotFoundError
 
-        print(self.q_out)
-
         #if self.saving:
         #    save_file = self.filename.split('.')[0]+'_backup'+'.h5'
         #    self.f = h5py.File(save_file, 'w', libver='latest')
@@ -63,6 +61,10 @@ class FileAcquirer(Actor):
         np.savetxt('output/timing/acquire_frame_time.txt', np.array(self.total_times))
         np.savetxt('output/timing/acquire_timestamp.txt', np.array(self.timestamp))
 
+        print('------- Acquirer loop time: '+ str(self.loop_time))
+        print('------- Acquirer putq time: '+ str(self.putq_time))
+        print('------- Acquirer putstore time: '+ str(self.putstore_time))
+
     def runAcquirer(self):
         '''While frames exist in location specified during setup,
            grab frame, save, put in store
@@ -76,7 +78,9 @@ class FileAcquirer(Actor):
             ## simulate frame-dropping
             # if self.frame_num > 1500 and self.frame_num < 1800:
             #     frame = None
+            t= time.time()
             id = self.client.put(frame, 'acq_raw'+str(self.frame_num))
+            t1= time.time()
             self.timestamp.append([time.time(), self.frame_num])
             try:
                 self.put([[id, str(self.frame_num)]], save=[True])

@@ -174,7 +174,7 @@ class MeanAnalysis(Actor):
         ids.append([self.client.put(self.coordDict, 'analys_coords'+str(self.frame)), 'analys_coords'+str(self.frame)])
         ids.append([self.frame, str(self.frame)])
 
-        self.put(ids, save= [False, False, False, False, False, True, False])
+        self.put(ids, save= [False, False, False, False, False, False, False])
 
         self.puttime.append(time.time()-t)
 

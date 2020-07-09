@@ -12,6 +12,7 @@ from caiman.motion_correction import motion_correct_iteration_fast, tile_and_cor
 from caiman.utils.visualization import get_contours
 from os.path import expanduser
 from queue import Empty
+import pyarrow.plasma as plasma
 from improv.actor import Actor, Spike, RunManager
 from improv.actors.process import CaimanProcessor
 import traceback
@@ -122,17 +123,19 @@ class BasicProcessor(CaimanProcessor):
         ids.append([self.client.put(C, 'C'+str(self.frame_number)), 'C'+str(self.frame_number)])
         ids.append([self.frame_number, str(self.frame_number)])
 
+        t5 = time.time()
+
         if self.frame_number %50 == 0:
-            self.put(ids, save= [False, False, False, False])
+            self.put(ids, save= [False, True, False, False])
 
         else:
             self.put(ids, save= [False]*4)
 
-        t5 = time.time()
+        t6= time.time()
 
         #self.q_comm.put([self.frame_number])
 
-        self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4])
+        self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t6-t4])
 
 
     def _updateCoords(self, A, dims):

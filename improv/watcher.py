@@ -13,6 +13,8 @@ import asyncio
 import concurrent
 from pyarrow.plasma import ObjectNotAvailable
 from improv.actor import Actor, Spike, RunManager, AsyncRunManager
+from improv.store import ObjectNotFoundError
+from pyarrow.plasma import ObjectNotAvailable
 
 class BasicWatcher(Actor):
 
@@ -49,6 +51,10 @@ class BasicWatcher(Actor):
         for i,t in enumerate(self.tasks):
             if t in done or self.polling[i].status == 'done':
                 r= self.polling[i].result # r should be array with id and name
-                obj= self.client.getID(r[0])
-                np.save('save/'+r[1], obj)
+                try:
+                    obj= self.client.getID(r[0])
+                    np.save('save/'+r[1], obj)
+                except ObjectNotFoundError as e:
+                    logger.info(e.message)
+                    pass
                 self.tasks[i] = (asyncio.ensure_future(self.polling[i].get_async()))

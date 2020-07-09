@@ -4,6 +4,7 @@ import time
 from typing import Awaitable, Callable
 import traceback
 
+
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -91,15 +92,18 @@ class Actor():
         raise NotImplementedError
 
     def put(self, idnames, q_out= None, save=None):
-
+    
         if save==None:
             save= [False]*len(idnames)
+
+        if len(save)<len(idnames):
+            save= save + [False]*(len(idnames)-len(save))
 
         if q_out == None:
             q_out= self.q_out
 
         q_out.put(idnames)
-
+ 
         for i in range(len(idnames)):
             if save[i]:
                 self.q_watchout.put(idnames[i])
