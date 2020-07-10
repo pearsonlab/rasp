@@ -50,10 +50,11 @@ class BasicWatcher(Actor):
 
         for i,t in enumerate(self.tasks):
             if t in done or self.polling[i].status == 'done':
-                r= self.polling[i].result # r should be array with id and name
+                r = self.polling[i].result # r should be array with id and name of object
+                actorID = self.polling[i].getStart() # name of actor asking watcher to save the object
                 try:
                     obj= self.client.getID(r[0])
-                    np.save('save/'+r[1], obj)
+                    np.save('output/saved/'+actorID+r[1], obj)
                 except ObjectNotFoundError as e:
                     logger.info(e.message)
                     pass

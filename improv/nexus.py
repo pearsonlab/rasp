@@ -151,7 +151,7 @@ class Nexus():
             self.assignLink(name, link)
 
         self.createWatcher()
-        self.actors['Watcher'].watchin= []
+        self.actors['Watcher'].watchin = []
 
         for name in self.tweak.settings['use_watcher']:
             watch_link= Link(name+'_watch', name, 'Watcher')
