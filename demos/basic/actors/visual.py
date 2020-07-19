@@ -132,7 +132,7 @@ class BasicCaimanVisual(Actor):
             self.C = self.C[:, -len(self.Cx):]
             self.Cpop = self.Cpop[-len(self.Cx):]
         
-        return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, self.tuned
+        return self.Cx, self.C[self.selectedNeuron,:], self.Cpop, self.tuned, np.size(self.C, 0)
 
     def getFrames(self):
         ''' Return the raw and colored frames for display

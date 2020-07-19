@@ -21,6 +21,7 @@ class Ui_MainWindow(object):
 "#label_3 {color: rgb(225, 230, 240)}\n"
 "#label_4 {color: rgb(225, 230, 240)}\n"
 "#label_5 {color: rgb(225, 230, 240)}\n"
+"#label_6 {color: rgb(225, 230, 240)}\n"
 "#frame {background-color: rgb(150, 160, 175);\n"
 "border-style: outset;\n"
 "border-width: 2px;\n"
@@ -258,6 +259,15 @@ class Ui_MainWindow(object):
         font.setWeight(75)
         self.label_5.setFont(font)
         self.label_5.setObjectName("label_5")
+        self.label_6 = QtWidgets.QLabel(self.centralwidget)
+        self.label_6.setGeometry(QtCore.QRect(20, 611, 331, 21))
+        font= QtGui.QFont()
+        font.setFamily("Helvetica Neue")
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_6.setFont(font)
+        self.label_6.setObjectName("label_6")
         self.frame_6 = QtWidgets.QFrame(self.centralwidget)
         self.frame_6.setGeometry(QtCore.QRect(170, 30, 431, 101))
         self.frame_6.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -321,6 +331,7 @@ class Ui_MainWindow(object):
         self.label_3.setText(_translate("MainWindow", "Selected Neuron"))
         self.label_4.setText(_translate("MainWindow", "Raw Frame"))
         self.label_5.setText(_translate("MainWindow", "Processed Frame"))
+        self.label_6.setText(_translate("MainWindow", "Number of Neurons: "))
         self.menuRASP_Display.setTitle(_translate("MainWindow", "Nexus Display"))
 
 

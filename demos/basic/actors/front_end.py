@@ -206,11 +206,15 @@ class BasicFrontEnd(QtGui.QMainWindow, improv_basic.Ui_MainWindow):
         Cx = None
         tune = None
         try:
-            (Cx, C, Cpop, tune) = self.visual.getCurves()
+            (Cx, C, Cpop, tune, N) = self.visual.getCurves()
         except TypeError:
             pass
         except Exception as e:
             logger.error('Output does not likely exist. Error: {}'.format(e))
+
+        if Cx is not None:
+            translate = QtCore.QCoreApplication.translate
+            self.label_6.setText(translate("MainWindow", "Number of Neurons: "+str(N)))
 
         if(C is not None and Cx is not None):
             self.c1.setData(Cx, Cpop, pen=penW)
