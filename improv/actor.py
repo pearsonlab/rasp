@@ -4,6 +4,7 @@ import time
 from typing import Awaitable, Callable
 import traceback
 
+
 import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -64,6 +65,11 @@ class Actor():
         self.q_out = q_out
         self.links.update({'q_out':self.q_out})
 
+    def setLinkWatch(self,  q_watch):
+
+        self.q_watchout= q_watch
+        self.links.update({'q_watchout':self.q_watchout})
+
     def addLink(self, name, link):
         ''' Function provided to add additional data links by name
             using same form as q_in or q_out
@@ -84,6 +90,24 @@ class Actor():
             options is a list of options, can be empty
         '''
         raise NotImplementedError
+
+    def put(self, idnames, q_out= None, save=None):
+    
+        if save==None:
+            save= [False]*len(idnames)
+
+        if len(save)<len(idnames):
+            save= save + [False]*(len(idnames)-len(save))
+
+        if q_out == None:
+            q_out= self.q_out
+
+        q_out.put(idnames)
+ 
+        for i in range(len(idnames)):
+            if save[i]:
+                self.q_watchout.put(idnames[i])
+
 
     def run(self):
         ''' Must run in continuous mode

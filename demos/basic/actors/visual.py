@@ -84,14 +84,15 @@ class BasicCaimanVisual(Actor):
         ids = None
         try:
             id = self.links['raw_frame_queue'].get(timeout=0.0001)
-            self.raw_frame_number = list(id[0].keys())[0]
-            self.raw = self.client.getID(id[0][self.raw_frame_number])
+            self.raw_frame_number = id[0][1]
+            self.raw = self.client.getID(id[0][0])
         except Empty as e:
             pass
         except Exception as e:
             logger.error('Visual: Exception in get data: {}'.format(e))
         try: 
             ids = self.q_in.get(timeout=0.0001)
+            ids= [id[0] for id in ids]
             if ids is not None and ids[0]==1:
                 print('visual: missing frame')
                 self.frame_num += 1

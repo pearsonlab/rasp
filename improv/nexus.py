@@ -19,6 +19,7 @@ from improv.actor import Spike
 from queue import Empty, Full
 import logging
 from datetime import datetime
+from improv.watcher import BasicWatcher
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -74,11 +75,12 @@ class Nexus():
         for name,m in self.actors.items(): # m accesses the specific actor class instance
             if 'GUI' not in name: #GUI already started
                 p = Process(target=self.runActor, name=name, args=(m,))
-                if 'daemon' in self.tweak.actors[name].options: # e.g. suite2p creates child processes.
-                    p.daemon = self.tweak.actors[name].options['daemon']
-                    logger.info('Setting daemon to {} for {}'.format(p.daemon,name))
-                else: 
-                    p.daemon = True #default behavior
+                if 'Watcher' not in name:
+                    if 'daemon' in self.tweak.actors[name].options: # e.g. suite2p creates child processes.
+                        p.daemon = self.tweak.actors[name].options['daemon']
+                        logger.info('Setting daemon to {} for {}'.format(p.daemon,name))
+                    else: 
+                        p.daemon = True #default behavior
                 self.processes.append(p)
 
         self.start()
@@ -91,6 +93,7 @@ class Nexus():
                 s, lambda s=s: asyncio.ensure_future(self.stop_polling(s, loop))) #TODO
 
         loop.run_until_complete(self.pollQueues()) #TODO: in Link executor, complete all tasks
+        logger.info('Shutdown loop')
 
     def loadTweak(self, file=None):
         ''' For each connection:
@@ -147,7 +150,26 @@ class Nexus():
         for name,link in self.data_queues.items():
             self.assignLink(name, link)
 
+        self.createWatcher()
+        self.actors['Watcher'].watchin = []
+
+        for name in self.tweak.settings['use_watcher']:
+            watch_link= Link(name+'_watch', name, 'Watcher')
+            self.assignLink(name+'.watchout', watch_link)
+            self.actors['Watcher'].watchin.append(watch_link)
+
         #TODO: error handling for if a user tries to use q_in without defining it
+
+    def createWatcher(self):
+        watcher= BasicWatcher('Watcher')
+        watcher.setStore(store.Limbo(watcher.name))
+        q_comm = Link('Watcher_comm', watcher.name, self.name)
+        q_sig = Link('Watcher_sig', self.name, watcher.name)
+        self.comm_queues.update({q_comm.name:q_comm})
+        self.sig_queues.update({q_sig.name:q_sig})
+        watcher.setCommLinks(q_comm, q_sig)
+
+        self.actors.update({watcher.name: watcher})
 
     def createActor(self, name, actor):
         ''' Function to instantiate actor, add signal and comm Links,
@@ -205,6 +227,8 @@ class Nexus():
             self.actors[classname].setLinkOut(link)
         elif linktype == 'q_in':
             self.actors[classname].setLinkIn(link)
+        elif linktype == 'watchout':
+            self.actors[classname].setLinkWatch(link)
         else:
             self.actors[classname].addLink(linktype, link)
 
@@ -223,6 +247,7 @@ class Nexus():
         self.p_watch = Process(target=self.watcher.run, name='watcher_process')
         self.p_watch.daemon = True
         self.p_watch.start()
+        self.processes.append(self.p_watch)
 
     def start(self):
         logger.info('Starting processes')
@@ -265,6 +290,7 @@ class Nexus():
         for p in self.processes:
             # if p.is_alive():
             #     p.terminate()
+            p.terminate()
             p.join()
 
         logger.warning('Done with available frames')
@@ -354,6 +380,8 @@ class Nexus():
         self._closeStore()
         logger.warning('Killed the central store')
 
+         
+
     def _closeStore(self):
         ''' Internal method to kill the subprocess
             running the store (plasma sever)
@@ -374,7 +402,8 @@ class Nexus():
         try:
             self.p_Limbo = subprocess.Popen(['plasma_store',
                               '-s', '/tmp/store',
-                              '-m', str(size)],
+                              '-m', str(size),
+                              '-e', 'hashtable://test'],
                               stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL)
             logger.info('Store started successfully')

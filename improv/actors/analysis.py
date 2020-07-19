@@ -75,6 +75,7 @@ class MeanAnalysis(Actor):
             pass #no change in input stimulus
         try:
             ids = self.q_in.get(timeout=0.0001)
+            ids = [id[0] for id in ids]
             if ids is not None and ids[0]==1:
                 print('analysis: missing frame')
                 self.total_times.append(time.time()-t)
@@ -165,15 +166,16 @@ class MeanAnalysis(Actor):
         '''
         t = time.time()
         ids = []
-        ids.append(self.client.put(self.Cx, 'Cx'+str(self.frame)))
-        ids.append(self.client.put(self.Call, 'Call'+str(self.frame)))
-        ids.append(self.client.put(self.Cpop, 'Cpop'+str(self.frame)))
-        ids.append(self.client.put(self.tune, 'tune'+str(self.frame)))
-        ids.append(self.client.put(self.color, 'color'+str(self.frame)))
-        ids.append(self.client.put(self.coordDict, 'analys_coords'+str(self.frame)))
-        ids.append(self.frame)
+        ids.append([self.client.put(self.Cx, 'Cx'+str(self.frame)), 'Cx'+str(self.frame)])
+        ids.append([self.client.put(self.Call, 'Call'+str(self.frame)), 'Call'+str(self.frame)])
+        ids.append([self.client.put(self.Cpop, 'Cpop'+str(self.frame)), 'Cpop'+str(self.frame)])
+        ids.append([self.client.put(self.tune, 'tune'+str(self.frame)), 'tune'+str(self.frame)])
+        ids.append([self.client.put(self.color, 'color'+str(self.frame)), 'color'+str(self.frame)])
+        ids.append([self.client.put(self.coordDict, 'analys_coords'+str(self.frame)), 'analys_coords'+str(self.frame)])
+        ids.append([self.frame, str(self.frame)])
 
-        self.q_out.put(ids)
+        self.put(ids, save= [False, False, False, False, False, False, False])
+
         self.puttime.append(time.time()-t)
 
     def stimAvg_start(self):

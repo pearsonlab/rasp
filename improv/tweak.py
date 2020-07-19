@@ -33,6 +33,8 @@ class Tweak():
         with open(self.configFile, 'r') as ymlfile:
             cfg = yaml.safe_load(ymlfile)
 
+        self.settings= cfg['settings']
+
         for name,actor in cfg['actors'].items(): 
             # put import/name info in TweakModule object TODO: make ordered?
 

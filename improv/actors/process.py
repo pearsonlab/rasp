@@ -26,10 +26,11 @@ class CaimanProcessor(Actor):
        interface with our pipeline.
        Uses code from caiman/source_extraction/cnmf/online_cnmf.py
     '''
-    def __init__(self, *args, init_filename='data/tbif_ex.h5', config_file=None):
+    def __init__(self, *args, init_filename='data/Tolias_mesoscope_2.hdf5', config_file=None):
         super().__init__(*args)
         print('initfile ', init_filename, 'config file ', config_file)
         self.param_file = config_file
+        print(init_filename)
         self.init_filename = init_filename
         self.frame_number = 0
 
@@ -43,18 +44,21 @@ class CaimanProcessor(Actor):
         self.coords = None
         self.ests = None
         self.A = None
+        self.saving= True
 
         self.loadParams(param_file=self.param_file)
         self.params = self.client.get('params_dict')
 
         # MUST include inital set of frames
         # TODO: Institute check here as requirement to Nexus
+        print(self.params['fnames'])
 
         self.opts = CNMFParams(params_dict=self.params)
         self.onAc = OnACID(params = self.opts)
         #TODO: Need to rewrite init online as well to receive individual frames.
         self.onAc.initialize_online()
         self.max_shifts_online = self.onAc.params.get('online', 'max_shifts_online')
+
 
     def run(self):
         '''Run the processor continually on input frames
@@ -265,7 +269,10 @@ class CaimanProcessor(Actor):
         ids.append(self.client.put(C, 'S'+str(self.frame_number)))
         ids.append(self.frame_number)
         t6 = time.time()
+
         self.q_out.put(ids)
+
+
         #self.q_comm.put([self.frame_number])
 
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4, t6-t5])
