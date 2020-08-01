@@ -262,8 +262,10 @@ class Ui_MainWindow(object):
         self.label_6.setFont(font)
         self.label_6.setObjectName("label_6")
         self.dir_icon = QtWidgets.QLabel(self.centralwidget)
-        self.dir_icon.setGeometry(QtCore.QRect(184, 110, 67, 55))
+        self.dir_icon.setGeometry(QtCore.QRect(184, 106, 67, 65))
         self.dir_icon.setText("")
+        self.dir_icon.setPixmap(QtGui.QPixmap(":/newPrefix/rainbow_dir.png"))
+        self.dir_icon.setScaledContents(True)
         self.dir_icon.setObjectName("dir_icon")
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
@@ -299,3 +301,4 @@ class Ui_MainWindow(object):
 
 
 from pyqtgraph import ImageView, PlotWidget
+from . import icon_rc

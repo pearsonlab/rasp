@@ -8,13 +8,13 @@ actors:
     package: actors.acquire_tbif
     class: TbifAcquirer
     filename: data/08-17-14_1437_F1_6dpfCOMPLETESET_WB_overclimbing_z-1.tbif
-    framerate: 2
+    framerate: 3.6
 
   Processor:
     package: actors.processor
     class: CaimanProcessor
     init_filename: data/tbif_ex_crop.h5
-    config_file: eva_caiman_params.txt
+    config_file: naumann_caiman_params.txt
 
   Visual:
     package: actors.visual_model

@@ -583,7 +583,6 @@ Neuron</string>
    <header>pyqtgraph.h</header>
   </customwidget>
  </customwidgets>
- <resources/>
  <connections/>
  <designerdata>
   <property name="gridDeltaX">

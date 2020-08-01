@@ -11,11 +11,11 @@ import logging; logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 class ModelAnalysis(Actor):
-    #TODO: Add additional error handling
+
     def __init__(self, *args):
         super().__init__(*args)
-        N = 20
-        w = np.zeros((N,N)) #guess XX neurons initially?
+        N = 20 #guess XX neurons initially?
+        w = np.zeros((N,N)) 
         h = np.zeros((N,4)) #dh is 4
         k = np.zeros((N,8))
         b = np.zeros(N)
@@ -28,11 +28,14 @@ class ModelAnalysis(Actor):
         np.seterr(divide='ignore')
 
         # TODO: same as behaviorAcquisition, need number of stimuli here. Make adaptive later
-        self.num_stim = 21 
+        self.num_stim = 12 
         self.frame = 0
         # self.curr_stim = 0 #start with zeroth stim unless signaled otherwise
         self.stim = {}
-        self.stimStart = {}
+        self.stimStart = -1
+        self.currentStim = None
+        self.ests = np.zeros((1, self.num_stim, 2)) #number of neurons, number of stim, on and baseline
+        self.counter = np.ones((self.num_stim,2))
         self.window = 500 #TODO: make user input, choose scrolling window for Visual
         self.C = None
         self.S = None
@@ -46,9 +49,10 @@ class ModelAnalysis(Actor):
         self.runMeanOff = None
         self.lastOnOff = None
         self.recentStim = [0]*self.window
-        self.currStimID = np.zeros((8, 100000)) #FIXME
+        self.currStimID = np.zeros((8, 1000000)) #FIXME
         self.currStim = -10
         self.allStims = {}
+        self.estsAvg = None
 
     def run(self):
         self.total_times = []
@@ -57,12 +61,14 @@ class ModelAnalysis(Actor):
         self.stimtime = []
         self.timestamp = []
         self.LL = []
+        self.fit_times = []
 
         with RunManager(self.name, self.runStep, self.setup, self.q_sig, self.q_comm) as rm:
             logger.info(rm)
         
         print('Analysis broke, avg time per frame: ', np.mean(self.total_times, axis=0))
         print('Analysis broke, avg time per put analysis: ', np.mean(self.puttime))
+        print('Analysis broke, avg time per put analysis: ', np.mean(self.fit_times))
         print('Analysis broke, avg time per color frame: ', np.mean(self.colortime))
         print('Analysis broke, avg time per stim avg: ', np.mean(self.stimtime))
         print('Analysis got through ', self.frame, ' frames')
@@ -84,11 +90,7 @@ class ModelAnalysis(Actor):
         '''
         t = time.time()
         ids = None
-        try: 
-            sig = self.links['input_stim_queue'].get(timeout=0.0001)
-            self.updateStim_start(sig)
-        except Empty as e:
-            pass #no change in input stimulus
+        
         try:
             ids = self.q_in.get(timeout=0.0001)
             if ids is not None and ids[0]==1:
@@ -104,11 +106,17 @@ class ModelAnalysis(Actor):
             
             # Compute tuning curves based on input stimulus
             # Just do overall average activity for now
+            try: 
+                sig = self.links['input_stim_queue'].get(timeout=0.0001)
+                self.updateStim_start(sig)
+            except Empty as e:
+                pass #no change in input stimulus
             self.stimAvg_start()
 
             # fit to model once we have enough neurons
             if self.C.shape[0]>=self.p['numNeurons']:
-                self.fit()
+                if self.frame % 5 == 0:
+                    self.fit()
             
             self.globalAvg = np.mean(self.estsAvg[:,:8], axis=0)
             self.tune = [self.estsAvg[:,:8], self.globalAvg]
@@ -158,13 +166,12 @@ class ModelAnalysis(Actor):
     
     def fit(self):
         '''
-        '''        
+        '''       
+        t = time.time() 
         if self.p["numNeurons"] < self.S.shape[0]: #check for more neurons
             self.updateTheta()
 
         self.p["numSamples"] = self.frame
-
-        # print('First test: ', self.ll(self.S[:,:self.frame]))
 
         if self.frame<50:
             y_step = self.S[:,:self.frame]
@@ -175,14 +182,11 @@ class ModelAnalysis(Actor):
 
         y_step = np.where(np.isnan(y_step), 0, y_step) #Why are there nans here anyway?? #TODO
 
-        t0 = time.time()
+        # t0 = time.time()
         self.theta -= 1e-5*self.ll_grad(y_step, stim_step)
         self.LL.append(self.ll(y_step, stim_step))
         # print(time.time()-t0, self.p['numNeurons'], self.LL[-1])
-
-        # gradStep = self.j_ll_grad(self.theta, y_step, self.p)
-        # self.theta -= 1e-5*gradStep
-        # self.theta -= 1e-5 * self.j_ll_grad(self.theta, y_step, self.p)
+        self.fit_times.append(time.time()-t)
 
     def ll(self, y, s):
         '''
@@ -262,26 +266,10 @@ class ModelAnalysis(Actor):
             for j in np.arange(0,dh):
                 grad['h'][i,j] = np.sum(np.flip(data['y'],1)[i,:]*rateDiff[i,:])/M
 
-        # check for nans
-        # grad = self.gradCheck(grad)
-
         # flatten grad
         grad_flat = np.concatenate((grad['w'],grad['h'],grad['b'],grad['k']), axis=None).flatten()/N
 
         return grad_flat
-
-    # def gradCheck(self, grad):
-    #     resgrad = {}
-    #     for key in grad.keys():
-    #         resgrad[key] = self.arrayCheck(grad[key], key)
-    #     return resgrad
-
-    # def arrayCheck(self, arr, name):
-    #     if ~np.isfinite(arr).all():
-    #         print('**** WARNING: Found non-finite value in ' + name + ' (%g percent of the values were bad)'%(np.mean(np.isfinite(arr))))
-    #     arr = np.where(np.isnan(arr), 0, arr)
-    #     arr[arr == np.inf] = 0
-    #     return arr
 
     def d_abs(self, weights):
         pos = (weights>=0)*1
@@ -307,11 +295,8 @@ class ModelAnalysis(Actor):
             expo[:,j] = self.runModelStep(data['y'][:,j-dh:j], data['s'][:,j])
         
         # computed rates
-        # try:
         rates = f(expo)
-        # except:
-        #     import pdb; pdb.set_trace()
-
+    
         return rates
 
     def runModelStep(self, y, s):
@@ -347,7 +332,7 @@ class ModelAnalysis(Actor):
             else:
                 weights = 0
 
-            stim = k[i,:].dot(s) #np.square(k[i,:]).dot(s)
+            stim = k[i,:].dot(s)
             
             expo[i] = (b[i] + hist + weights + stim) #+ eps #remove log 0 errors
         
@@ -380,55 +365,49 @@ class ModelAnalysis(Actor):
 
         self.theta = np.concatenate((w,h,b,k), axis=None).flatten()
 
-
     def updateStim_start(self, stim):
+        ''' Rearrange the info about stimulus into
+            cardinal directions and frame <--> stim correspondence.
+
+            self.stimStart is the frame where the stimulus started.
+        '''
+        # get frame number and stimID
         frame = list(stim.keys())[0]
         whichStim = stim[frame][0]
+        # convert stimID into 8 cardinal directions
         stimID = self.IDstim(int(whichStim))
-        if whichStim not in self.stimStart.keys():
-            self.stimStart.update({whichStim:[]})
-            self.allStims.update({stimID:[]})
-        if abs(stim[frame][1])>1 :
-            curStim = 1 #on
-            self.allStims[stimID].append(frame)
-        else:
-            curStim = 0 #off
-        if self.lastOnOff is None:
+
+        # assuming we have one of those 8 stimuli
+        if stimID != -10:
+
+            if stimID not in self.allStims.keys():
+                self.allStims.update({stimID:[]})
+
+                    # # account for stimuli we haven't yet seen
+                    # if stimID not in self.stimStart.keys():
+                    #     self.stimStart.update({stimID:None})
+            # determine if this is a new stimulus trial
+            if abs(stim[frame][1])>1 :
+                curStim = 1 #on
+                self.allStims[stimID].append(frame)
+            else:
+                curStim = 0 #off
+            # paradigm for these trials is for each stim: [off, on, off]
+            if self.lastOnOff is None:
+                self.lastOnOff = curStim
+            elif self.lastOnOff == 0 and curStim == 1: #was off, now on
+                # select this frame as the starting point of the new trial
+                # and stimulus has started to be shown
+                # All other computations will reference this point
+                self.stimStart = frame 
+                self.currentStim = stimID
+                if stimID<8:
+                    self.currStimID[stimID, frame] = 1
+                # NOTE: this overwrites historical info on past trials
+                logger.info('Stim {} started at {}'.format(stimID,frame))
+            else:
+                self.currStimID[:, frame] = np.zeros(8)
             self.lastOnOff = curStim
-        elif self.lastOnOff == 0 and curStim == 1: #was off, now on
-            self.stimStart[whichStim].append(frame)
-            print('Stim ', whichStim, ' started at ', frame)
-            if stimID > -10:
-                self.currStimID[stimID, frame] = 1
-            self.currStim = stimID
-        else:
-            # stim off
-            self.currStimID[:, frame] = np.zeros(8)
-
-        #TODO: only works if stim and frame received concurrently, which they are for this demo
-
-        self.lastOnOff = curStim
-
-    def IDstim(self, s):
-        stim = -10
-        if s == 3:
-            stim = 0
-        elif s==10:
-            stim = 1
-        elif s==9:
-            stim = 2
-        elif s==16:
-            stim = 3
-        elif s==4:
-            stim = 4
-        elif s==14:
-            stim = 5
-        elif s==13:
-            stim = 6
-        elif s==12:
-            stim = 7
-
-        return stim
 
     def putAnalysis(self):
         ''' Throw things to DS and put IDs in queue for Visual
@@ -454,65 +433,96 @@ class ModelAnalysis(Actor):
         self.puttime.append(time.time()-t)
 
     def stimAvg_start(self):
-        ests = self.S #ests = self.C
-        ests_num = ests.shape[1]
         t = time.time()
-        polarAvg = [np.zeros(ests.shape[0])]*12
-        estsAvg = [np.zeros(ests.shape[0])]*self.num_stim
-        for s,l in self.stimStart.items():
-            l = np.array(l)
-            # print('stim ', s, ' is l ', l)
-            if l.size>0:
-                onInd = np.array([np.arange(o+4,o+18) for o in np.nditer(l)]).flatten()
-                onInd = onInd[onInd<ests_num]
-                # print('on ', onInd)
-                offInd = np.array([np.arange(o-10,o+25) for o in np.nditer(l)]).flatten() #TODO replace
-                offInd = offInd[offInd>=0]
-                offInd = offInd[offInd<ests_num]
-                # print('off ', offInd)
-                try:
-                    if onInd.size>0:
-                        onEst = np.mean(ests[:,onInd], axis=1)
-                    else:
-                        onEst = np.zeros(ests.shape[0])
-                    if offInd.size>0:
-                        offEst = np.mean(ests[:,offInd], axis=1)
-                    else:
-                        offEst = np.zeros(ests.shape[0])
-                    try:
-                        estsAvg[int(s)] = onEst - offEst #(onEst / offEst) - 1
-                    except FloatingPointError:
-                        print('Could not compute on/off: ', onEst, offEst)
-                        estsAvg[int(s)] = onEst
-                    except ZeroDivisionError:
-                        estsAvg[int(s)] = np.zeros(ests.shape[0])
-                except FloatingPointError: #IndexError:
-                    logger.error('Index error ')
-                    print('int s is ', int(s))
+
+        ests = self.C
+        
+        if self.ests.shape[0]<ests.shape[0]:
+            diff = ests.shape[0] - self.ests.shape[0]
+            # added more neurons, grow the array
+            self.ests = np.pad(self.ests, ((0,diff),(0,0),(0,0)), mode='constant')
+            # print('------------------Grew:', self.ests.shape)
+
+        if self.currentStim is not None:
+
+            if self.stimStart == self.frame:
+                # account for the baseline prior to stimulus onset
+                self.ests[:,self.currentStim,1] = (self.counter[self.currentStim,1]*self.ests[:,self.currentStim,1] + np.mean(ests[:,self.frame-10:self.frame],1))/(self.counter[self.currentStim,1]+1)
+                self.counter[self.currentStim, 1] += 10
+
+            elif self.frame in range(self.stimStart+1, self.frame+26):
+                print(self.currentStim)
+                print(self.frame)
+                # continue computing the running mean for this trial
+                # print(self.frame)
+                # print(self.stimStart)
+                # print(self.ests[:,self.currentStim,1])
+                # print(self.counter[self.currentStim,1])
+                
+                self.ests[:,self.currentStim,1] = (self.counter[self.currentStim,1]*self.ests[:,self.currentStim,1] + ests[:,self.frame-1])/(self.counter[self.currentStim,1]+1)
+                self.counter[self.currentStim, 1] += 1
+
+                if self.frame in range(self.stimStart+5, self.stimStart+19):
+                    self.ests[:,self.currentStim,0] = (self.counter[self.currentStim,0]*self.ests[:,self.currentStim,0] + ests[:,self.frame-1])/(self.counter[self.currentStim,0]+1)
+                    self.counter[self.currentStim, 0] += 1
+
+        self.estsAvg = np.squeeze(self.ests[:,:,0] - self.ests[:,:,1])        
+
+        # for s,l in self.stimStart.items():
+        #     l = np.array(l)
+        #     print('stim ', s, ' is l ', l)
+        #     if l.size>0:
+        #         onInd = np.array([np.arange(o+4,o+18) for o in np.nditer(l)]).flatten()
+        #         onInd = onInd[onInd<ests_num]
+        #         # print('on ', onInd)
+        #         offInd = np.array([np.arange(o-10,o+25) for o in np.nditer(l)]).flatten() #TODO replace
+        #         offInd = offInd[offInd>=0]
+        #         offInd = offInd[offInd<ests_num]
+        #         # print('off ', offInd)
+        #         try:
+        #             if onInd.size>0:
+        #                 onEst = np.mean(ests[:,onInd], axis=1)
+        #             else:
+        #                 onEst = np.zeros(ests.shape[0])
+        #             if offInd.size>0:
+        #                 offEst = np.mean(ests[:,offInd], axis=1)
+        #             else:
+        #                 offEst = np.zeros(ests.shape[0])
+        #             try:
+        #                 estsAvg[int(s)] = onEst - offEst #(onEst / offEst) - 1
+        #             except FloatingPointError:
+        #                 print('Could not compute on/off: ', onEst, offEst)
+        #                 estsAvg[int(s)] = onEst
+        #             except ZeroDivisionError:
+        #                 estsAvg[int(s)] = np.zeros(ests.shape[0])
+        #         except FloatingPointError: #IndexError:
+        #             logger.error('Index error ')
+        #             print('int s is ', int(s))
             # else:
             #     estsAvg[int(s)] = np.zeros(ests.shape[0])
 
-        estsAvg = np.array(estsAvg)
-        #TODO: efficient update, no copy
-        polarAvg[2] = estsAvg[9,:] #np.sum(estsAvg[[9,11,15],:], axis=0)
-        polarAvg[1] = estsAvg[10, :]
-        polarAvg[0] = estsAvg[3, :] #np.sum(estsAvg[[3,5,8],:], axis=0)
-        polarAvg[7] = estsAvg[12, :]
-        polarAvg[6] = estsAvg[13, :] #np.sum(estsAvg[[13,17,18],:], axis=0)
-        polarAvg[5] = estsAvg[14, :]
-        polarAvg[4] = estsAvg[4, :] #np.sum(estsAvg[[4,6,7],:], axis=0)
-        polarAvg[3] = estsAvg[16, :]
+        # estsAvg = np.array(estsAvg)
+        # polarAvg[2] = estsAvg[9,:] #np.sum(estsAvg[[9,11,15],:], axis=0)
+        # polarAvg[1] = estsAvg[10, :]
+        # polarAvg[0] = estsAvg[3, :] #np.sum(estsAvg[[3,5,8],:], axis=0)
+        # polarAvg[7] = estsAvg[12, :]
+        # polarAvg[6] = estsAvg[13, :] #np.sum(estsAvg[[13,17,18],:], axis=0)
+        # polarAvg[5] = estsAvg[14, :]
+        # polarAvg[4] = estsAvg[4, :] #np.sum(estsAvg[[4,6,7],:], axis=0)
+        # polarAvg[3] = estsAvg[16, :]
 
-        # for color summation
-        polarAvg[8] = estsAvg[5, :]
-        polarAvg[9] = estsAvg[6, :]
-        polarAvg[10] = estsAvg[7, :]
-        polarAvg[11] = estsAvg[8, :]
+        # # for color summation
+        # polarAvg[8] = estsAvg[5, :]
+        # polarAvg[9] = estsAvg[6, :]
+        # polarAvg[10] = estsAvg[7, :]
+        # polarAvg[11] = estsAvg[8, :]
         
-        self.estsAvg = np.abs(np.transpose(np.array(polarAvg)))
+        # self.estsAvg = np.abs(np.transpose(np.array(polarAvg)))
+
         self.estsAvg = np.where(np.isnan(self.estsAvg), 0, self.estsAvg)
         self.estsAvg[self.estsAvg == np.inf] = 0
-        #self.estsAvg = np.clip(self.estsAvg*4, 0, 4)
+        self.estsAvg[self.estsAvg<0] = 0
+
         self.stimtime.append(time.time()-t)
 
     def plotColorFrame(self):
@@ -522,7 +532,7 @@ class ModelAnalysis(Actor):
         image = self.image
         color = np.stack([image, image, image, image], axis=-1).astype(np.uint8).copy()
         color[...,3] = 255
-            # color = self.color.copy() #TODO: don't stack image each time?
+            #TODO: don't stack image each time?
         if self.coords is not None:
             for i,c in enumerate(self.coords):
                 #c = np.array(c)
@@ -540,43 +550,24 @@ class ModelAnalysis(Actor):
         '''
         ests = self.estsAvg
         #ests = self.tune_k[0] 
-        if ests[ind] is not None: # and np.sum(np.abs(self.estsAvg[ind]))>2:
+        if ests[ind] is not None: 
             try:
-                # trying sort and compare
-                # rel = self.estsAvg[ind]/np.max(self.estsAvg[ind])
-                # order = np.argsort(rel)
-                # if rel[order[-1]] - rel[order[-2]] > 0.2: #ensure strongish tuning
-                    # r, g, b = self.manual_Color(order[-1])
-                    # return (r, g, b) + (255,)
-                # else:
-                #     # print(order, rel)
-                #     return (255, 255, 255, 50)
-
-                # trying summation coloring
-                return self.manual_Color_Sum(ests[ind])
-
-                # scale by intensity
-                # tc = np.nanargmax(self.estsAvg[ind])
-                # r, g, b,  = self.manual_Color_Sum(self.estsAvg[ind]) #self.manual_Color(tc)
-                # # h = (np.nanargmax(self.estsAvg[ind])*45)/360
-                # intensity = 1 #- np.mean(inten[0][0])/255.0
-                # # r, g, b, = colorsys.hls_to_rgb(h, intensity, 1)
-                # # r, g, b = [x*255.0 for x in (r, g, b)]
-                # return (r, g, b) + (intensity*255,)
-                
+                return self.manual_Color_Sum(ests[ind])                
             except ValueError:
                 return (255,255,255,0)
             except Exception:
                 print('inten is ', inten)
                 print('ests[i] is ', ests[ind])
         else:
-            return (255,255,255,50) #0)
+            return (255,255,255,50)
 
-    def manual_Color_Sum_k(self, x):
-        ''' x should be length 8 array for coloring
+    def manual_Color_Sum(self, x):
+        ''' x should be length 12 array for coloring
+            or, for k coloring, length 8
+            Using specific coloring scheme from Naumann lab
         '''
-
-        mat_weight = np.array([
+        if x.shape[0] == 8:
+            mat_weight = np.array([
             [1, 0.25, 0],
             [0.75, 1, 0],
             [0, 1, 0],
@@ -586,11 +577,29 @@ class ModelAnalysis(Actor):
             [1, 0, 1],
             [1, 0, 0.25],
         ])
+        elif x.shape[0] == 12:
+            mat_weight = np.array([
+                [1, 0.25, 0],
+                [0.75, 1, 0],
+                [0, 2, 0],
+                [0, 0.75, 1],
+                [0, 0.25, 1],
+                [0.25, 0, 1.],
+                [1, 0, 1],
+                [1, 0, 0.25],
+                [1, 0, 0],
+                [0, 0, 1],
+                [0, 0, 1],
+                [1, 0, 0]
+            ])
+        else:
+            print('Wrong shape for this coloring function')
+            return (255, 255, 255, 10)
 
         color = x @ mat_weight
 
-        blend = 0.8  #0.3
-        thresh = 0.2   #0.1
+        blend = 0.8  
+        thresh = 0.2   
         thresh_max = blend * np.max(color)
 
         color = np.clip(color, thresh, thresh_max)
@@ -599,45 +608,40 @@ class ModelAnalysis(Actor):
         color = np.nan_to_num(color)
 
         if color.any() and np.linalg.norm(color-np.ones(3))>0.35:
-            # print('color is ', color, 'with distance', np.linalg.norm(color-np.ones(3)))
             color *=255
             return (color[0], color[1], color[2], 255)       
         else:
             return (255, 255, 255, 10)
+    
+    def IDstim(self, s):
+        ''' Function to convert stim ID from Naumann lab experiment into
+            the 8 cardinal directions they correspond to.
+        ''' 
+        stim = -10
+        if s == 3:
+            stim = 0
+        elif s==10:
+            stim = 1
+        elif s==9:
+            stim = 2
+        elif s==16:
+            stim = 3
+        elif s==4:
+            stim = 4
+        elif s==14:
+            stim = 5
+        elif s==13:
+            stim = 6
+        elif s==12:
+            stim = 7
+        # add'l stim for specific coloring
+        elif s==5:
+            stim = 8
+        elif s==6:
+            stim = 9
+        elif s==7:
+            stim = 10
+        elif s==8:
+            stim = 11
 
-    def manual_Color_Sum(self, x):
-        ''' x should be length 12 array for coloring
-        '''
-
-        mat_weight = np.array([
-            [1, 0.25, 0],
-            [0.75, 1, 0],
-            [0, 2, 0],
-            [0, 0.75, 1],
-            [0, 0.25, 1],
-            [0.25, 0, 1.],
-            [1, 0, 1],
-            [1, 0, 0.25],
-            [1, 0, 0],
-            [0, 0, 1],
-            [0, 0, 1],
-            [1, 0, 0]
-        ])
-
-        color = x @ mat_weight
-
-        blend = 0.8  #0.3
-        thresh = 0.2   #0.1
-        thresh_max = blend * np.max(color)
-
-        color = np.clip(color, thresh, thresh_max)
-        color -= thresh
-        color /= thresh_max
-        color = np.nan_to_num(color)
-
-        if color.any() and np.linalg.norm(color-np.ones(3))>0.35:
-            # print('color is ', color, 'with distance', np.linalg.norm(color-np.ones(3)))
-            color *=255
-            return (color[0], color[1], color[2], 255)       
-        else:
-            return (255, 255, 255, 10)
+        return stim

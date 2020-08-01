@@ -60,8 +60,6 @@ class MeanAnalysis(Actor):
         np.savetxt('output/timing/analysiscolor_frame_time.txt', np.array(self.colortime))
         np.savetxt('output/timing/analysis_timestamp.txt', np.array(self.timestamp))
 
-        np.savetxt('output/final/analysis_tuning_curves.txt', np.array(self.polarAvg))
-
     def runAvg(self):
         ''' Take numpy estimates and frame_number
             Create X and Y for plotting

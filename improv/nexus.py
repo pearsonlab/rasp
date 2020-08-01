@@ -296,7 +296,7 @@ class Nexus():
             p.terminate()
             p.join()
 
-        logger.warning('Done with available frames')
+        logger.warning('Actors terminated')
         print('total time ', time.time()-self.t)
 
         self.destroyNexus()
@@ -382,8 +382,6 @@ class Nexus():
         logger.warning('Destroying Nexus')
         self._closeStore()
         logger.warning('Killed the central store')
-
-         
 
     def _closeStore(self):
         ''' Internal method to kill the subprocess
