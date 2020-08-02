@@ -87,22 +87,22 @@ class CaimanProcessor(Actor):
         np.savetxt('output/timing/putAnalysis_time.txt', np.array(self.putAnalysis_time))
         np.savetxt('output/timing/procFrame_time.txt', np.array(self.procFrame_time))
 
-        # before = self.params['init_batch']
-        # nb = self.onAc.params.get('init', 'nb')
-        # np.savetxt('raw_C.txt', np.array(self.onAc.estimates.C_on[nb:self.onAc.M, before:self.frame_number+before]))
+        before = self.params['init_batch']
+        nb = self.onAc.params.get('init', 'nb')
+        np.savetxt('output/raw_C.txt', np.array(self.onAc.estimates.C_on[nb:self.onAc.M, before:self.frame_number+before]))
 
         print('Number of times coords updated ', self.counter)
 
-        # with open('../S.pk', 'wb') as f:
+        # with open('output/S.pk', 'wb') as f:
         #     init = self.params['init_batch']
         #     S = np.stack([osi.s[init:] for osi in self.onAc.estimates.OASISinstances])
         #     print('--------Final S shape: ', S.shape)
         #     pickle.dump(S, f)
-        # with open('../A.pk', 'wb') as f:
-        #     nb = self.onAc.params.get('init', 'nb')
-        #     A = self.onAc.estimates.Ab[:, nb:]
-        #     print(type(A))
-        #     pickle.dump(A, f)
+        with open('output/A.pk', 'wb') as f:
+            nb = self.onAc.params.get('init', 'nb')
+            A = self.onAc.estimates.Ab[:, nb:]
+            print(type(A))
+            pickle.dump(A, f)
 
         if self.onAc.estimates.OASISinstances is not None:
             try:
@@ -269,9 +269,9 @@ class CaimanProcessor(Actor):
         #self.q_comm.put([self.frame_number])
 
         ## figures only
-        if self.frame_number in [100, 500, 1000, 2000, 2875]:
+        # if self.frame_number in [100, 500, 1000, 2000, 2875]:
             # save spikes
-            np.savetxt('output_snap/ests_S_frame'+str(self.frame_number)+'.txt', S)
+            # np.savetxt('output_snap/ests_S_frame'+str(self.frame_number)+'.txt', S)
 
         self.putAnalysis_time.append([time.time()-t, t2-t, t3-t2, t4-t3, t5-t4, t6-t5])
 

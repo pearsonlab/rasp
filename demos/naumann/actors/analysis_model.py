@@ -82,7 +82,7 @@ class ModelAnalysis(Actor):
         np.savetxt('output/analysis_proc_S.txt', np.array(self.S))
         np.savetxt('output/analysis_LL.txt', np.array(self.LL))
         
-        np.savetxt('output_snap/stims.txt', self.currStimID)
+        np.savetxt('output/used_stims.txt', self.currStimID)
 
     def runStep(self):
         ''' Take numpy estimates and frame_number
@@ -145,14 +145,14 @@ class ModelAnalysis(Actor):
                 self.Call = self.C #already a windowed version #[:,self.frame-window:self.frame]
             
             ## for figures only
-            if self.frame in [200, 500, 1000, 2000, 2875]:
-                # save weights
-                N = self.p["numNeurons"]
-                np.savetxt('output_snap/model_weights_frame'+str(self.frame)+'.txt', self.theta[:N*N].reshape((N,N)))
-                # save calcium traces
-                np.savetxt('output_snap/ests_C_frame'+str(self.frame)+'.txt', self.C)
-                # save computed tuning curves
-                np.savetxt('output_snap/tuning_curves_frame'+str(self.frame)+'.txt', self.estsAvg)
+            # if self.frame in [200, 500, 1000, 2000, 2875]:
+            #     # save weights
+            #     N = self.p["numNeurons"]
+            #     np.savetxt('output_snap/model_weights_frame'+str(self.frame)+'.txt', self.theta[:N*N].reshape((N,N)))
+            #     # save calcium traces
+            #     np.savetxt('output_snap/ests_C_frame'+str(self.frame)+'.txt', self.C)
+            #     # save computed tuning curves
+            #     np.savetxt('output_snap/tuning_curves_frame'+str(self.frame)+'.txt', self.estsAvg)
 
             self.putAnalysis()
             self.timestamp.append([time.time(), self.frame])
