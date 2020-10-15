@@ -8,7 +8,7 @@ actors:
     package: actors.acquire_zmq
     class: ZMQAcquirer
     ip: 10.122.170.21
-    ports: [4701,4702]
+    ports: [4701,4702,4703]
 
   Processor:
     package: demos.naumann.actors.processor

@@ -82,7 +82,7 @@ class ModelAnalysis(Actor):
         np.savetxt('output/analysis_proc_S.txt', np.array(self.S))
         np.savetxt('output/analysis_LL.txt', np.array(self.LL))
         
-        np.savetxt('output_snap/stims.txt', self.currStimID)
+        np.savetxt('output/used_stims.txt', self.currStimID)
 
     def runStep(self):
         ''' Take numpy estimates and frame_number
