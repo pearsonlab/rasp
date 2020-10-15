@@ -203,7 +203,8 @@ class FrontEnd(QtGui.QMainWindow, improv_fit.Ui_MainWindow):
             self.rawplot_2.ui.histogram.vb.setLimits(yMin=8, yMax=255)
 
         if self.visual.showConnectivity and weight is not None:
-            self.rawplot_3.setImage(weight*100)
+            if np.sum(np.abs(weight))>0.1:
+                self.rawplot_3.setImage(weight*100)
             # colordata = (np.array(cmapToColormap(cm.viridis).color) * 255).astype(np.uint8)
             # cmap = ColorMap(pos=np.linspace(0, 1, len(colordata)), color=colordata)
             # self.rawplot_3.setColorMap(cmap)

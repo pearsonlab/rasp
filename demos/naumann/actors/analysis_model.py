@@ -114,9 +114,9 @@ class ModelAnalysis(Actor):
             self.stimAvg_start()
 
             # fit to model once we have enough neurons
-            if self.C.shape[0]>=self.p['numNeurons']:
-                if self.frame % 5 == 0:
-                    self.fit()
+            if self.C.shape[0]>=self.p['numNeurons'] and self.frame>5:
+                # if self.frame % 5 == 0:
+                self.fit()
             
             self.globalAvg = np.mean(self.estsAvg[:,:8], axis=0)
             self.tune = [self.estsAvg[:,:8], self.globalAvg]
@@ -145,14 +145,14 @@ class ModelAnalysis(Actor):
                 self.Call = self.C #already a windowed version #[:,self.frame-window:self.frame]
             
             ## for figures only
-            if self.frame in [200, 500, 1000, 2000, 2875]:
-                # save weights
-                N = self.p["numNeurons"]
-                np.savetxt('output_snap/model_weights_frame'+str(self.frame)+'.txt', self.theta[:N*N].reshape((N,N)))
-                # save calcium traces
-                np.savetxt('output_snap/ests_C_frame'+str(self.frame)+'.txt', self.C)
-                # save computed tuning curves
-                np.savetxt('output_snap/tuning_curves_frame'+str(self.frame)+'.txt', self.estsAvg)
+            # if self.frame in [200, 500, 1000, 2000, 2875]:
+            #     # save weights
+            #     N = self.p["numNeurons"]
+            #     np.savetxt('output_snap/model_weights_frame'+str(self.frame)+'.txt', self.theta[:N*N].reshape((N,N)))
+            #     # save calcium traces
+            #     np.savetxt('output_snap/ests_C_frame'+str(self.frame)+'.txt', self.C)
+            #     # save computed tuning curves
+            #     np.savetxt('output_snap/tuning_curves_frame'+str(self.frame)+'.txt', self.estsAvg)
 
             self.putAnalysis()
             self.timestamp.append([time.time(), self.frame])
@@ -371,9 +371,11 @@ class ModelAnalysis(Actor):
 
             self.stimStart is the frame where the stimulus started.
         '''
+        print('got stim ', stim)
         # get frame number and stimID
         frame = list(stim.keys())[0]
-        whichStim = stim[frame][0]
+        print('got frame ', frame)
+        whichStim = stim[frame]#[0]
         # convert stimID into 8 cardinal directions
         stimID = self.IDstim(int(whichStim))
 
@@ -386,27 +388,30 @@ class ModelAnalysis(Actor):
                     # # account for stimuli we haven't yet seen
                     # if stimID not in self.stimStart.keys():
                     #     self.stimStart.update({stimID:None})
+
             # determine if this is a new stimulus trial
-            if abs(stim[frame][1])>1 :
-                curStim = 1 #on
-                self.allStims[stimID].append(frame)
-            else:
-                curStim = 0 #off
+            # if abs(stim[frame][1])>1 :
+            curStim = 1 #on
+            self.allStims[stimID].append(frame)
+            for i in range(10):
+                self.allStims[stimID].append(frame+i+1)
+            # else:
+            #     curStim = 0 #off
             # paradigm for these trials is for each stim: [off, on, off]
-            if self.lastOnOff is None:
-                self.lastOnOff = curStim
-            elif self.lastOnOff == 0 and curStim == 1: #was off, now on
+            # if self.lastOnOff is None:
+            #     self.lastOnOff = curStim
+            # elif self.lastOnOff == 0 and curStim == 1: #was off, now on
                 # select this frame as the starting point of the new trial
                 # and stimulus has started to be shown
                 # All other computations will reference this point
-                self.stimStart = frame 
-                self.currentStim = stimID
-                if stimID<8:
-                    self.currStimID[stimID, frame] = 1
-                # NOTE: this overwrites historical info on past trials
-                logger.info('Stim {} started at {}'.format(stimID,frame))
-            else:
-                self.currStimID[:, frame] = np.zeros(8)
+            self.stimStart = frame 
+            self.currentStim = stimID
+            if stimID<8:
+                self.currStimID[stimID, frame] = 1
+            # NOTE: this overwrites historical info on past trials
+            logger.info('Stim {} started at {}'.format(stimID,frame))
+            # else:
+            #     self.currStimID[:, frame] = np.zeros(8)
             self.lastOnOff = curStim
 
     def putAnalysis(self):
@@ -451,8 +456,8 @@ class ModelAnalysis(Actor):
                 self.counter[self.currentStim, 1] += 10
 
             elif self.frame in range(self.stimStart+1, self.frame+26):
-                print(self.currentStim)
-                print(self.frame)
+                # print(self.currentStim)
+                # print(self.frame)
                 # continue computing the running mean for this trial
                 # print(self.frame)
                 # print(self.stimStart)
@@ -618,30 +623,47 @@ class ModelAnalysis(Actor):
             the 8 cardinal directions they correspond to.
         ''' 
         stim = -10
+        # if s == 3:
+        #     stim = 0
+        # elif s==10:
+        #     stim = 1
+        # elif s==9:
+        #     stim = 2
+        # elif s==16:
+        #     stim = 3
+        # elif s==4:
+        #     stim = 4
+        # elif s==14:
+        #     stim = 5
+        # elif s==13:
+        #     stim = 6
+        # elif s==12:
+        #     stim = 7
+        # # add'l stim for specific coloring
+        # elif s==5:
+        #     stim = 8
+        # elif s==6:
+        #     stim = 9
+        # elif s==7:
+        #     stim = 10
+        # elif s==8:
+        #     stim = 11
+
         if s == 3:
             stim = 0
-        elif s==10:
+        elif s == 9:
             stim = 1
-        elif s==9:
+        elif s == 15:
             stim = 2
-        elif s==16:
+        elif s == 21:
             stim = 3
-        elif s==4:
+        elif s == 27:
             stim = 4
-        elif s==14:
+        elif s == 33:
             stim = 5
-        elif s==13:
+        elif s == 39:
             stim = 6
-        elif s==12:
+        elif s == 45:
             stim = 7
-        # add'l stim for specific coloring
-        elif s==5:
-            stim = 8
-        elif s==6:
-            stim = 9
-        elif s==7:
-            stim = 10
-        elif s==8:
-            stim = 11
 
         return stim

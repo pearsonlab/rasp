@@ -1,0 +1,36 @@
+actors:
+  GUI:
+    package: actors.visual_model
+    class: DisplayVisual
+    visual: Visual
+
+  Acquirer:
+    package: improv.actors.acquire
+    class: TiffAcquirer
+    filename: data/recent/xx.tif
+    framerate: 2
+
+  Processor:
+    package: actors.processor
+    class: CaimanProcessor
+    init_filename: data/recent/xx.tif
+    config_file: naumann_caiman_params.txt
+
+  Visual:
+    package: actors.visual_model
+    class: CaimanVisual
+  
+  Analysis:
+    package: actors.analysis_model
+    class: ModelAnalysis
+
+  InputStim:
+    package: improv.actors.acquire
+    class: StimAcquirer
+    filename: data/recent/stim_freq.txt
+
+connections:
+  Acquirer.q_out: [Processor.q_in, Visual.raw_frame_queue]
+  Processor.q_out: [Analysis.q_in]
+  Analysis.q_out: [Visual.q_in]
+  InputStim.q_out: [Analysis.input_stim_queue]

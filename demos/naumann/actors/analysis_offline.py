@@ -205,8 +205,8 @@ def updateTheta(theta, m, v, newN):
 if __name__=="__main__":
     # load data
     # import numpy
-    C = np.loadtxt(open('output_snap/ests_C_frame2875.txt', 'rb'), delimiter=' ')
-    stim = np.loadtxt(open('output_snap/stims.txt', 'rb'), delimiter=' ')[:,:2875]
+    C = np.loadtxt(open('out_snap_100win/ests_S_frame2875.txt', 'rb'), delimiter=' ')
+    stim = np.loadtxt(open('out_snap_100win/stims.txt', 'rb'), delimiter=' ')[:,:2875]
     
     # C = np.asarray(C)
     # stim = np.asarray(stim)

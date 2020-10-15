@@ -122,15 +122,17 @@ class StimAcquirer(Actor):
 
     def setup(self):
         self.n= 0
+        self.sID = 0
         if os.path.exists(self.filename):
             print('Looking for ', self.filename)
             n, ext = os.path.splitext(self.filename)[:2]
             if ext== ".txt":
-                self.stim=[]
-                f = np.loadtxt(self.filename)
-                for _, frame in enumerate(f):
-                    stiminfo= frame[0:2]
-                    self.stim.append(stiminfo)
+                self.stim = np.loadtxt(self.filename)
+                # self.stim=[]
+                # f = np.loadtxt(self.filename)
+                # for _, frame in enumerate(f):
+                #     stiminfo = frame[0:2]
+                #     self.stim.append(stiminfo)
             else: 
                 logger.error('Cannot load file, bad extension')
                 raise Exception
@@ -146,9 +148,11 @@ class StimAcquirer(Actor):
     def getInput(self):
         ''' Check for input from behavioral control
         '''
-        if (self.n<len(self.stim)):
-            self.q_out.put({self.n:self.stim[self.n]})
-        time.sleep(0.068)   # simulate a particular stimulus rate
+        if (self.n%28==0): #self.n<len(self.stim)
+            s = self.stim[self.sID]
+            self.sID+=1
+            self.q_out.put({self.n:s})
+        time.sleep(0.5)   # simulate a particular stimulus rate
         self.n+=1
 
 
