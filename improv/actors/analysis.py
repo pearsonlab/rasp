@@ -2,6 +2,7 @@ import time
 import cv2
 import numpy as np
 from queue import Empty
+import os
 
 from improv.actor import Actor, Spike, RunManager
 from improv.store import ObjectNotFoundError
@@ -55,6 +56,16 @@ class MeanAnalysis(Actor):
         print('Analysis broke, avg time per stim avg: ', np.mean(self.stimtime))
         print('Analysis got through ', self.frame, ' frames')
 
+        if not os._exists('output'):
+            try:
+                os.makedirs('output')
+            except:
+                pass
+        if not os._exists('output/timing'):
+            try:
+                os.makedirs('output/timing')
+            except:
+                pass
         np.savetxt('output/timing/analysis_frame_time.txt', np.array(self.total_times))
         np.savetxt('output/timing/analysisput_frame_time.txt', np.array(self.puttime))
         np.savetxt('output/timing/analysiscolor_frame_time.txt', np.array(self.colortime))

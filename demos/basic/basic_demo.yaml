@@ -8,7 +8,7 @@ actors:
     package: improv.actors.acquire
     class: FileAcquirer
     filename: data/Tolias_mesoscope_2.hdf5
-    framerate: 30
+    framerate: 15
 
   Processor:
     package: actors.basic_processor
@@ -35,5 +35,5 @@ connections:
   Analysis.q_out: [Visual.q_in]
   InputStim.q_out: [Analysis.input_stim_queue]
 
-settings:
-  use_watcher: [Acquirer, Processor, Visual, Analysis]
+# settings:
+#   use_watcher: [Acquirer, Processor, Visual, Analysis]

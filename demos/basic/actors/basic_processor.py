@@ -47,6 +47,16 @@ class BasicProcessor(CaimanProcessor):
 
         print('Processor broke, avg time per frame: ', np.mean(self.total_times, axis=0))
         print('Processor got through ', self.frame_number, ' frames')
+        if not os._exists('output'):
+            try:
+                os.makedirs('output')
+            except:
+                pass
+        if not os._exists('output/timing'):
+            try:
+                os.makedirs('output/timing')
+            except:
+                pass
         np.savetxt('output/timing/process_frame_time.txt', np.array(self.total_times))
         np.savetxt('output/timing/process_timestamp.txt', np.array(self.timestamp))
 
@@ -110,8 +120,8 @@ class BasicProcessor(CaimanProcessor):
         t2 = time.time()
         
         image = self.makeImage()
-        if self.frame_number == 1:
-            np.savetxt('output/image.txt', np.array(image))
+        # if self.frame_number == 1:
+        #     np.savetxt('output/image.txt', np.array(image))
         t3 = time.time()
         dims = image.shape
         self._updateCoords(A,dims)
@@ -125,11 +135,13 @@ class BasicProcessor(CaimanProcessor):
 
         t5 = time.time()
 
-        if self.frame_number %50 == 0:
-            self.put(ids, save= [False, True, False, False])
+        # if self.frame_number %50 == 0:
+        #     self.put(ids, save= [False, True, False, False])
 
-        else:
-            self.put(ids, save= [False]*4)
+        # else:
+        # self.put(ids, save=[False]*4)
+
+        self.put(ids)
 
         t6= time.time()
 

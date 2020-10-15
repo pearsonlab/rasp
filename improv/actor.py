@@ -18,6 +18,7 @@ class Actor():
         ''' Require a name for multiple instances of the same actor/class
             Create initial empty dict of Links for easier referencing
         '''
+        self.q_watchout = None
         self.name = name
         self.links = links
         self.done = False # TODO: obsolete, remove
@@ -106,7 +107,8 @@ class Actor():
  
         for i in range(len(idnames)):
             if save[i]:
-                self.q_watchout.put(idnames[i])
+                if self.q_watchout:
+                    self.q_watchout.put(idnames[i])
 
 
     def run(self):

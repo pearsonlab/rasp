@@ -58,12 +58,18 @@ class FileAcquirer(Actor):
             
         print('Done running Acquire, avg time per frame: ', np.mean(self.total_times))
         print('Acquire got through ', self.frame_num, ' frames')
+        if not os._exists('output'):
+            try:
+                os.makedirs('output')
+            except:
+                pass
+        if not os._exists('output/timing'):
+            try:
+                os.makedirs('output/timing')
+            except:
+                pass
         np.savetxt('output/timing/acquire_frame_time.txt', np.array(self.total_times))
         np.savetxt('output/timing/acquire_timestamp.txt', np.array(self.timestamp))
-
-        print('------- Acquirer loop time: '+ str(self.loop_time))
-        print('------- Acquirer putq time: '+ str(self.putq_time))
-        print('------- Acquirer putstore time: '+ str(self.putstore_time))
 
     def runAcquirer(self):
         '''While frames exist in location specified during setup,
@@ -127,14 +133,14 @@ class StimAcquirer(Actor):
             print('Looking for ', self.filename)
             n, ext = os.path.splitext(self.filename)[:2]
             if ext== ".txt":
-                self.stim = np.loadtxt(self.filename)
-                # self.stim=[]
-                # f = np.loadtxt(self.filename)
-                # for _, frame in enumerate(f):
-                #     stiminfo = frame[0:2]
-                #     self.stim.append(stiminfo)
+                # self.stim = np.loadtxt(self.filename)
+                self.stim=[]
+                f = np.loadtxt(self.filename)
+                for _, frame in enumerate(f):
+                    stiminfo = frame[0:2]
+                    self.stim.append(stiminfo)
             else: 
-                logger.error('Cannot load file, bad extension')
+                logger.error('Cannot load file, possible bad extension')
                 raise Exception
 
         else: raise FileNotFoundError
@@ -148,10 +154,10 @@ class StimAcquirer(Actor):
     def getInput(self):
         ''' Check for input from behavioral control
         '''
-        if (self.n%28==0): #self.n<len(self.stim)
-            s = self.stim[self.sID]
-            self.sID+=1
-            self.q_out.put({self.n:s})
+        if self.n<len(self.stim):
+            # s = self.stim[self.sID]
+            # self.sID+=1
+            self.q_out.put({self.n:self.stim[self.n]})
         time.sleep(0.5)   # simulate a particular stimulus rate
         self.n+=1
 

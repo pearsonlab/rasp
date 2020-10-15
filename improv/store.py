@@ -45,7 +45,7 @@ class Limbo(StoreInterface):
     '''
 
     def __init__(self, name='default', store_loc='/tmp/store',
-                 hdd_loc='output/', use_hdd=False, hdd_maxstore=1e12,
+                 hdd_path='output/', use_hdd=False, hdd_maxstore=1e12,
                  flush_immediately=False, commit_freq=20):
         # TODO TODO TODO: Refactor to use local hdd settings instead of put and get
         ''' Constructor for Limbo
